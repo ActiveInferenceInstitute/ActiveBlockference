@@ -1,6 +1,29 @@
-# ActiveBlockference
+# 💡 ActiveBlockference
 
 This is a work-in-progress repository for active inference agents in cadCAD.
+
+## 🚧 Getting Started
+
+```
+# clone the repo
+
+git clone https://github.com/ActiveInferenceLab/ActiveBlockference.git
+
+cd ActiveBlockference/
+
+# create new python enviornment
+
+python -m venv cad
+
+# activate the environment
+
+source cad/bin/activate
+
+# install requirements
+
+pip install -r requirements.txt
+```
+
 
 ## Developing Active Inference Agents in cadCAD
 
