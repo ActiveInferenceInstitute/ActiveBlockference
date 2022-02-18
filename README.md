@@ -29,8 +29,9 @@ In cadCAD terms:
     - `calc_action_posterior`
     - `sample_action`
     - `calc_next_prior`
+    - `update_env_state`
 - states:
     - `prior_A`
     - `prior_B`
     - `prior_C`
-    - `env_sate`
+    - `env_state`
