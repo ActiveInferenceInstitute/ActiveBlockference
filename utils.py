@@ -6,6 +6,8 @@ import pandas as pd
 
 import warnings
 import itertools
+from pymdp.maths import softmax
+from pymdp.maths import spm_log_single as log_stable
 
 EPS_VAL = 1e-16 # global constant for use in norm_dist()
 

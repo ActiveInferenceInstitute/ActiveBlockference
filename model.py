@@ -14,17 +14,22 @@ class ActiveGridference():
     - (initial state) D -> the generative model's prior belief over hidden states at the first timestep
     - (affordances) E -> the generative model's available actions 
     """
-    def __init__(self, grid, actions: list) -> None:
+    def __init__(self, grid) -> None:
         self.A = None
         self.B = None
         self.C = None
         self.D = None
-        self.E = actions
+        self.E = ["UP", "DOWN", "LEFT", "RIGHT", "STAY"]
 
         # environment
         self.grid = grid
         self.n_states = len(self.grid)
         self.n_observations = len(self.grid)
+        self.border = np.sqrt(self.n_states) - 1
+
+        if self.grid is not None:
+            self.get_A()
+            self.get_B()
 
     def get_A(self):
         """
@@ -49,13 +54,13 @@ class ActiveGridference():
                     next_y = y - 1 if y > 0 else y 
                     next_x = x
                 elif action_label == "DOWN":
-                    next_y = y + 1 if y < 2 else y 
+                    next_y = y + 1 if y < self.border else y 
                     next_x = x
                 elif action_label == "LEFT":
                     next_x = x - 1 if x > 0 else x 
                     next_y = y
                 elif action_label == "RIGHT":
-                    next_x = x + 1 if x < 2 else x 
+                    next_x = x + 1 if x < self.border else x 
                     next_y = y
                 elif action_label == "STAY":
                     next_x = x
