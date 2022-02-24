@@ -21,6 +21,8 @@ class ActiveGridference():
         self.D = None
         self.E = ["UP", "DOWN", "LEFT", "RIGHT", "STAY"]
 
+        self.policy_len = 2
+
         # environment
         self.grid = grid
         self.n_states = len(self.grid)
