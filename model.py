@@ -14,14 +14,14 @@ class ActiveGridference():
     - (initial state) D -> the generative model's prior belief over hidden states at the first timestep
     - (affordances) E -> the generative model's available actions 
     """
-    def __init__(self, grid) -> None:
+    def __init__(self, grid, planning_length: int = 2) -> None:
         self.A = None
         self.B = None
         self.C = None
         self.D = None
         self.E = ["UP", "DOWN", "LEFT", "RIGHT", "STAY"]
 
-        self.policy_len = 2
+        self.policy_len = planning_length
 
         # environment
         self.grid = grid
