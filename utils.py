@@ -6,10 +6,19 @@ import pandas as pd
 
 import warnings
 import itertools
-from pymdp.maths import softmax
 from pymdp.maths import spm_log_single as log_stable
 
 EPS_VAL = 1e-16 # global constant for use in norm_dist()
+
+def softmax(dist, weight=0):
+    """ 
+    Computes the softmax function on a set of values
+    """
+
+    output = dist - dist.max(axis=0)
+    output = np.exp(output)
+    output = output / np.sum(output, axis=0)
+    return output
 
 def sample(probabilities):
     sample_onehot = np.random.multinomial(1, probabilities.squeeze())
@@ -663,13 +672,13 @@ def plot_beliefs(belief_dist, title_str=""):
 
 # ActInf functions
 
-def infer_states(observation_index, A, prior):
+def infer_states(observation_index, A, prior, noise):
   
   log_likelihood = log_stable(A[observation_index,:])
 
   log_prior = log_stable(prior)
 
-  qs = softmax(log_likelihood + log_prior)
+  qs = softmax(log_likelihood + log_prior, noise)
    
   return qs
 def get_expected_states(B, qs_current, action):

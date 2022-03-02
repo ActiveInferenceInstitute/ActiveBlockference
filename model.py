@@ -14,7 +14,7 @@ class ActiveGridference():
     - (initial state) D -> the generative model's prior belief over hidden states at the first timestep
     - (affordances) E -> the generative model's available actions 
     """
-    def __init__(self, grid, planning_length: int = 2) -> None:
+    def __init__(self, grid, planning_length: int = 2, env_state: tuple = (0, 0)) -> None:
         self.A = None
         self.B = None
         self.C = None
@@ -28,6 +28,12 @@ class ActiveGridference():
         self.n_states = len(self.grid)
         self.n_observations = len(self.grid)
         self.border = np.sqrt(self.n_states) - 1
+
+        # active
+        self.prior = self.D
+        self.current_action = ''
+        self.current_inference = ''
+        self.env_state = env_state
 
         if self.grid is not None:
             self.get_A()
@@ -78,3 +84,4 @@ class ActiveGridference():
     def get_D(self, initial_state):
         """Initial State"""
         self.D = utils.onehot(self.grid.index( initial_state ), self.n_states)
+        self.prior = self.D
