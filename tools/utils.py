@@ -572,7 +572,7 @@ def build_belief_array(qx):
     num_factors = len(qx[0][0])
 
     if num_factors > 1:
-        belief_array = utils.obj_array(num_factors)
+        belief_array = obj_array(num_factors)
         for factor in range(num_factors):
             belief_array[factor] = np.zeros( (num_policies, qx[0][0][factor].shape[0], num_timesteps) )
         for policy_i in range(num_policies):
@@ -601,9 +601,9 @@ def build_xn_vn_array(xn):
     num_factors = len(xn[0][0])
 
     if num_factors > 1:
-        xn_array = utils.obj_array(num_factors)
+        xn_array = obj_array(num_factors)
         for factor in range(num_factors):
-            num_states, infer_len = xn[0][0][f].shape
+            num_states, infer_len = xn[0][0].shape
             xn_array[factor] = np.zeros( (num_itr, num_states, infer_len, num_policies) )
         for policy_i in range(num_policies):
             for itr in range(num_itr):
