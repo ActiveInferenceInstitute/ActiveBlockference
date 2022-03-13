@@ -155,3 +155,69 @@ def actinf_graph(agent_network):
         agent_updates.append(agent_update)
 
     return {'agent_updates': agent_updates}
+
+def actinf_dict(agents_dict):
+    # list of all updates to the agents in the network
+    agent_updates = []
+
+    for source, agent in agents_dict.items():
+
+        policies = construct_policies([agent.n_states], [len(agent.E)], policy_len = agent.policy_len)
+        # get obs_idx
+        obs_idx = grid.index(agent.env_state)
+
+        # infer_states
+        qs_current = u.infer_states(obs_idx, agent.A, agent.prior)
+
+        # calc efe
+        _G = u.calculate_G_policies(agent.A, agent.B, agent.C, qs_current, policies=policies)
+
+        # calc action posterior
+        Q_pi = u.softmax(-_G)
+        # compute the probability of each action
+        P_u = u.compute_prob_actions(agent.E, policies, Q_pi)
+        
+        # sample action
+        chosen_action = u.sample(P_u)
+
+        # calc next prior
+        prior = agent.B[:,:,chosen_action].dot(qs_current) 
+
+        # update env state
+        # action_label = params['actions'][chosen_action]
+
+        (Y, X) = agent.env_state
+        Y_new = Y
+        X_new = X
+        # here
+
+        if chosen_action == 0: # UP
+            
+            Y_new = Y - 1 if Y > 0 else Y
+            X_new = X
+
+        elif chosen_action == 1: # DOWN
+
+            Y_new = Y + 1 if Y < agent.border else Y
+            X_new = X
+
+        elif chosen_action == 2: # LEFT
+            Y_new = Y
+            X_new = X - 1 if X > 0 else X
+
+        elif chosen_action == 3: # RIGHT
+            Y_new = Y
+            X_new = X +1 if X < agent.border else X
+
+        elif chosen_action == 4: # STAY
+            Y_new, X_new = Y, X 
+            
+        current_state = (Y_new, X_new) # store the new grid location
+        agent_update = {'source': source,
+                        'update_prior': prior,
+                        'update_env': current_state,
+                        'update_action': chosen_action,
+                        'update_inference': qs_current}
+        agent_updates.append(agent_update)
+
+    return {'agent_updates': agent_updates}
