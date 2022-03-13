@@ -1,5 +1,5 @@
 import numpy as np
-import tools.utils as utils
+import utils
 
 class ActiveGridference():
     """
