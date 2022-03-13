@@ -176,7 +176,7 @@ def actinf_dict(agents_dict):
         Q_pi = u.softmax(-_G)
         # compute the probability of each action
         P_u = u.compute_prob_actions(agent.E, policies, Q_pi)
-        
+
         # sample action
         chosen_action = u.sample(P_u)
 
