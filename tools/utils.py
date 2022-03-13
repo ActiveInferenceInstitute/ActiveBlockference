@@ -10,7 +10,7 @@ from pymdp.maths import spm_log_single as log_stable
 
 EPS_VAL = 1e-16 # global constant for use in norm_dist()
 
-def softmax(dist, weight=0):
+def softmax(dist):
     """ 
     Computes the softmax function on a set of values
     """
@@ -672,13 +672,13 @@ def plot_beliefs(belief_dist, title_str=""):
 
 # ActInf functions
 
-def infer_states(observation_index, A, prior, noise):
+def infer_states(observation_index, A, prior):
   
   log_likelihood = log_stable(A[observation_index,:])
 
   log_prior = log_stable(prior)
 
-  qs = softmax(log_likelihood + log_prior, noise)
+  qs = softmax(log_likelihood + log_prior)
    
   return qs
 def get_expected_states(B, qs_current, action):
