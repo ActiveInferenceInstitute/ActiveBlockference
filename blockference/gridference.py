@@ -156,7 +156,7 @@ def actinf_graph(agent_network):
 
     return {'agent_updates': agent_updates}
 
-def actinf_dict(agents_dict):
+def actinf_dict(agents_dict, g_agent):
     # list of all updates to the agents in the network
     agent_updates = []
 
@@ -164,7 +164,7 @@ def actinf_dict(agents_dict):
 
         policies = construct_policies([agent.n_states], [len(agent.E)], policy_len = agent.policy_len)
         # get obs_idx
-        obs_idx = grid.index(agent.env_state)
+        obs_idx = g_agent.grid.index(agent.env_state)
 
         # infer_states
         qs_current = u.infer_states(obs_idx, agent.A, agent.prior)
@@ -221,3 +221,8 @@ def actinf_dict(agents_dict):
         agent_updates.append(agent_update)
 
     return {'agent_updates': agent_updates}
+
+
+class GridAgent():
+    def __init__(self, grid) -> None:
+        self.grid = grid
