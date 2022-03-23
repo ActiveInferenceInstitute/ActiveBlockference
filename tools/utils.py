@@ -479,12 +479,12 @@ def create_A_matrix_stub(model_labels):
         # obs_combinations += num_state_combos * list(itertools.product(*levels_to_combine))
         obs_combinations += list(itertools.product(*levels_to_combine))
 
+    obs_combinations = pd.MultiIndex.from_tuples(obs_combinations, names=["Modality", "Level"])
 
-    obs_combinations = pd.MultiIndex.from_tuples(obs_combinations, names = ["Modality", "Level"])
-
-    A_matrix = pd.DataFrame(cell_values, index = obs_combinations, columns=state_combinations)
+    A_matrix = pd.DataFrame(cell_values, index=obs_combinations, columns=state_combinations)
 
     return A_matrix
+
 
 def create_B_matrix_stubs(model_labels):
 
@@ -509,12 +509,13 @@ def create_B_matrix_stubs(model_labels):
         cell_values = np.zeros((num_rows, num_state_action_combos))
 
         next_state_list = state_labels[factor]
-        
-        B_matrix_f = pd.DataFrame(cell_values, index = next_state_list, columns=prev_state_action_combos)
+
+        B_matrix_f = pd.DataFrame(cell_values, index=next_state_list, columns=prev_state_action_combos)
 
         B_matrices[factor] = B_matrix_f
 
     return B_matrices
+
 
 def read_A_matrix(path, num_hidden_state_factors):
     raw_table = pd.read_excel(path, header=None)
@@ -528,13 +529,14 @@ def read_A_matrix(path, num_hidden_state_factors):
         header=list(range(level_counts["header"]))
         ).astype(np.float64)
 
+
 def read_B_matrices(path):
 
-    all_sheets = pd.read_excel(path, sheet_name = None, header=None)
+    all_sheets = pd.read_excel(path, sheet_name=None, header=None)
 
     level_counts = {}
     for sheet_name, raw_table in all_sheets.items():
-    
+
         level_counts[sheet_name] = {
             "index": raw_table.iloc[0, :].dropna().index[0]+1,
             "header": raw_table.iloc[0, :].dropna().index[0]+2,
@@ -544,18 +546,19 @@ def read_B_matrices(path):
     for sheet_name, level_counts_sheet in level_counts.items():
         sheet_f = pd.read_excel(
             path,
-            sheet_name = sheet_name,
+            sheet_name=sheet_name,
             index_col=list(range(level_counts_sheet["index"])),
             header=list(range(level_counts_sheet["header"]))
             ).astype(np.float64)
         stub_dict[sheet_name] = sheet_f
-        
+
     return stub_dict
+
 
 def convert_A_stub_to_ndarray(A_stub, model_labels):
     """
     This function converts a multi-index pandas dataframe `A_stub` into an object array of different
-    A matrices, one per observation modality. 
+    A matrices, one per observation modality.
     """
 
     num_obs, num_modalities, num_states, num_factors = get_model_dimensions_from_labels(model_labels)
@@ -568,28 +571,29 @@ def convert_A_stub_to_ndarray(A_stub, model_labels):
 
     return A
 
+
 def convert_B_stubs_to_ndarray(B_stubs, model_labels):
     """
     This function converts a list of multi-index pandas dataframes `B_stubs` into an object array
     of different B matrices, one per hidden state factor
     """
 
-    _, _, num_states, num_factors, num_controls, num_control_fac  = get_model_dimensions_from_labels(model_labels)
+    _, _, num_states, num_factors, num_controls, num_control_fac = get_model_dimensions_from_labels(model_labels)
 
     B = obj_array(num_factors)
 
     for f, factor_name in enumerate(B_stubs.keys()):
-        
+
         B[f] = B_stubs[factor_name].to_numpy().reshape(num_states[f], num_states[f], num_controls[f])
         assert (B[f].sum(axis=0) == 1.0).all(), 'B matrix not normalized! Check your initialization....\n'
 
     return B
 
-def build_belief_array(qx):
 
+def build_belief_array(qx):
     """
     This function constructs array-ified (not nested) versions
-    of the posterior belief arrays, that are separated 
+    of the posterior belief arrays, that are separated
     by policy, timepoint, and hidden state factor
     """
 
@@ -600,25 +604,25 @@ def build_belief_array(qx):
     if num_factors > 1:
         belief_array = obj_array(num_factors)
         for factor in range(num_factors):
-            belief_array[factor] = np.zeros( (num_policies, qx[0][0][factor].shape[0], num_timesteps) )
+            belief_array[factor] = np.zeros((num_policies, qx[0][0][factor].shape[0], num_timesteps))
         for policy_i in range(num_policies):
             for timestep in range(num_timesteps):
                 for factor in range(num_factors):
                     belief_array[factor][policy_i, :, timestep] = qx[policy_i][timestep][factor]
     else:
         num_states = qx[0][0][0].shape[0]
-        belief_array = np.zeros( (num_policies, num_states, num_timesteps) )
+        belief_array = np.zeros((num_policies, num_states, num_timesteps))
         for policy_i in range(num_policies):
             for timestep in range(num_timesteps):
                 belief_array[policy_i, :, timestep] = qx[policy_i][timestep][0]
-    
+
     return belief_array
 
-def build_xn_vn_array(xn):
 
+def build_xn_vn_array(xn):
     """
     This function constructs array-ified (not nested) versions
-    of the posterior xn (beliefs) or vn (prediction error) arrays, that are separated 
+    of the posterior xn (beliefs) or vn (prediction error) arrays, that are separated
     by iteration, hidden state factor, timepoint, and policy
     """
 
@@ -630,47 +634,48 @@ def build_xn_vn_array(xn):
         xn_array = obj_array(num_factors)
         for factor in range(num_factors):
             num_states, infer_len = xn[0][0].shape
-            xn_array[factor] = np.zeros( (num_itr, num_states, infer_len, num_policies) )
+            xn_array[factor] = np.zeros((num_itr, num_states, infer_len, num_policies))
         for policy_i in range(num_policies):
             for itr in range(num_itr):
                 for factor in range(num_factors):
-                    xn_array[factor][itr,:,:,policy_i] = xn[policy_i][itr][factor]
+                    xn_array[factor][itr, :, :, policy_i] = xn[policy_i][itr][factor]
     else:
-        num_states, infer_len  = xn[0][0][0].shape
-        xn_array = np.zeros( (num_itr, num_states, infer_len, num_policies) )
+        num_states, infer_len = xn[0][0][0].shape
+        xn_array = np.zeros((num_itr, num_states, infer_len, num_policies))
         for policy_i in range(num_policies):
             for itr in range(num_itr):
-                xn_array[itr,:,:,policy_i] = xn[policy_i][itr][0] 
-    
+                xn_array[itr, :, :, policy_i] = xn[policy_i][itr][0]
+
     return xn_array
 
 
 # plotting functions
-def plot_likelihood(matrix, xlabels = list(range(9)), ylabels = list(range(9)), title_str = "Likelihood distribution (A)"):
+def plot_likelihood(matrix, xlabels=list(range(9)), ylabels=list(range(9)), title_str="Likelihood distribution (A)"):
     """
     Plots a 2-D likelihood matrix as a heatmap
     """
 
     if not np.isclose(matrix.sum(axis=0), 1.0).all():
-      raise ValueError("Distribution not column-normalized! Please normalize (ensure matrix.sum(axis=0) == 1.0 for all columns)")
-    
-    fig = plt.figure(figsize = (6,6))
-    ax = sns.heatmap(matrix, xticklabels = xlabels, yticklabels = ylabels, cmap = 'gray', cbar = False, vmin = 0.0, vmax = 1.0)
+        raise ValueError("Distribution not column-normalized! Please normalize (ensure matrix.sum(axis=0) == 1.0 for all columns)")
+    fig = plt.figure(figsize=(6, 6))  # Unclear what "fig" is doing here.
+    ax=sns.heatmap(matrix, xticklabels=xlabels, yticklabels=ylabels, cmap='gray', cbar=False, vmin=0.0, vmax=1.0)  # Unclear what ax is doing
     plt.title(title_str)
     plt.show()
 
-def plot_grid(grid_locations, num_x = 3, num_y = 3 ):
+
+def plot_grid(grid_locations, num_x=3, num_y=3):
     """
-    Plots the spatial coordinates of GridWorld as a heatmap, with each (X, Y) coordinate 
+    Plots the spatial coordinates of GridWorld as a heatmap, with each (X, Y) coordinate
     labeled with its linear index (its `state id`)
     """
 
     grid_heatmap = np.zeros((num_x, num_y))
     for linear_idx, location in enumerate(grid_locations):
-      y, x = location
-      grid_heatmap[y, x] = linear_idx
+        y, x = location
+    grid_heatmap[y, x] = linear_idx
     sns.set(font_scale=1.5)
-    sns.heatmap(grid_heatmap, annot=True, cbar = False, fmt='.0f', cmap='crest')
+    sns.heatmap(grid_heatmap, annot=True, cbar=False, fmt='.0f', cmap='crest')
+
 
 def plot_point_on_grid(state_vector, grid_locations):
     """
@@ -678,9 +683,10 @@ def plot_point_on_grid(state_vector, grid_locations):
     """
     state_index = np.where(state_vector)[0][0]
     y, x = grid_locations[state_index]
-    grid_heatmap = np.zeros((3,3))
-    grid_heatmap[y,x] = 1.0
-    sns.heatmap(grid_heatmap, cbar = False, fmt='.0f')
+    grid_heatmap = np.zeros((3, 3))
+    grid_heatmap[y, x] = 1.0
+    sns.heatmap(grid_heatmap, cbar=False, fmt='.0f')
+
 
 def plot_beliefs(belief_dist, title_str=""):
     """
@@ -688,7 +694,7 @@ def plot_beliefs(belief_dist, title_str=""):
     """
 
     if not np.isclose(belief_dist.sum(), 1.0):
-      raise ValueError("Distribution not normalized! Please normalize")
+        raise ValueError("Distribution not normalized! Please normalize")
 
     plt.grid(zorder=0)
     plt.bar(range(belief_dist.shape[0]), belief_dist, color='r', zorder=3)
@@ -698,18 +704,21 @@ def plot_beliefs(belief_dist, title_str=""):
 
 # ActInf functions
 
+
 def infer_states(observation_index, A, prior):
-  
-  log_likelihood = log_stable(A[observation_index,:])
+
+  log_likelihood = log_stable(A[observation_index, :])
 
   log_prior = log_stable(prior)
 
   qs = softmax(log_likelihood + log_prior)
    
   return qs
+
+
 def get_expected_states(B, qs_current, action):
   """ Compute the expected states one step into the future, given a particular action """
-  qs_u = B[:,:,action].dot(qs_current)
+  qs_u = B[:, :, action].dot(qs_current)
 
   return qs_u
 
@@ -769,16 +778,16 @@ def calculate_G_policies(A, B, C, qs_current, policies):
       if t == 0:
         qs_prev = qs_current 
       else:
-        qs_prev = qs_pi_t
+        qs_prev = qs_pi_t  # What is "qs_pi_t"?
         
       qs_pi_t = get_expected_states(B, qs_prev, action) # expected states, under the action entailed by the policy at this particular time
       qo_pi_t = get_expected_observations(A, qs_pi_t)   # expected observations, under the action entailed by the policy at this particular time
 
-      kld = kl_divergence(qo_pi_t, C) # Kullback-Leibler divergence between expected observations and the prior preferences C
+      kld = kl_divergence(qo_pi_t, C)  # Kullback-Leibler divergence between expected observations and the prior preferences C
 
-      G_pi_t = H_A.dot(qs_pi_t) + kld # predicted uncertainty + predicted divergence, for this policy & timepoint
+      G_pi_t = H_A.dot(qs_pi_t) + kld  # predicted uncertainty + predicted divergence, for this policy & timepoint
 
-      G_pi += G_pi_t # accumulate the expected free energy for each timepoint into the overall EFE for the policy
+      G_pi += G_pi_t  # accumulate the expected free energy for each timepoint into the overall EFE for the policy
 
     G[policy_id] += G_pi
   
@@ -789,7 +798,7 @@ def compute_prob_actions(actions, policies, Q_pi):
 
   for policy_id, policy in enumerate(policies):
     P_u[int(policy[0,0])] += Q_pi[policy_id] # get the marginal probability for the given action, entailed by this policy at the first timestep
-  
+
   P_u = norm_dist(P_u) # normalize the action probabilities
-  
+
   return P_u
