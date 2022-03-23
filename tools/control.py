@@ -9,6 +9,7 @@ from pymdp.maths import softmax, softmax_obj_arr, spm_dot, spm_wnorm, spm_MDP_G,
 from pymdp import utils
 import copy
 
+
 def update_posterior_policies_full(
     qs_seq_pi,
     A,
@@ -21,10 +22,10 @@ def update_posterior_policies_full(
     prior=None,
     pA=None,
     pB=None,
-    F = None,
-    E = None,
+    F=None,
+    E=None,
     gamma=16.0
-):  
+):
     """
     Update posterior beliefs about policies by computing expected free energy of each policy and integrating that
     with the variational free energy of policies ``F`` and prior over policies ``E``. This is intended to be used in conjunction
@@ -37,7 +38,7 @@ def update_posterior_policies_full(
         where e.g. ``qs_seq_pi[p][t][f]`` stores the marginal belief about factor ``f`` at timepoint ``t`` under policy ``p``.
     A: ``numpy.ndarray`` of dtype object
         Sensory likelihood mapping or 'observation model', mapping from hidden states to observations. Each element ``A[m]`` of
-        stores an ``numpy.ndarray`` multidimensional array for observation modality ``m``, whose entries ``A[m][i, j, k, ...]`` store 
+        stores an ``numpy.ndarray`` multidimensional array for observation modality ``m``, whose entries ``A[m][i, j, k, ...]`` store
         the probability of observation level ``i`` given hidden state levels ``j, k, ...``
     B: ``numpy.ndarray`` of dtype object
         Dynamics likelihood mapping or 'transition model', mapping from hidden states at ``t`` to hidden states at ``t+1``, given some control state ``u``.
@@ -54,9 +55,9 @@ def update_posterior_policies_full(
     use_states_info_gain: ``Bool``, default ``True``
         Boolean flag that determines whether state epistemic value (info gain about hidden states) should be incorporated into computation of EFE.
     use_param_info_gain: ``Bool``, default ``False`` 
-        Boolean flag that determines whether parameter epistemic value (info gain about generative model parameters) should be incorporated into computation of EFE. 
+        Boolean flag that determines whether parameter epistemic value (info gain about generative model parameters) should be incorporated into computation of EFE.
     prior: ``numpy.ndarray`` of dtype object, default ``None``
-        If provided, this is a ``numpy`` object array with one sub-array per hidden state factor, that stores the prior beliefs about initial states. 
+        If provided, this is a ``numpy`` object array with one sub-array per hidden state factor, that stores the prior beliefs about initial states.
         If ``None``, this defaults to a flat (uninformative) prior over hidden states.
     pA: ``numpy.ndarray`` of dtype object, default ``None``
         Dirichlet parameters over observation model (same shape as ``A``)
@@ -96,7 +97,7 @@ def update_posterior_policies_full(
     if E is None:
         lnE = spm_log_single(np.ones(num_policies) / num_policies)
     else:
-        lnE = spm_log_single(E) 
+        lnE = spm_log_single(E)
 
 
     for p_idx, policy in enumerate(policies):
@@ -116,7 +117,7 @@ def update_posterior_policies_full(
                 G[p_idx] += calc_pB_info_gain(pB, qs_seq_pi[p_idx], prior, policy)
 
     q_pi = softmax(G * gamma - F + lnE)
-    
+
     return q_pi, G
 
 
@@ -131,14 +132,14 @@ def update_posterior_policies(
     use_param_info_gain=False,
     pA=None,
     pB=None,
-    E = None,
+    E=None,
     gamma=16.0
 ):
     """
     Update posterior beliefs about policies by computing expected free energy of each policy and integrating that
     with the prior over policies ``E``. This is intended to be used in conjunction
     with the ``update_posterior_states`` method of the ``inference`` module, since only the posterior about the hidden states at the current timestep
-    ``qs`` is assumed to be provided, unconditional on policies. The predictive posterior over hidden states under all policies Q(s, pi) is computed 
+    ``qs`` is assumed to be provided, unconditional on policies. The predictive posterior over hidden states under all policies Q(s, pi) is computed
     using the starting posterior about states at the current timestep ``qs`` and the generative model (e.g. ``A``, ``B``, ``C``)
     Parameters
     ----------
@@ -146,14 +147,14 @@ def update_posterior_policies(
         Marginal posterior beliefs over hidden states at current timepoint (unconditioned on policies)
     A: ``numpy.ndarray`` of dtype object
         Sensory likelihood mapping or 'observation model', mapping from hidden states to observations. Each element ``A[m]`` of
-        stores an ``numpy.ndarray`` multidimensional array for observation modality ``m``, whose entries ``A[m][i, j, k, ...]`` store 
+        stores an ``numpy.ndarray`` multidimensional array for observation modality ``m``, whose entries ``A[m][i, j, k, ...]`` store
         the probability of observation level ``i`` given hidden state levels ``j, k, ...``
     B: ``numpy.ndarray`` of dtype object
         Dynamics likelihood mapping or 'transition model', mapping from hidden states at ``t`` to hidden states at ``t+1``, given some control state ``u``.
         Each element ``B[f]`` of this object array stores a 3-D tensor for hidden state factor ``f``, whose entries ``B[f][s, v, u]`` store the probability
         of hidden state level ``s`` at the current time, given hidden state level ``v`` and action ``u`` at the previous time.
     C: ``numpy.ndarray`` of dtype object
-       Prior over observations or 'prior preferences', storing the "value" of each outcome in terms of relative log probabilities. 
+       Prior over observations or 'prior preferences', storing the "value" of each outcome in terms of relative log probabilities.
        This is softmaxed to form a proper probability distribution before being used to compute the expected utility term of the expected free energy.
     policies: ``list`` of 2D ``numpy.ndarray``
         ``list`` that stores each policy in ``policies[p_idx]``. Shape of ``policies[p_idx]`` is ``(num_timesteps, num_factors)`` where `num_timesteps` is the temporal
@@ -187,7 +188,7 @@ def update_posterior_policies(
     if E is None:
         lnE = spm_log_single(np.ones(n_policies) / n_policies)
     else:
-        lnE = spm_log_single(E) 
+        lnE = spm_log_single(E)
 
     for idx, policy in enumerate(policies):
         qs_pi = get_expected_states(qs, B, policy)
@@ -205,9 +206,10 @@ def update_posterior_policies(
             if pB is not None:
                 G[idx] += calc_pB_info_gain(pB, qs_pi, qs, policy)
 
-    q_pi = softmax(G * gamma + lnE)    
+    q_pi = softmax(G * gamma + lnE)
 
     return q_pi, G
+
 
 def get_expected_states(qs, B, policy):
     """
@@ -234,11 +236,11 @@ def get_expected_states(qs, B, policy):
 
     # initialise posterior predictive density as a list of beliefs over time, including current posterior beliefs about hidden states as the first element
     qs_pi = [qs] + [utils.obj_array(n_factors) for t in range(n_steps)]
-    
+
     # get expected states over time
     for t in range(n_steps):
-        for control_factor, action in enumerate(policy[t,:]):
-            qs_pi[t+1][control_factor] = B[control_factor][:,:,int(action)].dot(qs_pi[t][control_factor])
+        for control_factor, action in enumerate(policy[t, :]):
+            qs_pi[t+1][control_factor] = B[control_factor][:, :, int(action)].dot(qs_pi[t][control_factor])
 
     return qs_pi[1:]
  
@@ -253,7 +255,7 @@ def get_expected_obs(qs_pi, A):
         hidden states expected under the policy at time ``t``
     A: ``numpy.ndarray`` of dtype object
         Sensory likelihood mapping or 'observation model', mapping from hidden states to observations. Each element ``A[m]`` of
-        stores an ``numpy.ndarray`` multidimensional array for observation modality ``m``, whose entries ``A[m][i, j, k, ...]`` store 
+        stores an ``numpy.ndarray`` multidimensional array for observation modality ``m``, whose entries ``A[m][i, j, k, ...]`` store
         the probability of observation level ``i`` given hidden state levels ``j, k, ...``
     Returns
     -------
@@ -262,7 +264,7 @@ def get_expected_obs(qs_pi, A):
         observations expected under the policy at time ``t``
     """
 
-    n_steps = len(qs_pi) # each element of the list is the PPD at a different timestep
+    n_steps = len(qs_pi)  # each element of the list is the PPD at a different timestep
 
     # initialise expected observations
     qo_pi = []
@@ -278,6 +280,7 @@ def get_expected_obs(qs_pi, A):
 
     return qo_pi
 
+
 def calc_expected_utility(qo_pi, C):
     """
     Computes the expected utility of a policy, using the observation distribution expected under that policy and a prior preference vector.
@@ -287,7 +290,7 @@ def calc_expected_utility(qo_pi, C):
         Predictive posterior beliefs over observations expected under the policy, where ``qo_pi[t]`` stores the beliefs about
         observations expected under the policy at time ``t``
     C: ``numpy.ndarray`` of dtype object
-       Prior over observations or 'prior preferences', storing the "value" of each outcome in terms of relative log probabilities. 
+       Prior over observations or 'prior preferences', storing the "value" of each outcome in terms of relative log probabilities.
        This is softmaxed to form a proper probability distribution before being used to compute the expected utility.
     Returns
     -------
@@ -308,9 +311,9 @@ def calc_expected_utility(qo_pi, C):
     # make a deepcopy of C where it has been tiled across timesteps
     C_tiled = copy.deepcopy(C)
     for modality in modalities_to_tile:
-        C_tiled[modality] = np.tile(C[modality][:,None], (1, n_steps) )
-    
-    C_prob = softmax_obj_arr(C_tiled) # convert relative log probabilities into proper probability distribution
+        C_tiled[modality] = np.tile(C[modality][:, None], (1, n_steps))
+
+    C_prob = softmax_obj_arr(C_tiled)  # convert relative log probabilities into proper probability distribution
 
     for t in range(n_steps):
         for modality in range(num_modalities):
@@ -323,13 +326,13 @@ def calc_expected_utility(qo_pi, C):
 
 def calc_states_info_gain(A, qs_pi):
     """
-    Computes the Bayesian surprise or information gain about states of a policy, 
+    Computes the Bayesian surprise or information gain about states of a policy,
     using the observation model and the hidden state distribution expected under that policy.
     Parameters
     ----------
     A: ``numpy.ndarray`` of dtype object
         Sensory likelihood mapping or 'observation model', mapping from hidden states to observations. Each element ``A[m]`` of
-        stores an ``numpy.ndarray`` multidimensional array for observation modality ``m``, whose entries ``A[m][i, j, k, ...]`` store 
+        stores an ``numpy.ndarray`` multidimensional array for observation modality ``m``, whose entries ``A[m][i, j, k, ...]`` store
         the probability of observation level ``i`` given hidden state levels ``j, k, ...``
     qs_pi: ``list`` of ``numpy.ndarray`` of dtype object
         Predictive posterior beliefs over hidden states expected under the policy, where ``qs_pi[t]`` stores the beliefs about
@@ -369,14 +372,14 @@ def calc_pA_info_gain(pA, qo_pi, qs_pi):
     """
 
     n_steps = len(qo_pi)
-    
+
     num_modalities = len(pA)
     wA = utils.obj_array(num_modalities)
     for modality, pA_m in enumerate(pA):
         wA[modality] = spm_wnorm(pA[modality])
 
     pA_infogain = 0
-    
+
     for modality in range(num_modalities):
         wA_modality = wA[modality] * (pA[modality] > 0).astype("float")
         for t in range(n_steps):
@@ -400,7 +403,7 @@ def calc_pB_info_gain(pB, qs_pi, qs_prev, policy):
     policy: 2D ``numpy.ndarray``
         Array that stores actions entailed by a policy over time. Shape is ``(num_timesteps, num_factors)`` where ``num_timesteps`` is the temporal
         depth of the policy and ``num_factors`` is the number of control factors.
-    
+
     Returns
     -------
     infogain_pB: float
@@ -435,10 +438,11 @@ def calc_pB_info_gain(pB, qs_pi, qs_prev, policy):
 
     return pB_infogain
 
-def construct_policies(num_states, num_controls = None, policy_len=1, control_fac_idx=None):
+
+def construct_policies(num_states, num_controls=None, policy_len=1, control_fac_idx=None):
     """
     Generate a ``list`` of policies. The returned array ``policies`` is a ``list`` that stores one policy per entry.
-    A particular policy (``policies[i]``) has shape ``(num_timesteps, num_factors)`` 
+    A particular policy (``policies[i]``) has shape ``(num_timesteps, num_factors)``
     where ``num_timesteps`` is the temporal depth of the policy and ``num_factors`` is the number of control factors.
     Parameters
     ----------
@@ -453,7 +457,7 @@ def construct_policies(num_states, num_controls = None, policy_len=1, control_fa
     Returns
     ----------
     policies: ``list`` of 2D ``numpy.ndarray``
-        ``list`` that stores each policy as a 2D array in ``policies[p_idx]``. Shape of ``policies[p_idx]`` 
+        ``list`` that stores each policy as a 2D array in ``policies[p_idx]``. Shape of ``policies[p_idx]``
         is ``(num_timesteps, num_factors)`` where ``num_timesteps`` is the temporal
         depth of the policy and ``num_factors`` is the number of control factors.
     """
@@ -467,14 +471,15 @@ def construct_policies(num_states, num_controls = None, policy_len=1, control_fa
 
     if num_controls is None:
         num_controls = [num_states[c_idx] if c_idx in control_fac_idx else 1 for c_idx in range(num_factors)]
-        
+
     x = num_controls * policy_len
     policies = list(itertools.product(*[list(range(i)) for i in x]))
     for pol_i in range(len(policies)):
         policies[pol_i] = np.array(policies[pol_i]).reshape(policy_len, num_factors)
 
     return policies
-    
+
+
 def get_num_controls_from_policies(policies):
     """
     Calculates the ``list`` of dimensionalities of control factors (``num_controls``)
@@ -483,20 +488,20 @@ def get_num_controls_from_policies(policies):
     Parameters
     ----------
     policies: ``list`` of 2D ``numpy.ndarray``
-        ``list`` that stores each policy as a 2D array in ``policies[p_idx]``. Shape of ``policies[p_idx]`` 
+        ``list`` that stores each policy as a 2D array in ``policies[p_idx]``. Shape of ``policies[p_idx]``
         is ``(num_timesteps, num_factors)`` where ``num_timesteps`` is the temporal
         depth of the policy and ``num_factors`` is the number of control factors.
-    
+
     Returns
     ----------
     num_controls: ``list`` of ``int``
         ``list`` of the dimensionalities of each control state factor, computed here automatically from a ``list`` of policies.
     """
 
-    return list(np.max(np.vstack(policies), axis = 0) + 1)
-    
+    return list(np.max(np.vstack(policies), axis=0) + 1)
 
-def sample_action(q_pi, policies, num_controls, action_selection="deterministic", alpha = 16.0):
+
+def sample_action(q_pi, policies, num_controls, action_selection="deterministic", alpha=16.0):
     """
     Computes the marginal posterior over actions and then samples an action from it, one action per control factor.
     Parameters
@@ -504,7 +509,7 @@ def sample_action(q_pi, policies, num_controls, action_selection="deterministic"
     q_pi: 1D ``numpy.ndarray``
         Posterior beliefs over policies, i.e. a vector containing one posterior probability per policy.
     policies: ``list`` of 2D ``numpy.ndarray``
-        ``list`` that stores each policy as a 2D array in ``policies[p_idx]``. Shape of ``policies[p_idx]`` 
+        ``list`` that stores each policy as a 2D array in ``policies[p_idx]``. Shape of ``policies[p_idx]``
         is ``(num_timesteps, num_factors)`` where ``num_timesteps`` is the temporal
         depth of the policy and ``num_factors`` is the number of control factors.
     num_controls: ``list`` of ``int``
@@ -513,7 +518,7 @@ def sample_action(q_pi, policies, num_controls, action_selection="deterministic"
         String indicating whether whether the selected action is chosen as the maximum of the posterior over actions,
         or whether it's sampled from the posterior marginal over actions
     alpha: float, default 16.0
-        Action selection precision -- the inverse temperature of the softmax that is used to scale the 
+        Action selection precision -- the inverse temperature of the softmax that is used to scale the
         action marginals before sampling. This is only used if ``action_selection`` argument is "stochastic"
     Returns
     ----------
@@ -524,18 +529,18 @@ def sample_action(q_pi, policies, num_controls, action_selection="deterministic"
     num_factors = len(num_controls)
 
     action_marginals = utils.obj_array_zeros(num_controls)
-    
+
     # weight each action according to its integrated posterior probability over policies and timesteps
     # for pol_idx, policy in enumerate(policies):
     #     for t in range(policy.shape[0]):
     #         for factor_i, action_i in enumerate(policy[t, :]):
     #             action_marginals[factor_i][action_i] += q_pi[pol_idx]
-    
+
     # weight each action according to its integrated posterior probability under all policies at the current timestep
     for pol_idx, policy in enumerate(policies):
         for factor_i, action_i in enumerate(policy[0, :]):
             action_marginals[factor_i][action_i] += q_pi[pol_idx]
-    
+
     action_marginals = utils.norm_dist_obj_arr(action_marginals)
 
     selected_policy = np.zeros(num_factors)
