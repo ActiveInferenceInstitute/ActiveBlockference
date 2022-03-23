@@ -8,10 +8,11 @@ import warnings
 import itertools
 from pymdp.maths import spm_log_single as log_stable
 
-EPS_VAL = 1e-16 # global constant for use in norm_dist()
+EPS_VAL = 1e-16  # global constant for use in norm_dist()
+
 
 def softmax(dist):
-    """ 
+    """
     Computes the softmax function on a set of values
     """
 
@@ -20,18 +21,21 @@ def softmax(dist):
     output = output / np.sum(output, axis=0)
     return output
 
+
 def sample(probabilities):
     sample_onehot = np.random.multinomial(1, probabilities.squeeze())
     return np.where(sample_onehot == 1)[0][0]
 
+
 def sample_obj_array(arr):
-    """ 
-    Sample from set of Categorical distributions, stored in the sub-arrays of an object array 
     """
-    
+    Sample from set of Categorical distributions, stored in the sub-arrays of an object array
+    """
+
     samples = [sample(arr_i) for arr_i in arr]
 
     return samples
+
 
 def obj_array(num_arr):
     """
@@ -39,8 +43,9 @@ def obj_array(num_arr):
     """
     return np.empty(num_arr, dtype=object)
 
+
 def obj_array_zeros(shape_list):
-    """ 
+    """
     Creates a numpy object array whose sub-arrays are 1-D vectors
     filled with zeros, with shapes given by shape_list[i]
     """
@@ -48,6 +53,7 @@ def obj_array_zeros(shape_list):
     for i, shape in enumerate(shape_list):
         arr[i] = np.zeros(shape)
     return arr
+
 
 def obj_array_uniform(shape_list):
     """ 
@@ -60,17 +66,20 @@ def obj_array_uniform(shape_list):
         arr[i] = norm_dist(np.ones(shape))
     return arr
 
-def obj_array_ones(shape_list, scale = 1.0):
+
+def obj_array_ones(shape_list, scale=1.0):
     arr = obj_array(len(shape_list))
     for i, shape in enumerate(shape_list):
         arr[i] = scale * np.ones(shape)
-    
+
     return arr
+
 
 def onehot(value, num_values):
     arr = np.zeros(num_values)
     arr[value] = 1.0
     return arr
+
 
 def random_A_matrix(num_obs, num_states):
     if type(num_obs) is int:
@@ -85,6 +94,7 @@ def random_A_matrix(num_obs, num_states):
         modality_dist = np.random.rand(*modality_shape)
         A[modality] = norm_dist(modality_dist)
     return A
+
 
 def random_B_matrix(num_states, num_controls):
     if type(num_states) is int:
@@ -101,24 +111,26 @@ def random_B_matrix(num_states, num_controls):
         B[factor] = norm_dist(factor_dist)
     return B
 
+
 def random_single_categorical(shape_list):
     """
-    Creates a random 1-D categorical distribution (or set of 1-D categoricals, e.g. multiple marginals of different factors) and returns them in an object array 
+    Creates a random 1-D categorical distribution (or set of 1-D categoricals, e.g. multiple marginals of different factors) and returns them in an object array
     """
-    
+
     num_sub_arrays = len(shape_list)
 
     out = obj_array(num_sub_arrays)
 
-    for arr_idx, shape_i  in enumerate(shape_list):
+    for arr_idx, shape_i in enumerate(shape_list):
         out[arr_idx] = norm_dist(np.random.rand(shape_i))
-    
+
     return out
+
 
 def construct_controllable_B(num_states, num_controls):
     """
-    Generates a fully controllable transition likelihood array, where each 
-    action (control state) corresponds to a move to the n-th state from any 
+    Generates a fully controllable transition likelihood array, where each
+    action (control state) corresponds to a move to the n-th state from any
     other state, for each control factor
     """
 
@@ -132,26 +144,27 @@ def construct_controllable_B(num_states, num_controls):
 
     return B
 
-def dirichlet_like(template_categorical, scale = 1.0):
+
+def dirichlet_like(template_categorical, scale=1.0):
     """
     Helper function to construct a Dirichlet distribution based on an existing Categorical distribution
-    """ 
+    """
 
     if not is_obj_array(template_categorical):
         warnings.warn(
-                    "Input array is not an object array...\
-                    Casting the input to an object array"
+                    "Input array is not an object array...Casting the input to an object array"
                 )
         template_categorical = to_obj_array(template_categorical)
 
     n_sub_arrays = len(template_categorical)
 
     dirichlet_out = obj_array(n_sub_arrays)
-    
+
     for i, arr in enumerate(template_categorical):
         dirichlet_out[i] = scale * arr
 
     return dirichlet_out
+
 
 def get_model_dimensions(A=None, B=None):
 
@@ -165,7 +178,7 @@ def get_model_dimensions(A=None, B=None):
         num_modalities = len(num_obs)
     else:
         num_obs, num_modalities = None, None
-    
+
     if B is not None:
         num_states = [b.shape[0] for b in B] if is_obj_array(B) else [B.shape[0]]
         num_factors = len(num_states)
@@ -175,8 +188,9 @@ def get_model_dimensions(A=None, B=None):
             num_factors = len(num_states)
         else:
             num_states, num_factors = None, None
-    
+
     return num_obs, num_states, num_modalities, num_factors
+
 
 def get_model_dimensions_from_labels(model_labels):
 
@@ -209,13 +223,15 @@ def norm_dist(dist):
     else:
         return np.divide(dist, dist.sum(axis=0))
 
+
 def norm_dist_obj_arr(obj_arr):
 
     normed_obj_array = obj_array(len(obj_arr))
     for i, arr in enumerate(obj_arr):
         normed_obj_array[i] = norm_dist(arr)
-    
+
     return normed_obj_array
+
 
 def is_normalized(dist):
     """
@@ -232,11 +248,13 @@ def is_normalized(dist):
     else:
         column_sums = dist.sum(axis=0)
         out = np.allclose(column_sums, np.ones_like(column_sums))
-    
+
     return out
+
 
 def is_obj_array(arr):
     return arr.dtype == "object"
+
 
 def to_obj_array(arr):
     if is_obj_array(arr):
@@ -245,15 +263,17 @@ def to_obj_array(arr):
     obj_array_out[0] = arr.squeeze()
     return obj_array_out
 
+
 def obj_array_from_list(list_input):
     """
     Takes a list of `numpy.ndarray` and converts them to a `numpy.ndarray` of `dtype = object`
     """
-    return np.array(list_input, dtype = object)
+    return np.array(list_input, dtype=object)
+
 
 def process_observation_seq(obs_seq, n_modalities, n_observations):
     """
-    Helper function for formatting observations    
+    Helper function for formatting observations
         Observations can either be `int` (converted to one-hot)
         or `tuple` (obs for each modality), or `list` (obs for each modality)
         If list, the entries could be object arrays of one-hots, in which
@@ -264,11 +284,12 @@ def process_observation_seq(obs_seq, n_modalities, n_observations):
         proc_obs_seq[t] = process_observation(obs_t, n_modalities, n_observations)
     return proc_obs_seq
 
+
 def process_observation(obs, num_modalities, num_observations):
     """
-    Helper function for formatting observations    
+    Helper function for formatting observations
     USAGE NOTES:
-    - If `obs` is a 1D numpy array, it must be a one-hot vector, where one entry (the entry of the observation) is 1.0 
+    - If `obs` is a 1D numpy array, it must be a one-hot vector, where one entry (the entry of the observation) is 1.0
     and all other entries are 0. This therefore assumes it's a single modality observation. If these conditions are met, then
     this function will return `obs` unchanged. Otherwise, it'll throw an error.
     - If `obs` is an int, it assumes this is a single modality observation, whose observation index is given by the value of `obs`. This function will convert
@@ -287,7 +308,7 @@ def process_observation(obs, num_modalities, num_observations):
     if isinstance(obs, (int, np.integer)):
         obs = onehot(obs, num_observations[0])
 
-    if isinstance(obs, tuple) or isinstance(obs,list):
+    if isinstance(obs, tuple) or isinstance(obs, list):
         obs_arr_arr = obj_array(num_modalities)
         for m in range(num_modalities):
             obs_arr_arr[m] = onehot(obs[m], num_observations[m])
@@ -295,29 +316,30 @@ def process_observation(obs, num_modalities, num_observations):
 
     return obs
 
+
 def convert_observation_array(obs, num_obs):
     """
     Converts from SPM-style observation array to infer-actively one-hot object arrays.
-    
+
     Parameters
     ----------
     - 'obs' [numpy 2-D nd.array]:
-        SPM-style observation arrays are of shape (num_modalities, T), where each row 
-        contains observation indices for a different modality, and columns indicate 
-        different timepoints. Entries store the indices of the discrete observations 
-        within each modality. 
+        SPM-style observation arrays are of shape (num_modalities, T), where each row
+        contains observation indices for a different modality, and columns indicate
+        different timepoints. Entries store the indices of the discrete observations
+        within each modality.
     - 'num_obs' [list]:
-        List of the dimensionalities of the observation modalities. `num_modalities` 
-        is calculated as `len(num_obs)` in the function to determine whether we're 
-        dealing with a single- or multi-modality 
+        List of the dimensionalities of the observation modalities. `num_modalities`
+        is calculated as `len(num_obs)` in the function to determine whether we're
+        dealing with a single- or multi-modality
         case.
     Returns
     ----------
     - `obs_t`[list]: 
-        A list with length equal to T, where each entry of the list is either a) an object 
-        array (in the case of multiple modalities) where each sub-array is a one-hot vector 
+        A list with length equal to T, where each entry of the list is either a) an object
+        array (in the case of multiple modalities) where each sub-array is a one-hot vector
         with the observation for the correspond modality, or b) a 1D numpy array (in the case
-        of one modality) that is a single one-hot vector encoding the observation for the 
+        of one modality) that is a single one-hot vector encoding the observation for the
         single modality.
     """
 
@@ -341,21 +363,23 @@ def convert_observation_array(obs, num_obs):
 
     return obs_t
 
+
 def insert_multiple(s, indices, items):
     for idx in range(len(items)):
         s.insert(indices[idx], items[idx])
     return s
 
+
 def reduce_a_matrix(A):
     """
     Utility function for throwing away dimensions (lagging dimensions, hidden state factors)
-    of a particular A matrix that are independent of the observation. 
+    of a particular A matrix that are independent of the observation.
     Parameters:
     ==========
     - `A` [np.ndarray]:
         The A matrix or likelihood array that encodes probabilistic relationship
         of the generative model between hidden state factors (lagging dimensions, columns, slices, etc...)
-        and observations (leading dimension, rows). 
+        and observations (leading dimension, rows).
     Returns:
     =========
     - `A_reduced` [np.ndarray]:
@@ -367,29 +391,30 @@ def reduce_a_matrix(A):
     """
 
     o_dim, num_states = A.shape[0], A.shape[1:]
-    idx_vec_s = [slice(0, o_dim)]  + [slice(ns) for _, ns in enumerate(num_states)]
+    idx_vec_s = [slice(0, o_dim)] + [slice(ns) for _, ns in enumerate(num_states)]
 
     original_factor_idx = []
-    excluded_factor_idx = [] # the indices of the hidden state factors that are independent of the observation and thus marginalized away
+    excluded_factor_idx = []  # the indices of the hidden state factors that are independent of the observation and thus marginalized away
     for factor_i, ns in enumerate(num_states):
 
         level_counter = 0
         break_flag = False
         while level_counter < ns and break_flag is False:
             idx_vec_i = idx_vec_s.copy()
-            idx_vec_i[factor_i+1] = slice(level_counter,level_counter+1,None)
+            idx_vec_i[factor_i+1] = slice(level_counter, level_counter+1, None)
             if not np.isclose(A.mean(axis=factor_i+1), A[tuple(idx_vec_i)].squeeze()).all():
-                break_flag = True # this means they're not independent
+                break_flag = True  # this means they're not independent
                 original_factor_idx.append(factor_i)
             else:
                 level_counter += 1
-        
+
         if break_flag is False:
             excluded_factor_idx.append(factor_i+1)
-    
+
     A_reduced = A.mean(axis=tuple(excluded_factor_idx)).squeeze()
 
     return A_reduced, original_factor_idx
+
 
 def construct_full_a(A_reduced, original_factor_idx, num_states):
     """
@@ -400,7 +425,7 @@ def construct_full_a(A_reduced, original_factor_idx, num_states):
     - `A_reduced` [np.ndarray]:
         The reduced A matrix or likelihood array that encodes probabilistic relationship
         of the generative model between hidden state factors (lagging dimensions, columns, slices, etc...)
-        and observations (leading dimension, rows). 
+        and observations (leading dimension, rows).
     - `original_factor_idx` [list]:
         List of hidden state indices in terms of the full hidden state factor list, that comprise
         the lagging dimensions of `A_reduced`
@@ -412,36 +437,37 @@ def construct_full_a(A_reduced, original_factor_idx, num_states):
     - `A` [np.ndarray]:
         The full A matrix, containing all the lagging dimensions that correspond to hidden state factors, including
         those that are statistically independent of observations
-    
-    @ NOTE: This is the "inverse" of the reduce_a_matrix function, 
+
+    @ NOTE: This is the "inverse" of the reduce_a_matrix function,
     i.e. `reduce_a_matrix(construct_full_a(A_reduced, original_factor_idx, num_states)) == A_reduced, original_factor_idx`
     """
 
-    o_dim = A_reduced.shape[0] # dimensionality of the support of the likelihood distribution (i.e. the number of observation levels)
-    full_dimensionality = [o_dim] + num_states # full dimensionality of the output (`A`)
-    fill_indices = [0] +  [f+1 for f in original_factor_idx] # these are the indices of the dimensions we need to fill for this modality
-    fill_dimensions = np.delete(full_dimensionality, fill_indices) 
+    o_dim = A_reduced.shape[0]  # dimensionality of the support of the likelihood distribution (i.e. the number of observation levels)
+    full_dimensionality = [o_dim] + num_states  # full dimensionality of the output (`A`)
+    fill_indices = [0] + [f+1 for f in original_factor_idx]  # these are the indices of the dimensions we need to fill for this modality
+    fill_dimensions = np.delete(full_dimensionality, fill_indices)
 
-    original_factor_dims = [num_states[f] for f in original_factor_idx] # dimensionalities of the relevant factors
-    prefilled_slices = [slice(0, o_dim)] + [slice(0, ns) for ns in original_factor_dims] # these are the slices that are filled out by the provided `A_reduced`
+    original_factor_dims = [num_states[f] for f in original_factor_idx]  # dimensionalities of the relevant factors
+    prefilled_slices = [slice(0, o_dim)] + [slice(0, ns) for ns in original_factor_dims]  # these are the slices that are filled out by the provided `A_reduced`
 
     A = np.zeros(full_dimensionality)
 
     for item in itertools.product(*[list(range(d)) for d in fill_dimensions]):
         slice_ = list(item)
-        A_indices = insert_multiple(slice_, fill_indices, prefilled_slices) #here we insert the correct values for the fill indices for this slice                    
+        A_indices = insert_multiple(slice_, fill_indices, prefilled_slices)  # here we insert the correct values for the fill indices for this slice
         A[tuple(A_indices)] = A_reduced
-    
+
     return A
+
 
 def create_A_matrix_stub(model_labels):
 
-    num_obs, _, num_states, _= get_model_dimensions_from_labels(model_labels)
+    num_obs, _, num_states, _ = get_model_dimensions_from_labels(model_labels)
 
     obs_labels, state_labels = model_labels['observations'], model_labels['states']
 
     state_combinations = pd.MultiIndex.from_product(list(state_labels.values()), names=list(state_labels.keys()))
-    num_state_combos = np.prod(num_states)
+    num_state_combos = np.prod(num_states)  # What is num_state_combos??
     # num_rows = (np.array(num_obs) * num_state_combos).sum()
     num_rows = sum(num_obs)
 
