@@ -1,10 +1,11 @@
 import numpy as np
 import tools.utils as utils
 
+
 class ActiveGridference():
     """
     The ActiveInference class is to be used to create a generative model to be used in cadCAD simulations.
-    The current focus is on discrete spaces. 
+    The current focus is on discrete spaces.
     ------------------------------------------------------
     An actinf generative model consists of the following:
 
@@ -12,8 +13,9 @@ class ActiveGridference():
     - (state-transition matrix) B -> the generative model's prior beliefs about controllable transitions between hidden states over time
     - (preference matrix) C -> the biased generative model's prior preference for particular observations encoded in terms of probabilities
     - (initial state) D -> the generative model's prior belief over hidden states at the first timestep
-    - (affordances) E -> the generative model's available actions 
+    - (affordances) E -> the generative model's available actions
     """
+
     def __init__(self, grid, planning_length: int = 2, env_state: tuple = (0, 0), ) -> None:
         self.A = None
         self.B = None
@@ -47,10 +49,10 @@ class ActiveGridference():
             - n_states: int: number of possible states
         """
         self.A = np.eye(self.n_observations, self.n_states)
-    
+
     def get_B(self):
         """State-Transition Matrix"""
-        self.B = np.zeros( (len(self.grid), len(self.grid), len(self.E)) )
+        self.B = np.zeros((len(self.grid), len(self.grid), len(self.E)))
 
         for action_id, action_label in enumerate(self.E):
 
@@ -59,16 +61,16 @@ class ActiveGridference():
                 y, x = grid_location
 
                 if action_label == "UP":
-                    next_y = y - 1 if y > 0 else y 
+                    next_y = y - 1 if y > 0 else y
                     next_x = x
                 elif action_label == "DOWN":
-                    next_y = y + 1 if y < self.border else y 
+                    next_y = y + 1 if y < self.border else y
                     next_x = x
                 elif action_label == "LEFT":
-                    next_x = x - 1 if x > 0 else x 
+                    next_x = x - 1 if x > 0 else x
                     next_y = y
                 elif action_label == "RIGHT":
-                    next_x = x + 1 if x < self.border else x 
+                    next_x = x + 1 if x < self.border else x
                     next_y = y
                 elif action_label == "STAY":
                     next_x = x
@@ -83,8 +85,9 @@ class ActiveGridference():
 
     def get_D(self, initial_state):
         """Initial State"""
-        self.D = utils.onehot(self.grid.index( initial_state ), self.n_states)
+        self.D = utils.onehot(self.grid.index(initial_state), self.n_states)
         self.prior = self.D
 
     def get_E(self, actions: list):
         self.E = actions
+        
