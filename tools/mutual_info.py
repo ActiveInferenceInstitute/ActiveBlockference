@@ -27,8 +27,9 @@ def calculate_mi(X, y):
     return mi_scores
 
 
-if condtion:
-    import seaborn as sns
-    import matplotlib.pyplot as plt
-    calculate_mi(X, y, discrete_features)
-    #sns.lmplot(x=.. , y=.. , hue=.. , data=..)
+if __name__ == "__main__":
+    if condtion:
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+        calculate_mi(X, y, discrete_features)
+        #sns.lmplot(x=.. , y=.. , hue=.. , data=..)
