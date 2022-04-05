@@ -1,8 +1,8 @@
-from radcad import Model, Simulation, Experiment
+from radcad import Model, Simulation, Experiment  #experiment not used presently
 
 from model import ActiveGridference
 import pandas as pd
-import pyarrow.feather as feather
+import pyarrow.feather as feather  #pyarrow.feather not used presently
 import sys
 
 # Additional dependencies
@@ -14,7 +14,8 @@ import itertools
 import utils as u
 from control import construct_policies
 import random as rand
-from pymdp.maths import softmax
+from pymdp.maths import softmax  # pymdp.maths.softmax not used presently
+
 
 def run_grid(dimension, no_agents, no_timesteps):
     print(f'Running Gridference. Grid dimension: {dimension} | Number of agents: {no_agents} | Timesteps: {no_timesteps}')
@@ -32,7 +33,7 @@ def run_grid(dimension, no_agents, no_timesteps):
         # create new agent
         agent = ActiveGridference(grid)
         # generate target state
-        target = (rand.randint(0,int(dimension)-1), rand.randint(0,int(dimension)-1))
+        target = (rand.randint(0, int(dimension)-1), rand.randint(0, int(dimension)-1))
         # add target state
         agent.get_C(target)
         # all agents start in the same position
@@ -46,17 +47,17 @@ def run_grid(dimension, no_agents, no_timesteps):
     print('Agents initialized')
 
     initial_state = {
-    'agents': agents,
-    'priors': priors,
-    'env_states': env_states,
-    'actions': actions,
-    'inferences': inferences
+        'agents': agents,
+        'priors': priors,
+        'env_states': env_states,
+        'actions': actions,
+        'inferences': inferences
     }
 
     params = {
-    'preferred_state': grid,
-    'initial_state': grid,
-    'noise': [0]
+        'preferred_state': grid,
+        'initial_state': grid,
+        'noise': [0]
     }
 
     def p_actinf(params, substep, state_history, previous_state):
@@ -68,7 +69,7 @@ def run_grid(dimension, no_agents, no_timesteps):
 
         for source, agent in agents.items():
 
-            policies = construct_policies([agent.n_states], [len(agent.E)], policy_len = agent.policy_len)
+            policies = construct_policies([agent.n_states], [len(agent.E)], policy_len=agent.policy_len)
             # get obs_idx
             obs_idx = grid.index(agent.env_state)
 
@@ -82,12 +83,12 @@ def run_grid(dimension, no_agents, no_timesteps):
             Q_pi = u.softmax(-_G, params['noise'])
             # compute the probability of each action
             P_u = u.compute_prob_actions(agent.E, policies, Q_pi)
-            
+
             # sample action
             chosen_action = u.sample(P_u)
 
             # calc next prior
-            prior = agent.B[:,:,chosen_action].dot(qs_current) 
+            prior = agent.B[:, :, chosen_action].dot(qs_current)
 
             # update env state
             # action_label = params['actions'][chosen_action]
@@ -97,28 +98,28 @@ def run_grid(dimension, no_agents, no_timesteps):
             X_new = X
             # here
 
-            if chosen_action == 0: # UP
+            if chosen_action == 0:  # UP
                 
                 Y_new = Y - 1 if Y > 0 else Y
                 X_new = X
 
-            elif chosen_action == 1: # DOWN
+            elif chosen_action == 1:  # DOWN
 
                 Y_new = Y + 1 if Y < agent.border else Y
                 X_new = X
 
-            elif chosen_action == 2: # LEFT
+            elif chosen_action == 2:  # LEFT
                 Y_new = Y
                 X_new = X - 1 if X > 0 else X
 
-            elif chosen_action == 3: # RIGHT
+            elif chosen_action == 3:  # RIGHT
                 Y_new = Y
-                X_new = X +1 if X < agent.border else X
+                X_new = X + 1 if X < agent.border else X
 
-            elif chosen_action == 4: # STAY
-                Y_new, X_new = Y, X 
-                
-            current_state = (Y_new, X_new) # store the new grid location
+            elif chosen_action == 4:  # STAY
+                Y_new, X_new = Y, X
+
+            current_state = (Y_new, X_new)  # store the new grid location
             agent_update = {'source': source,
                             'update_prior': prior,
                             'update_env': current_state,
@@ -127,7 +128,6 @@ def run_grid(dimension, no_agents, no_timesteps):
             agent_updates.append(agent_update)
 
         return {'agent_updates': agent_updates}
-
 
     def s_agents(params, substep, state_history, previous_state, policy_input):
 
@@ -241,6 +241,7 @@ def run_grid(dimension, no_agents, no_timesteps):
     df = pd.DataFrame(result)
     print(df)
     df.to_csv('result.csv')
+
 
 if __name__ == "__main__":
     run_grid(sys.argv[1], sys.argv[2], sys.argv[3])
