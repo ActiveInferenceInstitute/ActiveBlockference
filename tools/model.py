@@ -15,7 +15,7 @@ class ActiveGridference(GridAgent):
     - (initial state) D -> the generative model's prior belief over hidden states at the first timestep
     - (affordances) E -> the generative model's available actions
     """
-    def __init__(self, planning_length: int = 2, env_state: tuple = (0, 0), ) -> None:
+    def __init__(self, planning_length: int = 2, env_state: tuple = (0, 0)) -> None:
         super().__init__()
         self.A = None
         self.B = None

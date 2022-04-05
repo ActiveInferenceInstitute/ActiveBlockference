@@ -144,6 +144,8 @@ def actinf_graph(agent_network):
 class GridAgent():
     def __init__(self, grid_len, num_agents, grid_dim=2) -> None:
         self.grid = self.get_grid(grid_len, grid_dim)
+        self.grid_dim = grid_dim
+        self.no_actions = 2 * grid_dim + 1
         self.agents = self.init_agents(num_agents)
 
     def get_grid(self, grid_len, grid_dim):
@@ -151,6 +153,24 @@ class GridAgent():
         for i, p in enumerate(g):
             g[i] += (0,)
         return g
+    
+    def move_grid(self, agent, chosen_action):
+        no_actions = 2 * self.grid_dim
+        state = list(agent.env_state)
+        new_state = state.copy()
+
+        # here
+
+        if chosen_action == 0:  # STAY
+            new_state = state
+        else:
+            if chosen_action % 2 == 1:
+                index = (chosen_action+1) / 2
+                new_state[index] = state[index] - 1 if state[index] > 0 else state[index]
+            elif chosen_action % 2 == 0:
+                index = chosen_action / 2
+                new_state[index] = state[index] + 1 if state[index] < agent.border else state[index]
+        return new_state
 
     def init_agents(self, no_agents):
         # create a dict of agents
