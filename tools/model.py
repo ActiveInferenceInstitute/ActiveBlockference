@@ -1,7 +1,8 @@
 import numpy as np
 import tools.utils as utils
+from blockference.gridference import GridAgent
 
-class ActiveGridference():
+class ActiveGridference(GridAgent):
     """
     The ActiveInference class is to be used to create a generative model to be used in cadCAD simulations.
     The current focus is on discrete spaces. 
@@ -14,7 +15,8 @@ class ActiveGridference():
     - (initial state) D -> the generative model's prior belief over hidden states at the first timestep
     - (affordances) E -> the generative model's available actions 
     """
-    def __init__(self, grid, planning_length: int = 2, env_state: tuple = (0, 0), ) -> None:
+    def __init__(self, planning_length: int = 2, env_state: tuple = (0, 0), ) -> None:
+        super().__init__()
         self.A = None
         self.B = None
         self.C = None
@@ -24,7 +26,6 @@ class ActiveGridference():
         self.policy_len = planning_length
 
         # environment
-        self.grid = grid
         self.n_states = len(self.grid)
         self.n_observations = len(self.grid)
         self.border = np.sqrt(self.n_states) - 1
@@ -56,7 +57,7 @@ class ActiveGridference():
 
             for curr_state, grid_location in enumerate(self.grid):
 
-                y, x = grid_location
+                y, x, z = grid_location
 
                 if action_label == "UP":
                     next_y = y - 1 if y > 0 else y 
@@ -73,7 +74,7 @@ class ActiveGridference():
                 elif action_label == "STAY":
                     next_x = x
                     next_y = y
-                new_location = (next_y, next_x)
+                new_location = (next_y, next_x, 0)
                 next_state = self.grid.index(new_location)
                 self.B[next_state, curr_state, action_id] = 1.0
 
