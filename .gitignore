@@ -2,3 +2,4 @@ __pycache__*
 *.ini
 *.xml
 *.iml
+*.ipynb_checkpoints/

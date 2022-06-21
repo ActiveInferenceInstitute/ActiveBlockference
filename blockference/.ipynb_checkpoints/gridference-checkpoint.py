@@ -4,6 +4,7 @@ from pymdp.control import construct_policies
 import pymdp.utils as u
 import random as rand
 import itertools
+import numpy as np
 
 from matplotlib.pyplot import grid
 
@@ -303,7 +304,7 @@ class GridAgent():
 
         return (X_new, Y_new, Z_new)
 
-class ActiveGridference(GridAgent):
+class ActiveGridference():
     """
     The ActiveInference class is to be used to create a generative model to be used in cadCAD simulations.
     The current focus is on discrete spaces.
@@ -316,13 +317,14 @@ class ActiveGridference(GridAgent):
     - (initial state) D -> the generative model's prior belief over hidden states at the first timestep
     - (affordances) E -> the generative model's available actions
     """
-    def __init__(self, planning_length: int = 2, env_state: tuple = (0, 0)) -> None:
+    def __init__(self, grid, planning_length: int = 2, env_state: tuple = (0, 0)) -> None:
         super().__init__()
         self.A = None
         self.B = None
         self.C = None
         self.D = None
         self.E = ["UP", "DOWN", "LEFT", "RIGHT", "STAY"]
+        self.grid = grid
 
         self.policy_len = planning_length
 
@@ -358,7 +360,7 @@ class ActiveGridference(GridAgent):
 
             for curr_state, grid_location in enumerate(self.grid):
 
-                y, x, z = grid_location
+                y, x = grid_location
 
                 if action_label == "UP":
                     next_y = y - 1 if y > 0 else y
@@ -375,17 +377,17 @@ class ActiveGridference(GridAgent):
                 elif action_label == "STAY":
                     next_x = x
                     next_y = y
-                new_location = (next_y, next_x, 0)
+                new_location = (next_y, next_x)
                 next_state = self.grid.index(new_location)
                 self.B[next_state, curr_state, action_id] = 1.0
 
     def get_C(self, preferred_state: tuple):
         """Target Location (preferences)"""
-        self.C = utils.onehot(self.grid.index(preferred_state), self.n_observations)
+        self.C = u.onehot(self.grid.index(preferred_state), self.n_observations)
 
     def get_D(self, initial_state):
         """Initial State"""
-        self.D = utils.onehot(self.grid.index(initial_state), self.n_states)
+        self.D = u.onehot(self.grid.index(initial_state), self.n_states)
         self.prior = self.D
 
     def get_E(self, actions: list):
