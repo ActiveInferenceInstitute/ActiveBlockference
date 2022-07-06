@@ -345,7 +345,7 @@ class ActiveGridference():
 
     def get_A(self):
         """
-        State Matrix (identity matrix)
+        State Matrix (identity matrix for the single agent gridworld)
         Params:
             - n_observations: int: number of possible observations
             - n_states: int: number of possible states
