@@ -3,3 +3,6 @@ __pycache__*
 *.xml
 *.iml
 *.ipynb_checkpoints/
+./blockference/.ipynb_checkpoints
+.DS_Store
+**checkpoint.py

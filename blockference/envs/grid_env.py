@@ -6,12 +6,13 @@ class GridAgent():
         self.grid = self.get_grid(grid_len, grid_dim)
         self.grid_dim = grid_dim
         self.no_actions = 2 * grid_dim + 1
-        self.agents = self.init_agents(num_agents)
+        self.n_observations = grid_len ** 2
+        self.n_states = grid_len ** 2
+        self.border = np.sqrt(self.n_states) - 1
+        # self.agents = self.init_agents(num_agents)
 
     def get_grid(self, grid_len, grid_dim):
         g = list(itertools.product(range(grid_len), repeat=grid_dim))
-        for i, p in enumerate(g):
-            g[i] += (0,)
         return g
 
     def move_grid(self, agent, chosen_action):
@@ -29,7 +30,7 @@ class GridAgent():
                 new_state[index] = state[index] - 1 if state[index] > 0 else state[index]
             elif chosen_action % 2 == 0:
                 index = chosen_action / 2
-                new_state[index] = state[index] + 1 if state[index] < agent.border else state[index]
+                new_state[index] = state[index] + 1 if state[index] < self.border else state[index]
         return new_state
 
     def init_agents(self, no_agents):
