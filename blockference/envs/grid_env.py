@@ -2,7 +2,7 @@ from blockference.gridference import *
 
 
 class GridAgent():
-    def __init__(self, grid_len, num_agents, grid_dim=2) -> None:
+    def __init__(self, grid_len, grid_dim=2) -> None:
         self.grid = self.get_grid(grid_len, grid_dim)
         self.grid_dim = grid_dim
         self.no_actions = 2 * grid_dim + 1
