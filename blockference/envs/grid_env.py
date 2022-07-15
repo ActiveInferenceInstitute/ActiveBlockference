@@ -11,10 +11,12 @@ class GridAgent():
         self.border = np.sqrt(self.n_states) - 1
         self.states = [agent.D for agent in agents]
         self.rel_locs = ["NONE", "NEXT_LEFT", "NEXT_RIGHT", "ABOVE", "BELOW"]
+        self.agent_locs = [self.grid.index(self.states[0][0]), self.grid.index(self.states[1][0])]
         assert len(self.states) == len(self.agents)
 
     def step(self, actions):
         assert len(self.states) == len(actions), "Number of actions received is more than number of agents"
+        next_state = copy.deepcopy(self.states)
         
         for idx, action in enumerate(actions):
             new_loc = copy.deepcopy(self.states[idx][0]) # new location of agent on grid
@@ -47,8 +49,9 @@ class GridAgent():
                 next_state = (grid.index(new_location), new_ref)
             else:
                 new_ref = self.rel_locs.index(rel_pos)
-                next_state = (grid.index(new_location), new_ref)
-            return next_state
+                next_state[idx] = (grid.index(new_location), new_ref)
+            self.agent_locs[idx] = new_location
+        return next_state # update both agents at the same time, need to be optimized in future iterations
 
     def get_rel_pos(self, loc1, loc2):
         rel_pos = ""
