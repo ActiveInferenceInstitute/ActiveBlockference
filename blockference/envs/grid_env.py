@@ -2,14 +2,55 @@ from blockference.gridference import *
 
 
 class GridAgent():
-    def __init__(self, grid_len, grid_dim=2) -> None:
+    def __init__(self, grid_len, grid_dim=2, agents=[]) -> None:
         self.grid = self.get_grid(grid_len, grid_dim)
         self.grid_dim = grid_dim
         self.no_actions = 2 * grid_dim + 1
         self.n_observations = grid_len ** 2
         self.n_states = grid_len ** 2
         self.border = np.sqrt(self.n_states) - 1
-        # self.agents = self.init_agents(num_agents)
+        self.states = [agent.D for agent in agents]
+        assert len(self.states) == len(self.agents)
+
+    def step(self, actions):
+        assert len(self.states) == len(actions), "Number of actions received is more than number of agents"
+        
+        for idx, action in enumerate(actions):
+            new_loc = copy.deepcopy(self.states[idx][0]) # new location of agent on grid
+            new_ref = copy.deepcopy(self.states[idx][1]) # new relative position to the other agent on the grid
+            
+            if chosen_action == 0:  # STAY
+                new_state = state
+            else:
+                if chosen_action % 2 == 1:
+                    index = (chosen_action+1) / 2
+                    new_state[index] = state[index] - 1 if state[index] > 0 else state[index]
+                elif chosen_action % 2 == 0:
+                    index = chosen_action / 2
+                    new_state[index] = state[index] + 1 if state[index] < self.border else state[index]
+
+    def get_rel_pos(self, loc1, loc2):
+        rel_pos = ""
+        
+        if loc1[0] == loc2[0]: # on the same x-position
+            if (loc1[1] > loc2[1]) and ((loc1[1] - loc2[1]) == 1): # agent_2 is below agent_1
+                rel_pos = "BELOW"
+            elif (loc1[1] < loc2[1]) and ((loc1[1] - loc2[1]) == 1): # agent_2 is above agent_1
+                rel_pos = "ABOVE"
+            else:
+                rel_pos = "NONE"
+        elif loc1[1] == loc2[1]: # on the same x-position
+            if (loc1[0] > loc2[0]) and ((loc1[0] - loc2[0]) == 1): # agent_2 is to the left of agent_1
+                rel_pos = "NEXT_LEFT"
+            elif (loc1[0] < loc2[0]) and ((loc1[0] - loc2[0]) == 1): # agent_2 is above agent_1
+                rel_pos = "NEXT_RIGHT"
+            else:
+                rel_pos = "NONE"
+        elif (loc1[0] == loc2[0]) and (loc1[1] == loc2[1]): # on the same position, need to handle this better
+            rel_pos = "NONE"
+        else:
+            rel_pos = "NONE"
+        return rel_pos
 
     def get_grid(self, grid_len, grid_dim):
         g = list(itertools.product(range(grid_len), repeat=grid_dim))
@@ -33,24 +74,6 @@ class GridAgent():
                 new_state[index] = state[index] + 1 if state[index] < self.border else state[index]
         return new_state
 
-    def init_agents(self, no_agents):
-        # create a dict of agents
-        agents = {}
-
-        for a in range(no_agents):
-            # create new agent
-            agent = ActiveGridference(self.grid)
-            # generate target state
-            target = (rand.randint(0, 9), rand.randint(0, 9))
-            # add target state
-            agent.get_C(target + (0,))
-            # all agents start in the same position
-            start = (rand.randint(0, 9), rand.randint(0, 9))
-            agent.get_D(start + (1,))
-
-            agents[a] = agent
-
-        return agents
 
     def actinf_dict(self, agents_dict, g_agent):
         # list of all updates to the agents in the network
