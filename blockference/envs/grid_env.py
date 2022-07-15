@@ -11,8 +11,8 @@ class GridAgent():
         self.border = np.sqrt(self.n_states) - 1
         self.states = [agent.D for agent in agents]
         self.rel_locs = ["NONE", "NEXT_LEFT", "NEXT_RIGHT", "ABOVE", "BELOW"]
-        self.agent_locs = [self.grid.index(self.states[0][0]), self.grid.index(self.states[1][0])]
-        assert len(self.states) == len(self.agents)
+        self.agent_locs = [self.grid[self.states[0][0]], self.grid[self.states[1][0]]]
+        assert len(self.states) == len(agents)
 
     def step(self, actions):
         assert len(self.states) == len(actions), "Number of actions received is more than number of agents"
