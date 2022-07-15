@@ -10,6 +10,7 @@ class GridAgent():
         self.n_states = grid_len ** 2
         self.border = np.sqrt(self.n_states) - 1
         self.states = [agent.D for agent in agents]
+        self.rel_locs = ["NONE", "NEXT_LEFT", "NEXT_RIGHT", "ABOVE", "BELOW"]
         assert len(self.states) == len(self.agents)
 
     def step(self, actions):
@@ -19,15 +20,35 @@ class GridAgent():
             new_loc = copy.deepcopy(self.states[idx][0]) # new location of agent on grid
             new_ref = copy.deepcopy(self.states[idx][1]) # new relative position to the other agent on the grid
             
-            if chosen_action == 0:  # STAY
-                new_state = state
+            y, x = self.states[idx][0]
+
+            if action_label == "DOWN":
+                next_y = y - 1 if y > 0 else y
+                next_x = x
+            elif action_label == "UP":
+                next_y = y + 1 if y < border else y
+                next_x = x
+            elif action_label == "LEFT":
+                next_x = x - 1 if x > 0 else x
+                next_y = y
+            elif action_label == "RIGHT":
+                next_x = x + 1 if x < border else x
+                next_y = y
+            elif action_label == "STAY":
+                next_x = x
+                next_y = y
+            new_location = (next_y, next_x)
+            try:
+                rel_pos = self.get_rel_pos(new_location, self.states[idx+1][0])
+            except:
+                rel_pos = self.get_rel_pos(new_location, self.states[idx-1][0])
+            if rel_pos == "COLLISION":
+                new_location = self.states[idx][0]
+                next_state = (grid.index(new_location), new_ref)
             else:
-                if chosen_action % 2 == 1:
-                    index = (chosen_action+1) / 2
-                    new_state[index] = state[index] - 1 if state[index] > 0 else state[index]
-                elif chosen_action % 2 == 0:
-                    index = chosen_action / 2
-                    new_state[index] = state[index] + 1 if state[index] < self.border else state[index]
+                new_ref = self.rel_locs.index(rel_pos)
+                next_state = (grid.index(new_location), new_ref)
+            return next_state
 
     def get_rel_pos(self, loc1, loc2):
         rel_pos = ""
@@ -47,7 +68,7 @@ class GridAgent():
             else:
                 rel_pos = "NONE"
         elif (loc1[0] == loc2[0]) and (loc1[1] == loc2[1]): # on the same position, need to handle this better
-            rel_pos = "NONE"
+            rel_pos = "COLLISION"
         else:
             rel_pos = "NONE"
         return rel_pos
