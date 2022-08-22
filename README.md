@@ -14,7 +14,7 @@ git clone https://github.com/ActiveInferenceLab/ActiveBlockference.git
 
 cd ActiveBlockference/
 
-# create new python enviornment
+# create new python environment
 
 python -m venv cad
 
@@ -39,7 +39,7 @@ An active inference agent consists of the following matrices:
 ### pymdp ~ Active Inference
 #### Analysis of actinf_from_scratch pymdp tutorial
 
-The pymdp inference loop has the following steps (for more information visit the official [tutorial](https://pymdp-rtd.readthedocs.io/en/latest/notebooks/active_inference_from_scratch.html):
+The pymdp inference loop has the following steps (for more information visit the official [tutorial](https://pymdp-rtd.readthedocs.io/en/latest/notebooks/active_inference_from_scratch.html)):
 - initialize prior to the D matrix
 - get observation index from `grid_locations`
 - (q_s) perform inference over hidden states with `infer_states`, passing in the observation index, the A matrix, and the prior
