@@ -2,7 +2,7 @@
 
 This is a work-in-progress repository for active inference agents in cadCAD.
 
-Active Blockference is an open source project that will be stewarded through deep time by Active Inference Lab.
+Active Blockference is an open source project that will be stewarded through deep time by the Active Inference Institute.
 Reduce your uncertainty about how to participate in Active Inference Institute or contact us: https://activeinference.org/ 
 
 ## 🚧 Getting Started
@@ -10,7 +10,7 @@ Reduce your uncertainty about how to participate in Active Inference Institute o
 ```
 # clone the repo
 
-git clone https://github.com/ActiveInferenceLab/ActiveBlockference.git
+git clone https://github.com/ActiveInferenceInstitute/ActiveBlockference.git
 
 cd ActiveBlockference/
 
