@@ -25,6 +25,10 @@ class GridAgent():
     def step(self, actions):
         # assert len(self.states) == len(actions), "Number of actions received is more than number of agents"
         print(f"actions received: {actions} with length: {len(actions)}")
+        print(f"actions for agent 1: {self.E[int(actions[0])]} and for agent 2: {self.E[int(actions[1])]}")
+        print(f"Current state is: {self.states}")
+        print(f"Current observations are (agent locations): {self.agent_locs}")
+        assert 1==0
         next_state = copy.deepcopy(self.states)
         
         for idx, action in enumerate(actions):
