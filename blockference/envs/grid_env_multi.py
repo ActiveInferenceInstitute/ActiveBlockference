@@ -15,11 +15,9 @@ class GridAgent():
         self.n_observations = grid_len ** 2
         self.n_states = grid_len ** 2
         # self.border = np.sqrt(self.n_states) - 1
-        self.states = [agent.D for agent in agents]
-        self.rel_locs = ["NONE", "NEXT_LEFT", "NEXT_RIGHT", "ABOVE", "BELOW"]
+        self.states = agent[0].D # states and locs are now the same thing
         self.E = ["UP", "DOWN", "LEFT", "RIGHT", "STAY"]
 
-        self.agent_locs = [np.nonzero(self.states[0][0])[0][0], np.nonzero(self.states[1][0])[0][0]]
         assert len(self.states) == len(agents)
 
     def step(self, actions):
@@ -32,6 +30,8 @@ class GridAgent():
         next_state = copy.deepcopy(self.states)
         
         for idx, action in enumerate(actions):
+            agent_idx = idx
+            other_agent_idx = 0 if agent_idx == 1 else 1
             new_loc = copy.deepcopy(self.states[idx][0]) # new location of agent on grid
             new_ref = copy.deepcopy(self.states[idx][1]) # new relative position to the other agent on the grid
             action_label = self.E[int(action[0])]
@@ -67,6 +67,8 @@ class GridAgent():
                 next_state[idx] = (self.grid.index(new_location), new_ref)
             self.agent_locs[idx] = new_location
         return next_state # update both agents at the same time, need to be optimized in future iterations
+
+    def is_collision(self, agent_idx, other_agent_idx, new_location):
 
     def get_rel_pos(self, loc1, loc2):
         rel_pos = ""
