@@ -4,6 +4,13 @@ import copy
 
 class GridAgent():
     def __init__(self, grid_len, grid_dim=2, agents=[]) -> None:
+        """
+        The GridAgent class represent the gridworld environment and keeps track of the locations of the individual agents.
+        
+        Params
+            pos_dict - position dictionary mapping location indexes to their (x, y) values
+            states - a list of the index locations of the agents
+        """
         self.grid = self.get_grid(grid_len, grid_dim)
         grid = list(itertools.product(range(3), repeat=2))
         self.border = np.sqrt(len(grid)) - 1
@@ -26,7 +33,6 @@ class GridAgent():
         print(f"actions for agent 1: {self.E[int(actions[0])]} and for agent 2: {self.E[int(actions[1])]}")
         print(f"Current state is: {self.states}")
         print(f"Current observations are (agent locations): {self.agent_locs}")
-        assert 1==0
         next_state = copy.deepcopy(self.states)
         
         for idx, action in enumerate(actions):
