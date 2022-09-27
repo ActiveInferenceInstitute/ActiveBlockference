@@ -7,31 +7,40 @@ class GridAgent():
         """
         The GridAgent class represent the gridworld environment and keeps track of the locations of the individual agents.
         
-        Params
-            pos_dict - position dictionary mapping location indexes to their (x, y) values
-            states - a list of the index locations of the agents
+        Params:
+            grid_len: length of the gridworld
+            grid_dim: dimension of the gridworld
+            agents: list of agents in the environment
+            no_actions: number of actions available to the agents
+            n_states: number of states in the environment
+            states: list of current agent states in the environment
+            pos_dict: dictionary of agent states and their corresponding positions on the grid
         """
         self.grid = self.get_grid(grid_len, grid_dim)
         grid = list(itertools.product(range(3), repeat=2))
         self.border = np.sqrt(len(grid)) - 1
         self.pos_dict = {}
-        print(f'pos-dict is {self.pos_dict}')
-        assert 1==0
         for i in range(0, len(grid)):
             self.pos_dict[i] = grid[i]
+        print(f'pos_dict is {self.pos_dict}')
 
         self.grid_dim = grid_dim
         self.no_actions = 2 * grid_dim + 1
         self.n_observations = grid_len ** 2
         self.n_states = grid_len ** 2
         # self.border = np.sqrt(self.n_states) - 1
-        self.states = agent[0].D # states and locs are now the same thing
+        self.states = agents[0].D # states and locs are now the same thing
         self.E = ["UP", "DOWN", "LEFT", "RIGHT", "STAY"]
 
         assert len(self.states) == len(agents)
 
     def step(self, actions):
-        next_state = copy.deepcopy(self.states)
+        """
+        Step function for the gridworld environment.
+
+        Params:
+            actions: list of actions chosen by the agents in the environment
+        """
         
         for idx, action in enumerate(actions):
             # get indexes of the current reference agent and the other agent (2-agent case, in the future might be handled with a dict)
@@ -62,18 +71,19 @@ class GridAgent():
             elif action_label == "STAY":
                 next_x = x
                 next_y = y
+            else:
+                raise ValueError(f'Action {action_label} not recognized')
 
             new_location = (next_y, next_x)
-            new_agent_state = list(mydict.keys())[list(mydict.values()).index(new_location)
+            new_agent_state = list(self.pos_dict.keys())[list(self.pos_dict.values()).index(new_location)]
             
             # check for collisions
             if new_agent_state == other_agent_state:
                 new_agent_state = self.states[agent_idx] # i.e. could not perform the action
+
             self.states[agent_idx] = new_agent_state # update state
 
         return self.states # update both agents at the same time, need to be optimized in future iterations
-
-    def is_collision(self, agent_idx, other_agent_idx, new_location):
 
     def get_rel_pos(self, loc1, loc2):
         rel_pos = ""
