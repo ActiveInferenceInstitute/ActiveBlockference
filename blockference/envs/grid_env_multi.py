@@ -1,8 +1,13 @@
 from blockference.gridference import *
+from pymdp import utils
 import copy
 
 
-class GridAgent():
+LOCATION_FACTOR_ID = 0
+OTHER_AGENT_FACTOR_ID = 1
+
+
+class TwoGridAgent():
     def __init__(self, grid_len, grid_dim=2, agents=[]) -> None:
         """
         The GridAgent class represent the gridworld environment and keeps track of the locations of the individual agents.
@@ -31,8 +36,66 @@ class GridAgent():
         # self.border = np.sqrt(self.n_states) - 1
         self.states = agents[0].D # states and locs are now the same thing
         self.E = ["UP", "DOWN", "LEFT", "RIGHT", "STAY"]
+        self._likelihood_dist = self._construct_likelihood_dist()
 
         assert len(self.states) == len(agents)
+
+    def get_likelihood_dist(self):
+        return self._likelihood_dist.copy()
+
+    def _construct_likelihood_dist(self):
+
+        A = utils.obj_array_zeros([ [obs_dim] + self.num_states for _, obs_dim in enumerate(self.num_obs)] )
+        
+        for loc in range(self.num_states[LOCATION_FACTOR_ID]):
+            for reward_condition in range(self.num_states[TRIAL_FACTOR_ID]):
+
+                if loc == 0:  # the case when the agent is in the centre location
+                    # When in the centre location, reward observation is always 'no reward', or the outcome with index 0
+                    A[REWARD_MODALITY_ID][0, loc, reward_condition] = 1.0
+
+                    # When in the center location, cue observation is always 'no cue', or the outcome with index 0
+                    A[CUE_MODALITY_ID][0, loc, reward_condition] = 1.0
+
+                # The case when loc == 3, or the cue location ('bottom arm')
+                elif loc == 3:
+
+                    # When in the cue location, reward observation is always 'no reward', or the outcome with index 0
+                    A[REWARD_MODALITY_ID][0, loc, reward_condition] = 1.0
+
+                    # When in the cue location, the cue indicates the reward condition umambiguously
+                    # signals where the reward is located
+                    A[CUE_MODALITY_ID][reward_condition + 1, loc, reward_condition] = 1.0
+
+                # The case when the agent is in one of the (potentially-) rewarding arms
+                else:
+
+                    # When location is consistent with reward condition
+                    if loc == (reward_condition + 1):
+                        # Means highest probability is concentrated over reward outcome
+                        high_prob_idx = REWARD_IDX
+                        # Lower probability on loss outcome
+                        low_prob_idx = LOSS_IDX  #
+                    else:
+                        # Means highest probability is concentrated over loss outcome
+                        high_prob_idx = LOSS_IDX
+                        # Lower probability on reward outcome
+                        low_prob_idx = REWARD_IDX
+
+                    reward_probs = self.reward_probs[0]
+                    A[REWARD_MODALITY_ID][high_prob_idx, loc, reward_condition] = reward_probs
+                    reward_probs = self.reward_probs[1]
+                    A[REWARD_MODALITY_ID][low_prob_idx, loc, reward_condition] = reward_probs
+
+                    # When in the one of the rewarding arms, cue observation is always 'no cue', or the outcome with index 0
+                    A[CUE_MODALITY_ID][0, loc, reward_condition] = 1.0
+
+                # The agent always observes its location, regardless of the reward condition
+                A[LOCATION_MODALITY_ID][loc, loc, reward_condition] = 1.0
+
+        return A
+
+
 
     def step(self, actions):
         """
