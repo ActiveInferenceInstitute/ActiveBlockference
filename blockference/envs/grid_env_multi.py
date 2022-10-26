@@ -28,7 +28,7 @@ class TwoMultiGridAgent():
             self.pos_dict[i] = self.grid[i]
         print(f'Position dictionary is {self.pos_dict}')
 
-        self.n_states = grid_len ** 2
+        self.num_states = grid_len ** 2
 
         self.current_state = init_pos # make them indexes
         print(f'Agents are occupying the states {[self.pos_dict[v] for v in init_pos]}')
@@ -54,16 +54,16 @@ class TwoMultiGridAgent():
             agent_idx = idx
             other_agent_idx = 0 if agent_idx == 1 else 1
             
-            # initialize new agent state
-            new_agent_state = copy.deepcopy(self.current_state[agent_idx]) # new location of agent on grid
+            # get state of other agent
             other_agent_state = self.current_state[other_agent_idx]
             
             # get word action label
             action_label = self.affordances[int(action[0])]
 
-            x, y = self.pos_dict[agent_idx]
+            x, y = self.pos_dict[self.current_state[agent_idx]]
 
             if action_label == "DOWN":
+                print("taking action DOWN")
                 next_y = y - 1 if y > 0 else y
                 next_x = x
             elif action_label == "UP":
@@ -83,12 +83,12 @@ class TwoMultiGridAgent():
 
             new_location = (next_x, next_y)
             new_agent_state = list(self.pos_dict.keys())[list(self.pos_dict.values()).index(new_location)] # returns index!
-            
             # check for collisions
             if new_agent_state == other_agent_state:
+                print("Almost collided!")
                 new_agent_state = self.current_state[agent_idx] # i.e. could not perform the action
-            
-            new_states[agent_idx] = new_agent_state
+
+            new_states.append(new_agent_state)
 
         print(f"New agent states are {new_states}")
         self.current_state = new_states
@@ -99,7 +99,7 @@ class TwoMultiGridAgent():
         for i in range(2): # not general, just for the two agents
             agent_idx = i
             other_agent_idx = 0 if agent_idx == 1 else 1
-            new_current_obs[i] = [utils.onehot(new_states[agent_idx], self.num_states), utils.onehot(new_states[other_agent_idx], self.num_states)]
+            new_current_obs.append([utils.onehot(new_states[agent_idx], self.num_states), utils.onehot(new_states[other_agent_idx], self.num_states)])
         
         print(f"New observations are {new_current_obs}")
         self.current_obs = new_current_obs
