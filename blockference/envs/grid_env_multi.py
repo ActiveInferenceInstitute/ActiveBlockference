@@ -47,6 +47,7 @@ class TwoMultiGridAgent():
         Params:
             actions: list of actions chosen by the agents in the environment
         """
+        new_states = []
 
         for idx, action in enumerate(actions):
             # get indexes of the current reference agent and the other agent (2-agent case, in the future might be handled with a dict)
@@ -54,8 +55,8 @@ class TwoMultiGridAgent():
             other_agent_idx = 0 if agent_idx == 1 else 1
             
             # initialize new agent state
-            new_agent_state = copy.deepcopy(self.states[agent_idx]) # new location of agent on grid
-            other_agent_state = self.states[other_agent_idx]
+            new_agent_state = copy.deepcopy(self.current_state[agent_idx]) # new location of agent on grid
+            other_agent_state = self.current_state[other_agent_idx]
             
             # get word action label
             action_label = self.affordances[int(action[0])]
@@ -80,16 +81,31 @@ class TwoMultiGridAgent():
             else:
                 raise ValueError(f'Action {action_label} not recognized')
 
-            new_location = (next_y, next_x)
-            new_agent_state = list(self.pos_dict.keys())[list(self.pos_dict.values()).index(new_location)]
+            new_location = (next_x, next_y)
+            new_agent_state = list(self.pos_dict.keys())[list(self.pos_dict.values()).index(new_location)] # returns index!
             
             # check for collisions
-            if np.array_equal(new_agent_state, other_agent_state):
-                new_agent_state = self.states[agent_idx] # i.e. could not perform the action
+            if new_agent_state == other_agent_state:
+                new_agent_state = self.current_state[agent_idx] # i.e. could not perform the action
+            
+            new_states[agent_idx] = new_agent_state
 
-            self.states[agent_idx] = new_agent_state # update state
+        print(f"New agent states are {new_states}")
+        self.current_state = new_states
+        
+        # Now generate new observations for each agent (after they have both taken a step)
+        new_current_obs = []
+        
+        for i in range(2): # not general, just for the two agents
+            agent_idx = i
+            other_agent_idx = 0 if agent_idx == 1 else 1
+            new_current_obs[i] = [utils.onehot(new_states[agent_idx], self.num_states), utils.onehot(new_states[other_agent_idx], self.num_states)]
+        
+        print(f"New observations are {new_current_obs}")
+        self.current_obs = new_current_obs
+            
 
-        return self.states # update both agents at the same time, need to be optimized in future iterations
+        return self.current_obs # update both agents at the same time, need to be optimized in future iterations
 
     def get_grid(self, grid_len, grid_dim):
         g = list(itertools.product(range(grid_len), repeat=grid_dim))
