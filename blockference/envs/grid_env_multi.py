@@ -61,13 +61,13 @@ class TwoMultiGridAgent():
             action_label = self.affordances[int(action[0])]
 
             x, y = self.pos_dict[self.current_state[agent_idx]]
+            
 
             if action_label == "DOWN":
-                print("taking action DOWN")
-                next_y = y - 1 if y > 0 else y
+                next_y = y + 1 if y < self.border else y
                 next_x = x
             elif action_label == "UP":
-                next_y = y + 1 if y < self.border else y
+                next_y = y - 1 if y > 0 else y
                 next_x = x
             elif action_label == "LEFT":
                 next_x = x - 1 if x > 0 else x
@@ -87,10 +87,12 @@ class TwoMultiGridAgent():
             if new_agent_state == other_agent_state:
                 print("Almost collided!")
                 new_agent_state = self.current_state[agent_idx] # i.e. could not perform the action
+                new_location = (x, y)
+            print(f"New location for agent {agent_idx} is {new_location}")
+                
 
             new_states.append(new_agent_state)
 
-        print(f"New agent states are {new_states}")
         self.current_state = new_states
         
         # Now generate new observations for each agent (after they have both taken a step)
@@ -99,9 +101,8 @@ class TwoMultiGridAgent():
         for i in range(2): # not general, just for the two agents
             agent_idx = i
             other_agent_idx = 0 if agent_idx == 1 else 1
-            new_current_obs.append([utils.onehot(new_states[agent_idx], self.num_states), utils.onehot(new_states[other_agent_idx], self.num_states)])
+            new_current_obs.append([utils.onehot(new_states[agent_idx], self.num_states).astype(int), utils.onehot(new_states[other_agent_idx], self.num_states).astype(int)])
         
-        print(f"New observations are {new_current_obs}")
         self.current_obs = new_current_obs
             
 
