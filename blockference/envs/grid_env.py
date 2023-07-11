@@ -1,40 +1,51 @@
 from blockference.gridference import *
+import copy
 
 
 class GridAgent():
     def __init__(self, grid_len, grid_dim=2, agents=[]) -> None:
         self.grid = self.get_grid(grid_len, grid_dim)
+        grid = list(itertools.product(range(3), repeat=2))
+        self.border = np.sqrt(len(grid)) - 1
+        self.pos_dict = {}
+        for i in range(0, len(grid)):
+            self.pos_dict[i] = grid[i]
         self.grid_dim = grid_dim
         self.no_actions = 2 * grid_dim + 1
         self.n_observations = grid_len ** 2
         self.n_states = grid_len ** 2
-        self.border = np.sqrt(self.n_states) - 1
+        # self.border = np.sqrt(self.n_states) - 1
         self.states = [agent.D for agent in agents]
         self.rel_locs = ["NONE", "NEXT_LEFT", "NEXT_RIGHT", "ABOVE", "BELOW"]
+        self.E = ["UP", "DOWN", "LEFT", "RIGHT", "STAY"]
+
         self.agent_locs = [np.nonzero(self.states[0][0])[0][0], np.nonzero(self.states[1][0])[0][0]]
         assert len(self.states) == len(agents)
 
     def step(self, actions):
-        assert len(self.states) == len(actions), "Number of actions received is more than number of agents"
+        # assert len(self.states) == len(actions), "Number of actions received is more than number of agents"
+        print(f"actions received: {actions} with length: {len(actions)}")
         next_state = copy.deepcopy(self.states)
         
         for idx, action in enumerate(actions):
             new_loc = copy.deepcopy(self.states[idx][0]) # new location of agent on grid
             new_ref = copy.deepcopy(self.states[idx][1]) # new relative position to the other agent on the grid
-            
-            y, x = self.states[idx][0]
+            action_label = self.E[int(action[0])]
+            # y, x = self.states[idx][0] # looks like [1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0]
+            k = [k for k, i in enumerate(self.states[idx][0]) if i != 0]
+            y, x = self.pos_dict[k[0]]
 
             if action_label == "DOWN":
                 next_y = y - 1 if y > 0 else y
                 next_x = x
             elif action_label == "UP":
-                next_y = y + 1 if y < border else y
+                next_y = y + 1 if y < self.border else y
                 next_x = x
             elif action_label == "LEFT":
                 next_x = x - 1 if x > 0 else x
                 next_y = y
             elif action_label == "RIGHT":
-                next_x = x + 1 if x < border else x
+                next_x = x + 1 if x < self.border else x
                 next_y = y
             elif action_label == "STAY":
                 next_x = x
@@ -46,10 +57,10 @@ class GridAgent():
                 rel_pos = self.get_rel_pos(new_location, self.states[idx-1][0])
             if rel_pos == "COLLISION":
                 new_location = self.states[idx][0]
-                next_state = (grid.index(new_location), new_ref)
+                next_state = (self.grid.index(new_location), new_ref)
             else:
                 new_ref = self.rel_locs.index(rel_pos)
-                next_state[idx] = (grid.index(new_location), new_ref)
+                next_state[idx] = (self.grid.index(new_location), new_ref)
             self.agent_locs[idx] = new_location
         return next_state # update both agents at the same time, need to be optimized in future iterations
 
