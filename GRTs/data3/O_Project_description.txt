@@ -1,0 +1,10 @@
+Write a 1000 word report on active inference, citing relevant papers at the end.
+
+Professor Karl: 
+- If you don't have the relevant information, send a request to Research Assistant Joe by creating a new requests.txt file.
+_ If you have any information, start writing the report, details below.
+- First write an outline of the report, including relevant sections.
+- Then complete the report from the gathered data.
+
+Research Assistant Joe:
+- Check if there are any outstanding requests from the Professor, otherwise, see what information is available on the project and gather more information if necessary.

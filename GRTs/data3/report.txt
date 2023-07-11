@@ -1,0 +1,21 @@
+The titles and authors of the papers on active inference are:
+
+1. 'Active inference and learning' by K Friston, T FitzGerald, F Rigoli and others. This paper offers an active inference account of choice behaviour and learning. It focuses on the distinction between goal-directed and habitual behaviour and how they contextualise each other.
+
+2. 'Active inference: a process theory' by K Friston, T FitzGerald, F Rigoli, P Schwartenbeck and others. Active inference is a process theory derived from the variational free energy. It is a leading theory in neuroscience that provides a simple and neuro-biologically plausible account of how action and perception are coupled in producing (Bayes) optimal behaviour.
+
+3. 'Active inference: demystified and compared' by N Sajid, PJ Ball, T Parr, KJ Friston. Active inference is a theory of perception, learning and decision making, which can be applied to neuroscience, robotics, and machine learning.
+
+4. 'Active inference, curiosity and insight' by KJ Friston, CD Frith. This article offers a formal account of curiosity and insight in terms of active (Bayesian) inference.
+
+5. 'Active inference and epistemic value' by K Friston, F Rigoli, D Ognibene, C Mathys et al. The resulting scheme resolves the exploration-exploitation dilemma: Epistemic value is maximized until there is no further information gain, after which exploitation is assured through maximization of extrinsic value.
+
+6. 'Active inference, stressors and allostatic states' by KJ Friston, R Rosch, T Parr, C Price et al. This paper offers a formal account of emotional inference and stress-related behaviour, using the notion of active inference.
+
+7. 'Active inference, curiosity and insight' by KJ Friston, CD Frith. This article offers a formal account of curiosity and insight in terms of active (Bayesian) inference.
+
+8. 'On the relationship between active inference and control as inference' by B Millidge, A Tschantz, AK Seth, CL Buckley. Active Inference (AIF) is an emerging framework in the brain sciences which suggests that biological agents act to minimise a variational bound on model evidence.
+
+9. 'Action understanding and active inference' by K Friston, J Mattout, J Kilner. This paper presents neuronal simulations based on the free-energy formulation of active inference, which is related to predictive coding.
+
+10. 'The anatomy of choice: active inference and agency' by K Friston, P Schwartenbeck, T FitzGerald. This paper discusses the intricate linkage of exteroceptive perception to the rhythmic activity of the visceral body, and the rise of interoceptive inference theories of affective perception and self-consciousness in cognitive science.
