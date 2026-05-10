@@ -1,0 +1,18 @@
+# Equivalent example expressed in TOML — proves both loaders work.
+name = "gridworld_sweep"
+seed = 7
+
+[grid]
+dimension = 4
+planning_length = 2
+affordances = ["UP", "DOWN", "LEFT", "RIGHT", "STAY"]
+
+[simulation]
+timesteps = 15
+runs = 3
+n_agents = 4
+target = "random"
+initial_state = [0, 0]
+
+[output]
+path = "results/gridworld_sweep.csv"

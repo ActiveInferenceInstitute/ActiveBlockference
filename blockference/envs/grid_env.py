@@ -1,34 +1,48 @@
-from blockference.gridference import *
 import copy
+import itertools
+
+import numpy as np
+
+from blockference.gridference import ActiveGridference  # noqa: F401
+from blockference.maths import construct_policies
+from blockference.utils import utils as u
 
 
-class GridAgent():
-    def __init__(self, grid_len, grid_dim=2, agents=[]) -> None:
+class GridAgent:
+    """Multi-agent grid environment.
+
+    Holds the canonical position dictionary, the agents' current state
+    distributions, and a 5-action affordance set. Inference is performed
+    by ``actinf_dict`` over a dict of :class:`ActiveGridference` agents.
+    """
+
+    def __init__(self, grid_len, grid_dim=2, agents=None) -> None:
+        agents = list(agents) if agents else []
         self.grid = self.get_grid(grid_len, grid_dim)
-        grid = list(itertools.product(range(3), repeat=2))
-        self.border = np.sqrt(len(grid)) - 1
-        self.pos_dict = {}
-        for i in range(0, len(grid)):
-            self.pos_dict[i] = grid[i]
+        self.border = int(np.sqrt(len(self.grid)) - 1)
+        self.pos_dict = {i: loc for i, loc in enumerate(self.grid)}
         self.grid_dim = grid_dim
         self.no_actions = 2 * grid_dim + 1
-        self.n_observations = grid_len ** 2
-        self.n_states = grid_len ** 2
-        # self.border = np.sqrt(self.n_states) - 1
-        self.states = [agent.D for agent in agents]
+        self.n_observations = grid_len ** grid_dim
+        self.n_states = grid_len ** grid_dim
         self.rel_locs = ["NONE", "NEXT_LEFT", "NEXT_RIGHT", "ABOVE", "BELOW"]
         self.E = ["UP", "DOWN", "LEFT", "RIGHT", "STAY"]
 
-        self.agent_locs = [np.nonzero(self.states[0][0])[0][0], np.nonzero(self.states[1][0])[0][0]]
+        self.states = [agent.D for agent in agents]
+        # Resolve each agent's index from its (1-D) one-hot D vector.
+        self.agent_locs = [
+            int(np.atleast_1d(np.nonzero(np.atleast_1d(state))[0])[0])
+            for state in self.states
+        ]
         assert len(self.states) == len(agents)
 
     def step(self, actions):
         # assert len(self.states) == len(actions), "Number of actions received is more than number of agents"
         print(f"actions received: {actions} with length: {len(actions)}")
         next_state = copy.deepcopy(self.states)
-        
+
         for idx, action in enumerate(actions):
-            new_loc = copy.deepcopy(self.states[idx][0]) # new location of agent on grid
+            copy.deepcopy(self.states[idx][0]) # new location of agent on grid
             new_ref = copy.deepcopy(self.states[idx][1]) # new relative position to the other agent on the grid
             action_label = self.E[int(action[0])]
             # y, x = self.states[idx][0] # looks like [1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0]
@@ -53,7 +67,7 @@ class GridAgent():
             new_location = (next_y, next_x)
             try:
                 rel_pos = self.get_rel_pos(new_location, self.states[idx+1][0])
-            except:
+            except IndexError:
                 rel_pos = self.get_rel_pos(new_location, self.states[idx-1][0])
             if rel_pos == "COLLISION":
                 new_location = self.states[idx][0]
@@ -66,7 +80,7 @@ class GridAgent():
 
     def get_rel_pos(self, loc1, loc2):
         rel_pos = ""
-        
+
         if loc1[0] == loc2[0]: # on the same x-position
             if (loc1[1] > loc2[1]) and ((loc1[1] - loc2[1]) == 1): # agent_2 is below agent_1
                 rel_pos = "BELOW"
@@ -92,7 +106,7 @@ class GridAgent():
         return g
 
     def move_grid(self, agent, chosen_action):
-        no_actions = 2 * self.grid_dim
+        2 * self.grid_dim
         state = list(agent.env_state)
         new_state = state.copy()
 

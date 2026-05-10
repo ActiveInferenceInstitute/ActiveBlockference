@@ -1,35 +1,75 @@
-import sklearn
-import pandas as pd
-import numpy as np
-from sklearn.feature_selection import mutual_info_regression as mi
+"""Mutual-information helpers for analysing simulation traces.
+
+The previous version of this file shipped with broken module-level argparse
+code that crashed on import. This rewrite exposes :func:`calculate_mi` as a
+plain function and gates all CLI side-effects behind ``if __name__ ==
+"__main__"``.
+"""
+
+from __future__ import annotations
 
 import argparse
-parser.add_argument('viz', help='Description for bar argument', required=True)
-parser.add_argument('X', type=argparse.FileType('r'), required=False)
-args = vars(parser.parse_args())
 
-condition = args['viz'] == 'v'
+import numpy as np
+import pandas as pd
+from sklearn.feature_selection import mutual_info_regression
 
-# X : paramter at step n, y : same paramter at step n+1
-def calculate_mi(X, y):   
-    ## Preprocess and int encode if not already
-    df = pd.read(X)
-    X.select_dtypes('int')
 
-    for colname in X.select_dtypes('object'): 
-        X[colname], uniques = X[colname].factorize()
-        discrete_features = X.dtypes
+def calculate_mi(X: pd.DataFrame, y: pd.Series) -> pd.Series:
+    """Compute mutual information between every column of ``X`` and ``y``.
 
-    mi_scores = mi(X,y,discrete_features=discrete_features)
-    mi_scores = pd.Series(mi_scores,name='MI Scores', index=X.columns)
-    mi_scores = mi_scores.sort_values(ascending=False)
+    Object/categorical columns are factorised before scoring.
+    """
+    X = X.copy()
+    discrete_features = []
+    for colname in X.select_dtypes("object").columns:
+        X[colname], _ = X[colname].factorize()
+    discrete_features = [
+        ptype.kind in ("i", "u", "b") for ptype in X.dtypes
+    ]
 
-    return mi_scores
+    mi_scores = mutual_info_regression(
+        X.to_numpy(), np.asarray(y), discrete_features=discrete_features
+    )
+    return pd.Series(mi_scores, name="MI Scores", index=X.columns).sort_values(
+        ascending=False
+    )
+
+
+def _read_table(path: str) -> pd.DataFrame:
+    return pd.read_csv(path)
+
+
+def _cli(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Compute mutual information.")
+    parser.add_argument("X", help="CSV file containing the feature matrix.")
+    parser.add_argument(
+        "--target",
+        required=True,
+        help="Column name in X to use as the target y.",
+    )
+    parser.add_argument(
+        "--viz", action="store_true", help="Render an MI bar chart with seaborn."
+    )
+    args = parser.parse_args(argv)
+
+    df = _read_table(args.X)
+    if args.target not in df.columns:
+        parser.error(f"target column {args.target!r} not present in {args.X}")
+    y = df.pop(args.target)
+    scores = calculate_mi(df, y)
+    print(scores.to_string())
+
+    if args.viz:
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
+        sns.barplot(x=scores.values, y=scores.index)
+        plt.title("Mutual information")
+        plt.tight_layout()
+        plt.show()
+    return 0
 
 
 if __name__ == "__main__":
-    if condtion:
-        import seaborn as sns
-        import matplotlib.pyplot as plt
-        calculate_mi(X, y, discrete_features)
-        #sns.lmplot(x=.. , y=.. , hue=.. , data=..)
+    raise SystemExit(_cli())

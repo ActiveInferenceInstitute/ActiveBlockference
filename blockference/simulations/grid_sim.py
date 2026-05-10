@@ -1,247 +1,373 @@
-from radcad import Model, Simulation, Experiment  #experiment not used presently
+"""radCAD/cadCAD-driven multi-agent grid simulation entry point.
 
-from model import ActiveGridference
-import pandas as pd
-import pyarrow.feather as feather  #pyarrow.feather not used presently
-import sys
+Two ways to invoke:
 
-# Additional dependencies
+1. Programmatic — pass primitives or an ``ExperimentConfig``::
 
-# For analytics
+       from blockference.simulations import run_grid
+       df = run_grid(dimension=3, no_agents=2, no_timesteps=10)
+
+       from blockference.config import load_experiment_config
+       from blockference.simulations import run_experiment
+       df = run_experiment(load_experiment_config("configs/example.yml"))
+
+2. CLI::
+
+       python -m blockference.simulations.grid_sim configs/example.yml
+       python -m blockference.simulations.grid_sim 3 2 10        # legacy form
+
+The CLI auto-detects whether the first arg is a path or an integer.
+
+Engine selection
+----------------
+``cfg.engine == "radcad"`` (default) drives ``radcad.Model`` /
+``radcad.Simulation`` — the fast, parallelisable cadCAD successor.
+``cfg.engine == "cadcad"`` routes the same state-update blocks through
+upstream ``cadCAD`` (slower, but the canonical reference implementation
+shipped by BlockScience). Both backends consume the same PSUBs so
+behaviour is bit-identical up to RNG draws.
+"""
+
+from __future__ import annotations
+
+import argparse
 import itertools
-
-# local utils
-import utils as u
-from control import construct_policies
+import os
 import random as rand
-from pymdp.maths import softmax  # pymdp.maths.softmax not used presently
+import sys
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from blockference.config import ExperimentConfig, load_experiment_config
+from blockference.gridference import ActiveGridference
+from blockference.utils.policy import p_actinf_dict
+
+__all__ = ["run_grid", "run_experiment", "build_state_update_blocks", "build_initial_state"]
 
 
-def run_grid(dimension, no_agents, no_timesteps):
-    print(f'Running Gridference. Grid dimension: {dimension} | Number of agents: {no_agents} | Timesteps: {no_timesteps}')
-    grid = list(itertools.product(range(int(dimension)), repeat=2))
-    print('Created Grid')
+# Per-agent diagnostic fields surfaced into cadCAD state at every step.
+# Kept here so the persistence + validation modules can introspect the
+# canonical field list without importing anything radcad-specific.
+PER_STEP_FIELDS: tuple[tuple[str, str], ...] = (
+    ("priors", "update_prior"),
+    ("env_states", "update_env"),
+    ("actions", "update_action"),
+    ("inferences", "update_inference"),
+    ("efe", "update_efe"),
+    ("efe_epistemic", "update_efe_epistemic"),
+    ("efe_pragmatic", "update_efe_pragmatic"),
+    ("q_pi", "update_q_pi"),
+    ("p_u", "update_p_u"),
+    ("obs_idx", "update_obs_idx"),
+)
 
-    # create a dict of agents
-    agents = {}
-    priors = {}
-    env_states = {}
-    inferences = {}
-    actions = {}
 
-    for a in range(int(no_agents)):
-        # create new agent
-        agent = ActiveGridference(grid)
-        # generate target state
-        target = (rand.randint(0, int(dimension)-1), rand.randint(0, int(dimension)-1))
-        # add target state
-        agent.get_C(target)
-        # all agents start in the same position
-        agent.get_D((0, 0))
-
-        agents[a] = agent
-        priors[a] = agent.D
-        env_states[a] = agent.env_state
-        inferences[a] = agent.current_inference
-        actions[a] = agent.current_action
-    print('Agents initialized')
-
-    initial_state = {
-        'agents': agents,
-        'priors': priors,
-        'env_states': env_states,
-        'actions': actions,
-        'inferences': inferences
+def build_initial_state(grid, n_agents, dimension, target, initial_state, planning_length):
+    """Construct the initial cadCAD state dict for a multi-agent gridworld."""
+    state = {
+        "agents": {},
+        **{key: {} for key, _ in PER_STEP_FIELDS},
     }
+    for a in range(int(n_agents)):
+        agent = ActiveGridference(grid, planning_length=planning_length)
+        if target == "random":
+            t = (rand.randint(0, int(dimension) - 1), rand.randint(0, int(dimension) - 1))
+        else:
+            t = tuple(target)
+        agent.get_C(t)
+        agent.get_D(tuple(initial_state))
+        state["agents"][a] = agent
+        state["priors"][a] = agent.D
+        state["env_states"][a] = agent.env_state
+        state["inferences"][a] = agent.current_inference
+        state["actions"][a] = agent.current_action
+        # Diagnostic slots start empty; populated by the policy block.
+        state["efe"][a] = ""
+        state["efe_epistemic"][a] = ""
+        state["efe_pragmatic"][a] = ""
+        state["q_pi"][a] = ""
+        state["p_u"][a] = ""
+        state["obs_idx"][a] = ""
+    return state
 
-    params = {
-        'preferred_state': grid,
-        'initial_state': grid,
-        'noise': [0]
-    }
 
-    def p_actinf(params, substep, state_history, previous_state):
-        # State Variables
-        agents = previous_state['agents']
+# Back-compat alias for any caller that imported the historical private name.
+_build_initial_state = build_initial_state
 
-        # list of all updates to the agents in the network
-        agent_updates = []
 
-        for source, agent in agents.items():
+def _make_state_updater(state_key: str, update_key: str):
+    """Return a cadCAD state-update fn that copies ``state_key`` and applies updates."""
 
-            policies = construct_policies([agent.n_states], [len(agent.E)], policy_len=agent.policy_len)
-            # get obs_idx
-            obs_idx = grid.index(agent.env_state)
+    def s_fn(params, substep, state_history, previous_state, policy_input):
+        new = previous_state[state_key].copy()
+        for upd in policy_input.get("agent_updates", []):
+            new[upd["source"]] = upd[update_key]
+        return state_key, new
 
-            # infer_states
-            qs_current = u.infer_states(obs_idx, agent.A, agent.prior, params['noise'])
+    s_fn.__name__ = f"s_{state_key}"
+    return s_fn
 
-            # calc efe
-            _G = u.calculate_G_policies(agent.A, agent.B, agent.C, qs_current, policies=policies)
 
-            # calc action posterior
-            Q_pi = u.softmax(-_G, params['noise'])
-            # compute the probability of each action
-            P_u = u.compute_prob_actions(agent.E, policies, Q_pi)
+def _agents_state_update(params, substep, state_history, previous_state, policy_input):
+    agents_new = previous_state["agents"].copy()
+    for upd in policy_input.get("agent_updates", []):
+        agent = agents_new[upd["source"]]
+        agent.prior = upd["update_prior"]
+        agent.env_state = upd["update_env"]
+        agent.current_action = upd["update_action"]
+        agent.current_inference = upd["update_inference"]
+    return "agents", agents_new
 
-            # sample action
-            chosen_action = u.sample(P_u)
 
-            # calc next prior
-            prior = agent.B[:, :, chosen_action].dot(qs_current)
+def build_state_update_blocks(grid):
+    """Assemble the canonical multi-agent PSUB list.
 
-            # update env state
-            # action_label = params['actions'][chosen_action]
+    Exposed as a public helper so callers driving cadCAD/radCAD by hand
+    (or composing additional updaters) can reuse the same wiring the
+    pipeline relies on.
+    """
+    def policy(params, substep, state_history, previous_state):
+        return p_actinf_dict(params, substep, state_history, previous_state, grid)
 
-            (Y, X) = agent.env_state
-            Y_new = Y
-            X_new = X
-            # here
+    variables = {"agents": _agents_state_update}
+    for key, upd in PER_STEP_FIELDS:
+        variables[key] = _make_state_updater(key, upd)
 
-            if chosen_action == 0:  # UP
-                
-                Y_new = Y - 1 if Y > 0 else Y
-                X_new = X
+    return [{"policies": {"p_actinf": policy}, "variables": variables}]
 
-            elif chosen_action == 1:  # DOWN
 
-                Y_new = Y + 1 if Y < agent.border else Y
-                X_new = X
-
-            elif chosen_action == 2:  # LEFT
-                Y_new = Y
-                X_new = X - 1 if X > 0 else X
-
-            elif chosen_action == 3:  # RIGHT
-                Y_new = Y
-                X_new = X + 1 if X < agent.border else X
-
-            elif chosen_action == 4:  # STAY
-                Y_new, X_new = Y, X
-
-            current_state = (Y_new, X_new)  # store the new grid location
-            agent_update = {'source': source,
-                            'update_prior': prior,
-                            'update_env': current_state,
-                            'update_action': chosen_action,
-                            'update_inference': qs_current}
-            agent_updates.append(agent_update)
-
-        return {'agent_updates': agent_updates}
-
-    def s_agents(params, substep, state_history, previous_state, policy_input):
-
-        agents_new = previous_state['agents'].copy()
-
-        agent_updates = policy_input['agent_updates']
-
-        if agent_updates != []:
-            for update in agent_updates:
-                s = update['source']
-                agent = agents_new[s]
-                update_prior = update['update_prior']
-                update_env = update['update_env']
-                update_action = update['update_action']
-                update_inference = update['update_inference']
-
-                agent.prior = update_prior
-                agent.env_state = update_env
-                agent.current_action = update_action
-                agent.current_inference = update_inference
-
-        return 'agents', agents_new
-
-    def s_priors(params, substep, state_history, previous_state, policy_input):
-
-        priors_new = previous_state['priors'].copy()
-
-        agent_updates = policy_input['agent_updates']
-
-        if agent_updates != []:
-            for update in agent_updates:
-                s = update['source']
-                update_prior = update['update_prior']
-                priors_new[s] = update_prior
-
-        return 'priors', priors_new
-
-    def s_env_states(params, substep, state_history, previous_state, policy_input):
-
-        env_states_new = previous_state['env_states'].copy()
-
-        agent_updates = policy_input['agent_updates']
-
-        if agent_updates != []:
-            for update in agent_updates:
-                s = update['source']
-                update_env = update['update_env']
-                env_states_new[s] = update_env
-
-        return 'env_states', env_states_new
-
-    def s_actions(params, substep, state_history, previous_state, policy_input):
-
-        actions_new = previous_state['actions'].copy()
-
-        agent_updates = policy_input['agent_updates']
-
-        if agent_updates != []:
-            for update in agent_updates:
-                s = update['source']
-                update_action = update['update_action']
-                actions_new[s] = update_action
-
-        return 'actions', actions_new
-
-    def s_inferences(params, substep, state_history, previous_state, policy_input):
-
-        inferences_new = previous_state['inferences'].copy()
-
-        agent_updates = policy_input['agent_updates']
-
-        if agent_updates != []:
-            for update in agent_updates:
-                s = update['source']
-                update_inference = update['update_inference']
-                inferences_new[s] = update_inference
-
-        return 'inferences', inferences_new
-
-    state_update_blocks = [
-        {
-            'policies': {
-                'p_actinf': p_actinf
-            },
-            'variables': {
-                'agents': s_agents,
-                'priors': s_priors,
-                'env_states': s_env_states,
-                'actions': s_actions,
-                'inferences': s_inferences
-            }
-        }
-    ]
+def _run_radcad(initial_state, state_update_blocks, params, timesteps, runs):
+    from radcad import Model, Simulation
 
     model = Model(
-        # Model initial state
         initial_state=initial_state,
-        # Model Partial State Update Blocks
         state_update_blocks=state_update_blocks,
-        # System Parameters
-        params=params
+        params=params,
+    )
+    simulation = Simulation(model=model, timesteps=int(timesteps), runs=int(runs))
+    return simulation.run()
+
+
+def _run_cadcad(initial_state, state_update_blocks, params, timesteps, runs):
+    """Drive the same PSUBs through upstream cadCAD."""
+    from cadCAD.configuration import Experiment
+    from cadCAD.configuration.utils import config_sim
+    from cadCAD.engine import ExecutionContext, ExecutionMode, Executor
+
+    sim_config = config_sim({
+        "N": int(runs),
+        "T": range(int(timesteps)),
+        "M": params,
+    })
+
+    experiment = Experiment()
+    experiment.append_configs(
+        initial_state=initial_state,
+        partial_state_update_blocks=state_update_blocks,
+        sim_configs=sim_config,
+    )
+    exec_context = ExecutionContext(context=ExecutionMode().local_mode)
+    executor = Executor(exec_context=exec_context, configs=experiment.configs)
+    raw_result, _tensor_field, _sessions = executor.execute()
+    return raw_result
+
+
+def run_experiment(cfg: ExperimentConfig) -> pd.DataFrame:
+    """Run a configured cadCAD/radCAD multi-agent gridworld and return the result frame.
+
+    Honours ``cfg.seed`` (Python ``random`` + NumPy global RNG), writes
+    ``cfg.output.path`` if set, and selects the engine via ``cfg.engine``.
+    """
+    if cfg.seed is not None:
+        rand.seed(cfg.seed)
+        np.random.seed(cfg.seed)
+
+    grid = list(itertools.product(range(int(cfg.grid.dimension)), repeat=2))
+    initial_state = build_initial_state(
+        grid=grid,
+        n_agents=cfg.simulation.n_agents,
+        dimension=cfg.grid.dimension,
+        target=cfg.simulation.target,
+        initial_state=cfg.simulation.initial_state,
+        planning_length=cfg.grid.planning_length,
     )
 
-    simulation = Simulation(
-        model=model,
-        timesteps=int(no_timesteps),  # Number of timesteps
-        runs=1  # Number of Monte Carlo Runs
-    )
+    params = {
+        "preferred_state": [grid],
+        "initial_state": [grid],
+        "noise": [0],
+    }
 
-    result = simulation.run()
+    state_update_blocks = build_state_update_blocks(grid)
+
+    engine = (getattr(cfg, "engine", None) or "radcad").lower()
+    if engine == "radcad":
+        result = _run_radcad(
+            initial_state, state_update_blocks, params,
+            cfg.simulation.timesteps, cfg.simulation.runs,
+        )
+    elif engine == "cadcad":
+        result = _run_cadcad(
+            initial_state, state_update_blocks, params,
+            cfg.simulation.timesteps, cfg.simulation.runs,
+        )
+    else:
+        raise ValueError(f"unknown engine {engine!r}; use 'radcad' or 'cadcad'")
+
     df = pd.DataFrame(result)
-    print(df)
-    df.to_csv('result.csv')
+
+    if cfg.output.path:
+        out = Path(cfg.output.path)
+        if out.parent and str(out.parent) not in ("", "."):
+            out.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(out)
+    return df
+
+
+def run_grid(
+    dimension,
+    no_agents,
+    no_timesteps,
+    output_path: str | None = "result.csv",
+    *,
+    planning_length: int = 2,
+    target=("random",),
+    initial_state=(0, 0),
+    seed: int | None = None,
+    runs: int = 1,
+    engine: str = "radcad",
+) -> pd.DataFrame:
+    """Convenience wrapper that builds an :class:`ExperimentConfig` from primitives.
+
+    Mirrors the historical signature for backwards compatibility while
+    routing through :func:`run_experiment`.
+    """
+    target_value = "random"
+    if target and target != ("random",):
+        target_value = target  # type: ignore[assignment]
+
+    cfg = ExperimentConfig.from_dict({
+        "name": "run_grid",
+        "seed": seed,
+        "engine": engine,
+        "grid": {
+            "dimension": int(dimension),
+            "planning_length": planning_length,
+        },
+        "simulation": {
+            "timesteps": int(no_timesteps),
+            "runs": runs,
+            "n_agents": int(no_agents),
+            "target": target_value,
+            "initial_state": list(initial_state),
+        },
+        "output": {"path": output_path},
+    })
+    print(
+        f"Running Gridference. Grid dimension: {cfg.grid.dimension} | "
+        f"Number of agents: {cfg.simulation.n_agents} | "
+        f"Timesteps: {cfg.simulation.timesteps} | "
+        f"Engine: {cfg.engine}"
+    )
+    return run_experiment(cfg)
+
+
+def _looks_like_path(s: str) -> bool:
+    return s.endswith((".yml", ".yaml", ".toml")) or os.sep in s or "/" in s
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Run an Active Inference cadCAD/radCAD gridworld experiment."
+    )
+    parser.add_argument(
+        "args",
+        nargs="*",
+        help=(
+            "Either a path to a YAML/TOML config, or three integers: "
+            "<dimension> <n_agents> <timesteps>."
+        ),
+    )
+    parser.add_argument(
+        "--config", "-c", help="Path to a YAML/TOML experiment config (overrides positional)."
+    )
+    parser.add_argument("--output", "-o", help="Override output CSV path.")
+    parser.add_argument(
+        "--engine",
+        choices=["radcad", "cadcad"],
+        help="Engine override (defaults to cfg.engine or 'radcad').",
+    )
+    parser.add_argument(
+        "--pipeline",
+        action="store_true",
+        help=(
+            "Run the full pipeline (data + viz + animation + validation) "
+            "into output/<run_name>/ instead of writing only a CSV."
+        ),
+    )
+    parser.add_argument(
+        "--output-root",
+        default="output",
+        help="Root directory for pipeline outputs (default: output/).",
+    )
+    parser.add_argument(
+        "--run-name",
+        help="Override the per-run subdirectory name (default: cfg.name).",
+    )
+    parser.add_argument(
+        "--timestamped",
+        action="store_true",
+        help="Append a UTC timestamp suffix to the run name.",
+    )
+    parsed = parser.parse_args(argv)
+
+    cfg_path = parsed.config
+    if cfg_path is None and parsed.args and _looks_like_path(parsed.args[0]):
+        cfg_path = parsed.args[0]
+
+    if parsed.pipeline:
+        from blockference.pipeline import run_pipeline
+
+        if not cfg_path:
+            parser.error("--pipeline requires a config path")
+        cfg = load_experiment_config(cfg_path)
+        if parsed.engine:
+            cfg.engine = parsed.engine
+        result = run_pipeline(
+            cfg,
+            output_root=parsed.output_root,
+            run_name=parsed.run_name,
+            timestamped=parsed.timestamped,
+        )
+        print(f"[pipeline] artefacts at: {result.paths.run_dir}")
+        print(f"[pipeline] schema check ok: {result.schema_report.ok}")
+        print(f"[pipeline] artefacts check ok: {result.artefacts_report.ok}")
+        return 0 if (result.schema_report.ok and result.artefacts_report.ok) else 1
+
+    if cfg_path:
+        cfg = load_experiment_config(cfg_path)
+        if parsed.output:
+            cfg.output.path = parsed.output
+        if parsed.engine:
+            cfg.engine = parsed.engine
+        run_experiment(cfg)
+        return 0
+
+    if len(parsed.args) >= 3:
+        run_grid(
+            dimension=parsed.args[0],
+            no_agents=parsed.args[1],
+            no_timesteps=parsed.args[2],
+            output_path=parsed.output or "result.csv",
+            engine=parsed.engine or "radcad",
+        )
+        return 0
+
+    parser.print_help(sys.stderr)
+    return 2
 
 
 if __name__ == "__main__":
-    run_grid(sys.argv[1], sys.argv[2], sys.argv[3])
+    raise SystemExit(main())

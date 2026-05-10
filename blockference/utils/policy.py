@@ -1,136 +1,99 @@
-import tools.utils as u
-from tools.control import construct_policies
+"""cadCAD/radCAD policy functions for Active Inference simulations.
 
-# Policies for cadCAD actinf simulations
+Each function takes the canonical cadCAD signature ``(params, substep,
+state_history, previous_state, …)`` and returns a dict of state-update
+instructions consumed by the corresponding state-update functions.
+
+The dict returned per agent carries the *full* per-step diagnostics that
+the pipeline can persist downstream:
+
+``update_prior``      next prior over hidden states (``B[:,:,a] · qs``)
+``update_env``        next ``(y, x)`` environment coordinate
+``update_action``     sampled action index ``a``
+``update_inference``  posterior over hidden states ``q(s_t)``
+``update_efe``        per-policy expected free energy ``G(π)``
+``update_efe_epistemic``  per-policy ambiguity term
+``update_efe_pragmatic``  per-policy risk (KL-to-C) term
+``update_q_pi``       policy posterior ``softmax(-G)``
+``update_p_u``        marginal action posterior ``P(u)``
+``update_obs_idx``    flattened observation index used by the inference step
+"""
+
+from blockference.gridference import _move
+from blockference.maths import construct_policies
+from blockference.utils import utils as u
+
+__all__ = ["p_actinf_single", "p_actinf_dict"]
 
 
-# single-agent with planning
-def p_actinf(params, substep, state_history, previous_state, act, grid):
+def _step_agent(agent, prior, A, B, C, env_state, grid):
+    """Run a single Active Inference inference + planning step.
 
-    policies = construct_policies([act.n_states], [len(act.E)], policy_len=act.policy_len)
-    # get obs_idx
-    obs_idx = grid.index(previous_state['env_state'])
+    Returns a dict carrying the full diagnostic set described in the
+    module docstring (sans ``source``).
+    """
+    policies = construct_policies(
+        [agent.n_states], [len(agent.E)], policy_len=agent.policy_len
+    )
+    obs_idx = grid.index(env_state)
 
-    # infer_states
-    qs_current = u.infer_states(obs_idx, previous_state['prior_A'], previous_state['prior'])
-
-    # calc efe
-    G = u.calculate_G_policies(previous_state['prior_A'], previous_state['prior_B'], previous_state['prior_C'], qs_current, policies=policies)
-
-    # calc action posterior
+    qs_current = u.infer_states(obs_idx, A, prior)
+    G, parts = u.calculate_G_policies_traced(A, B, C, qs_current, policies=policies)
     Q_pi = u.softmax(-G)
-
-    # compute the probability of each action
-    P_u = u.compute_prob_actions(act.E, policies, Q_pi)
-
-    # sample action
+    P_u = u.compute_prob_actions(agent.E, policies, Q_pi)
     chosen_action = u.sample(P_u)
 
-    # calc next prior
-    prior = previous_state['prior_B'][:, :, chosen_action].dot(qs_current) 
+    next_prior = B[:, :, chosen_action].dot(qs_current)
+    next_env = _move(chosen_action, env_state, agent.border)
 
-    # update env state
-    # action_label = params['actions'][chosen_action]
-
-    (Y, X) = previous_state['env_state']
-    Y_new = Y
-    X_new = X
-
-    if chosen_action == 0:  # UP
-
-        Y_new = Y - 1 if Y > 0 else Y
-        X_new = X
-
-    elif chosen_action == 1:  # DOWN
-
-        Y_new = Y + 1 if Y < act.border else Y
-        X_new = X
-
-    elif chosen_action == 2:  # LEFT
-        Y_new = Y
-        X_new = X - 1 if X > 0 else X
-
-    elif chosen_action == 3:  # RIGHT
-        Y_new = Y
-        X_new = X + 1 if X < act.border else X
-
-    elif chosen_action == 4:  # STAY
-        Y_new, X_new = Y, X
-
-    current_state = (Y_new, X_new)  # store the new grid location
-
-    return {'update_prior': prior,
-            'update_env': current_state,
-            'update_action': chosen_action,
-            'update_inference': qs_current}
+    return {
+        "update_prior": next_prior,
+        "update_env": next_env,
+        "update_action": int(chosen_action),
+        "update_inference": qs_current,
+        "update_efe": G,
+        "update_efe_epistemic": parts["epistemic"],
+        "update_efe_pragmatic": parts["pragmatic"],
+        "update_q_pi": Q_pi,
+        "update_p_u": P_u,
+        "update_obs_idx": int(obs_idx),
+    }
 
 
-# multi-agent (dict) gridworld
-def p_actinf(params, substep, state_history, previous_state, grid): # Is this a useless re-definition from Line 8??
-    # State Variables
-    agents = previous_state['agents']
+def p_actinf_single(params, substep, state_history, previous_state, act, grid):
+    """Single-agent Active Inference cadCAD policy.
 
-    # list of all updates to the agents in the network
+    Expects ``previous_state`` to contain ``env_state``, ``prior``,
+    ``prior_A``, ``prior_B``, ``prior_C``.
+    """
+    return _step_agent(
+        agent=act,
+        prior=previous_state["prior"],
+        A=previous_state["prior_A"],
+        B=previous_state["prior_B"],
+        C=previous_state["prior_C"],
+        env_state=previous_state["env_state"],
+        grid=grid,
+    )
+
+
+def p_actinf_dict(params, substep, state_history, previous_state, grid):
+    """Multi-agent Active Inference cadCAD policy (dict-based agent registry).
+
+    ``previous_state['agents']`` must be a ``dict[source_id -> agent]``.
+    """
+    agents = previous_state["agents"]
     agent_updates = []
-
     for source, agent in agents.items():
-
-        policies = construct_policies([agent.n_states], [len(agent.E)], policy_len=agent.policy_len)
-        # get obs_idx
-        obs_idx = grid.index(agent.env_state)
-
-        # infer_states
-        qs_current = u.infer_states(obs_idx, agent.A, agent.prior, 0)
-
-        # calc efe
-        _G = u.calculate_G_policies(agent.A, agent.B, agent.C, qs_current, policies=policies)
-
-        # calc action posterior
-        Q_pi = u.softmax(-_G, 0)
-        # compute the probability of each action
-        P_u = u.compute_prob_actions(agent.E, policies, Q_pi)
-
-        # sample action
-        chosen_action = u.sample(P_u)
-
-        # calc next prior
-        prior = agent.B[:, :, chosen_action].dot(qs_current)
-
-        # update env state
-        # action_label = params['actions'][chosen_action]
-
-        (Y, X) = agent.env_state
-        Y_new = Y
-        X_new = X
-        # here
-
-        if chosen_action == 0:  # UP
-
-            Y_new = Y - 1 if Y > 0 else Y
-            X_new = X
-
-        elif chosen_action == 1:  # DOWN
-
-            Y_new = Y + 1 if Y < agent.border else Y
-            X_new = X
-
-        elif chosen_action == 2:  # LEFT
-            Y_new = Y
-            X_new = X - 1 if X > 0 else X
-
-        elif chosen_action == 3:  # RIGHT
-            Y_new = Y
-            X_new = X + 1 if X < agent.border else X
-
-        elif chosen_action == 4:  # STAY
-            Y_new, X_new = Y, X
-
-        current_state = (Y_new, X_new)  # store the new grid location
-        agent_update = {'source': source,
-                        'update_prior': prior,
-                        'update_env': current_state,
-                        'update_action': chosen_action,
-                        'update_inference': qs_current}
-        agent_updates.append(agent_update)
-
-    return {'agent_updates': agent_updates}
+        upd = _step_agent(
+            agent=agent,
+            prior=agent.prior,
+            A=agent.A,
+            B=agent.B,
+            C=agent.C,
+            env_state=agent.env_state,
+            grid=grid,
+        )
+        upd["source"] = source
+        agent_updates.append(upd)
+    return {"agent_updates": agent_updates}

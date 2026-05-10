@@ -1,0 +1,24 @@
+# Reference configuration for an ActiveBlockference cadCAD experiment.
+# Run with the full pipeline to populate output/<name>/ with data + viz + GIF:
+#   uv run python -m blockference.simulations.grid_sim --pipeline configs/example.yml
+
+name: gridworld_example
+seed: 42
+engine: radcad          # one of: radcad (default, parallelisable), cadcad
+
+grid:
+  dimension: 3
+  planning_length: 2
+  affordances: [UP, DOWN, LEFT, RIGHT, STAY]
+
+simulation:
+  timesteps: 10
+  runs: 1
+  n_agents: 2
+  target: random          # or a [y, x] coordinate, e.g. [2, 2]
+  initial_state: [0, 0]
+
+output:
+  # When using --pipeline this is overridden to output/<name>/data/trajectory.csv.
+  # When using the legacy CLI it is the literal CSV path.
+  path: output/gridworld_example/data/trajectory.csv

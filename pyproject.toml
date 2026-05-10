@@ -1,0 +1,88 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "active-blockference"
+version = "0.2.0"
+description = "Active Inference agents in cadCAD — discrete-state generative models for grid-world, multi-agent, and graph environments."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Active Inference Institute" },
+]
+keywords = [
+    "active-inference",
+    "free-energy-principle",
+    "cadcad",
+    "pomdp",
+    "agent-based-modeling",
+    "computational-neuroscience",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    # pymdp 1.0+ is a JAX/Equinox rewrite. We do not depend on it for the
+    # grid pipeline (we own the math primitives in blockference.maths) but
+    # we keep it installed so users can opt into pymdp's high-level Agent
+    # via blockference.agent.BlockferenceAgent.
+    "inferactively-pymdp>=1.0.1",
+    "cadCAD>=0.4.28",
+    "radcad>=0.12",
+    "numpy>=1.24,<2.3",
+    "pandas>=2.0",
+    "matplotlib>=3.7",
+    "seaborn>=0.12",
+    "plotly>=5.0",
+    "networkx>=3.0",
+    "scikit-learn>=1.3",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+    "pytest-cov",
+    "ruff",
+    "ipykernel",
+    "jupyterlab",
+]
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+]
+
+[project.urls]
+Homepage = "https://github.com/ActiveInferenceInstitute/ActiveBlockference"
+Issues = "https://github.com/ActiveInferenceInstitute/ActiveBlockference/issues"
+Institute = "https://activeinference.org/"
+
+[tool.setuptools.packages.find]
+include = ["blockference*"]
+exclude = ["tests*", "notebooks*", "GRTs*", "docs*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["notebooks", "GRTs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]

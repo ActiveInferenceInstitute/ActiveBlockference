@@ -1,8 +1,59 @@
-__pycache__*
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+cad/
+
+# Jupyter
+.ipynb_checkpoints/
+**/.ipynb_checkpoints
+**checkpoint.py
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+coverage.xml
+
+# IDE / editor
+.vscode/
+.idea/
+*.iml
 *.ini
 *.xml
-*.iml
-*.ipynb_checkpoints/
-./blockference/.ipynb_checkpoints
+*.swp
+
+# Generated artefacts (commit on demand)
+result.csv
+*.csv.bak
+results/
+output/
+
+# uv
+.uv/
+uv.lock          # opt-in commit per project; we keep requirements.lock instead
+
+# OS
 .DS_Store
-**checkpoint.py
+Thumbs.db
+
+# Secrets
+.env
+.env.*
+!.env.example

@@ -1,0 +1,15 @@
+# Smallest valid experiment - used by CI smoke test.
+name: smoke
+seed: 0
+engine: radcad
+grid:
+  dimension: 3
+  planning_length: 1
+simulation:
+  timesteps: 2
+  runs: 1
+  n_agents: 1
+  target: [2, 2]
+  initial_state: [0, 0]
+output:
+  path: results/smoke.csv
