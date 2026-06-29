@@ -23,16 +23,15 @@ class GridAgent:
         self.pos_dict = {i: loc for i, loc in enumerate(self.grid)}
         self.grid_dim = grid_dim
         self.no_actions = 2 * grid_dim + 1
-        self.n_observations = grid_len ** grid_dim
-        self.n_states = grid_len ** grid_dim
+        self.n_observations = grid_len**grid_dim
+        self.n_states = grid_len**grid_dim
         self.rel_locs = ["NONE", "NEXT_LEFT", "NEXT_RIGHT", "ABOVE", "BELOW"]
         self.E = ["UP", "DOWN", "LEFT", "RIGHT", "STAY"]
 
         self.states = [agent.D for agent in agents]
         # Resolve each agent's index from its (1-D) one-hot D vector.
         self.agent_locs = [
-            int(np.atleast_1d(np.nonzero(np.atleast_1d(state))[0])[0])
-            for state in self.states
+            int(np.atleast_1d(np.nonzero(np.atleast_1d(state))[0])[0]) for state in self.states
         ]
         assert len(self.states) == len(agents)
 
@@ -42,8 +41,10 @@ class GridAgent:
         next_state = copy.deepcopy(self.states)
 
         for idx, action in enumerate(actions):
-            copy.deepcopy(self.states[idx][0]) # new location of agent on grid
-            new_ref = copy.deepcopy(self.states[idx][1]) # new relative position to the other agent on the grid
+            copy.deepcopy(self.states[idx][0])  # new location of agent on grid
+            new_ref = copy.deepcopy(
+                self.states[idx][1]
+            )  # new relative position to the other agent on the grid
             action_label = self.E[int(action[0])]
             # y, x = self.states[idx][0] # looks like [1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0]
             k = [k for k, i in enumerate(self.states[idx][0]) if i != 0]
@@ -66,9 +67,9 @@ class GridAgent:
                 next_y = y
             new_location = (next_y, next_x)
             try:
-                rel_pos = self.get_rel_pos(new_location, self.states[idx+1][0])
+                rel_pos = self.get_rel_pos(new_location, self.states[idx + 1][0])
             except IndexError:
-                rel_pos = self.get_rel_pos(new_location, self.states[idx-1][0])
+                rel_pos = self.get_rel_pos(new_location, self.states[idx - 1][0])
             if rel_pos == "COLLISION":
                 new_location = self.states[idx][0]
                 next_state = (self.grid.index(new_location), new_ref)
@@ -76,26 +77,30 @@ class GridAgent:
                 new_ref = self.rel_locs.index(rel_pos)
                 next_state[idx] = (self.grid.index(new_location), new_ref)
             self.agent_locs[idx] = new_location
-        return next_state # update both agents at the same time, need to be optimized in future iterations
+        return next_state  # update both agents at the same time, need to be optimized in future iterations
 
     def get_rel_pos(self, loc1, loc2):
         rel_pos = ""
 
-        if loc1[0] == loc2[0]: # on the same x-position
-            if (loc1[1] > loc2[1]) and ((loc1[1] - loc2[1]) == 1): # agent_2 is below agent_1
+        if loc1[0] == loc2[0]:  # on the same x-position
+            if (loc1[1] > loc2[1]) and ((loc1[1] - loc2[1]) == 1):  # agent_2 is below agent_1
                 rel_pos = "BELOW"
-            elif (loc1[1] < loc2[1]) and ((loc1[1] - loc2[1]) == 1): # agent_2 is above agent_1
+            elif (loc1[1] < loc2[1]) and ((loc1[1] - loc2[1]) == 1):  # agent_2 is above agent_1
                 rel_pos = "ABOVE"
             else:
                 rel_pos = "NONE"
-        elif loc1[1] == loc2[1]: # on the same x-position
-            if (loc1[0] > loc2[0]) and ((loc1[0] - loc2[0]) == 1): # agent_2 is to the left of agent_1
+        elif loc1[1] == loc2[1]:  # on the same x-position
+            if (loc1[0] > loc2[0]) and (
+                (loc1[0] - loc2[0]) == 1
+            ):  # agent_2 is to the left of agent_1
                 rel_pos = "NEXT_LEFT"
-            elif (loc1[0] < loc2[0]) and ((loc1[0] - loc2[0]) == 1): # agent_2 is above agent_1
+            elif (loc1[0] < loc2[0]) and ((loc1[0] - loc2[0]) == 1):  # agent_2 is above agent_1
                 rel_pos = "NEXT_RIGHT"
             else:
                 rel_pos = "NONE"
-        elif (loc1[0] == loc2[0]) and (loc1[1] == loc2[1]): # on the same position, need to handle this better
+        elif (loc1[0] == loc2[0]) and (
+            loc1[1] == loc2[1]
+        ):  # on the same position, need to handle this better
             rel_pos = "COLLISION"
         else:
             rel_pos = "NONE"
@@ -116,21 +121,21 @@ class GridAgent:
             new_state = state
         else:
             if chosen_action % 2 == 1:
-                index = (chosen_action+1) / 2
+                index = (chosen_action + 1) / 2
                 new_state[index] = state[index] - 1 if state[index] > 0 else state[index]
             elif chosen_action % 2 == 0:
                 index = chosen_action / 2
                 new_state[index] = state[index] + 1 if state[index] < self.border else state[index]
         return new_state
 
-
     def actinf_dict(self, agents_dict, g_agent):
         # list of all updates to the agents in the network
         agent_updates = []
 
         for source, agent in agents_dict.items():
-
-            policies = construct_policies([agent.n_states], [len(agent.E)], policy_len=agent.policy_len)
+            policies = construct_policies(
+                [agent.n_states], [len(agent.E)], policy_len=agent.policy_len
+            )
             # get obs_idx
             obs_idx = g_agent.grid.index(agent.env_state)
 
@@ -155,14 +160,16 @@ class GridAgent:
             # action_label = params['actions'][chosen_action]
 
             current_state = self.move_2d(agent, chosen_action)  # store the new grid location
-            agent_update = {'source': source,
-                            'update_prior': prior,
-                            'update_env': current_state,
-                            'update_action': chosen_action,
-                            'update_inference': qs_current}
+            agent_update = {
+                "source": source,
+                "update_prior": prior,
+                "update_env": current_state,
+                "update_action": chosen_action,
+                "update_inference": qs_current,
+            }
             agent_updates.append(agent_update)
 
-        return {'agent_updates': agent_updates}
+        return {"agent_updates": agent_updates}
 
     def move_2d(self, agent, chosen_action):
         (Y, X) = agent.env_state
@@ -171,12 +178,10 @@ class GridAgent:
         # here
 
         if chosen_action == 0:  # UP
-
             Y_new = Y - 1 if Y > 0 else Y
             X_new = X
 
         elif chosen_action == 1:  # DOWN
-
             Y_new = Y + 1 if Y < agent.border else Y
             X_new = X
 
@@ -201,13 +206,11 @@ class GridAgent:
         # here
 
         if chosen_action == 0:  # UP
-
             Y_new = Y - 1 if Y > 0 else Y
             X_new = X
             Z_new = Z
 
         elif chosen_action == 1:  # DOWN
-
             Y_new = Y + 1 if Y < agent.border else Y
             X_new = X
             Z_new = Z

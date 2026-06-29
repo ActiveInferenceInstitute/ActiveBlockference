@@ -24,16 +24,12 @@ def calculate_mi(X: pd.DataFrame, y: pd.Series) -> pd.Series:
     discrete_features = []
     for colname in X.select_dtypes("object").columns:
         X[colname], _ = X[colname].factorize()
-    discrete_features = [
-        ptype.kind in ("i", "u", "b") for ptype in X.dtypes
-    ]
+    discrete_features = [ptype.kind in ("i", "u", "b") for ptype in X.dtypes]
 
     mi_scores = mutual_info_regression(
         X.to_numpy(), np.asarray(y), discrete_features=discrete_features
     )
-    return pd.Series(mi_scores, name="MI Scores", index=X.columns).sort_values(
-        ascending=False
-    )
+    return pd.Series(mi_scores, name="MI Scores", index=X.columns).sort_values(ascending=False)
 
 
 def _read_table(path: str) -> pd.DataFrame:
@@ -48,9 +44,7 @@ def _cli(argv: list[str] | None = None) -> int:
         required=True,
         help="Column name in X to use as the target y.",
     )
-    parser.add_argument(
-        "--viz", action="store_true", help="Render an MI bar chart with seaborn."
-    )
+    parser.add_argument("--viz", action="store_true", help="Render an MI bar chart with seaborn.")
     args = parser.parse_args(argv)
 
     df = _read_table(args.X)

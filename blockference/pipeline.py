@@ -238,9 +238,7 @@ def render_visualisations(
 
     try:
         log.info("rendering trajectory animation")
-        anims["trajectory"] = animate_trajectory(
-            df, paths.animations_dir / "trajectory.gif"
-        )
+        anims["trajectory"] = animate_trajectory(df, paths.animations_dir / "trajectory.gif")
     except (ValueError, RuntimeError) as exc:
         log.warning("animation skipped: %s", exc)
     return viz, anims
@@ -280,8 +278,12 @@ def simulate(cfg: ExperimentConfig) -> pd.DataFrame:
     """Stage 1: run the radCAD/cadCAD experiment and return the result frame."""
     from blockference.simulations import run_experiment
 
-    log.info("simulate: engine=%s timesteps=%d runs=%d",
-             cfg.engine, cfg.simulation.timesteps, cfg.simulation.runs)
+    log.info(
+        "simulate: engine=%s timesteps=%d runs=%d",
+        cfg.engine,
+        cfg.simulation.timesteps,
+        cfg.simulation.runs,
+    )
     df = run_experiment(cfg)
     log.info("simulate: produced %d rows", len(df))
     return df
@@ -306,8 +308,7 @@ def persist(
 
     summary = summarise_trajectory(df)
     persist_summary(summary, paths)
-    log.info("persisted summary: %d agents, %d rows",
-             summary["n_agents"], summary["n_rows"])
+    log.info("persisted summary: %d agents, %d rows", summary["n_agents"], summary["n_rows"])
 
     agents = _extract_agents_dict(df)
     if agents:
@@ -317,8 +318,7 @@ def persist(
         policies = _extract_policies(agents)
         if policies:
             persist_policies(policies, paths)
-            log.info("persisted %d policies of length %d",
-                     len(policies), policies[0].shape[0])
+            log.info("persisted %d policies of length %d", len(policies), policies[0].shape[0])
 
     per_step = build_per_step_records(df)
     if per_step:
@@ -349,8 +349,9 @@ def validate(
         rep = validate_generative_model(agent)
         model_reports[str(agent_id)] = rep
         if not rep.ok:
-            log.warning("generative model invariant failures for agent %s: %s",
-                        agent_id, rep.issues)
+            log.warning(
+                "generative model invariant failures for agent %s: %s", agent_id, rep.issues
+            )
         else:
             log.info("generative model invariants OK for agent %s", agent_id)
 
@@ -394,16 +395,20 @@ def run_pipeline(
     log_handler = configure_run_logging(paths.run_log)
     try:
         log.info("=== ActiveBlockference run start: %s ===", paths.run_name)
-        log.info("config: name=%s seed=%s engine=%s",
-                 cfg.name, cfg.seed, cfg.engine)
+        log.info("config: name=%s seed=%s engine=%s", cfg.name, cfg.seed, cfg.engine)
         log.info(
             "grid: dim=%d planning_length=%d affordances=%s",
-            cfg.grid.dimension, cfg.grid.planning_length, cfg.grid.affordances,
+            cfg.grid.dimension,
+            cfg.grid.planning_length,
+            cfg.grid.affordances,
         )
         log.info(
             "simulation: timesteps=%d runs=%d n_agents=%d target=%s initial_state=%s",
-            cfg.simulation.timesteps, cfg.simulation.runs,
-            cfg.simulation.n_agents, cfg.simulation.target, cfg.simulation.initial_state,
+            cfg.simulation.timesteps,
+            cfg.simulation.runs,
+            cfg.simulation.n_agents,
+            cfg.simulation.target,
+            cfg.simulation.initial_state,
         )
 
         # Route the simulation's CSV writer through our typed path.

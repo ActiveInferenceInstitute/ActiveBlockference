@@ -54,17 +54,13 @@ class GridConfig:
 
     dimension: int = 3
     planning_length: int = 2
-    affordances: list[str] = field(
-        default_factory=lambda: ["UP", "DOWN", "LEFT", "RIGHT", "STAY"]
-    )
+    affordances: list[str] = field(default_factory=lambda: ["UP", "DOWN", "LEFT", "RIGHT", "STAY"])
 
     def __post_init__(self) -> None:
         if self.dimension < 2:
             raise ValueError(f"grid.dimension must be >= 2, got {self.dimension}")
         if self.planning_length < 1:
-            raise ValueError(
-                f"grid.planning_length must be >= 1, got {self.planning_length}"
-            )
+            raise ValueError(f"grid.planning_length must be >= 1, got {self.planning_length}")
 
 
 @dataclass
@@ -115,9 +111,7 @@ class ExperimentConfig:
     def __post_init__(self) -> None:
         engine = (self.engine or "radcad").lower()
         if engine not in SUPPORTED_ENGINES:
-            raise ValueError(
-                f"unknown engine {self.engine!r}; expected one of {SUPPORTED_ENGINES}"
-            )
+            raise ValueError(f"unknown engine {self.engine!r}; expected one of {SUPPORTED_ENGINES}")
         self.engine = engine
 
     @classmethod
@@ -156,10 +150,7 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
         with path.open("rb") as fh:
             data = tomllib.load(fh)
     else:
-        raise ValueError(
-            f"unsupported config extension {suffix!r}; "
-            "use .yml, .yaml, or .toml"
-        )
+        raise ValueError(f"unsupported config extension {suffix!r}; use .yml, .yaml, or .toml")
 
     if not isinstance(data, dict):
         raise ValueError(f"config root must be a mapping, got {type(data).__name__}")

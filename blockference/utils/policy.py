@@ -32,9 +32,7 @@ def _step_agent(agent, prior, A, B, C, env_state, grid):
     Returns a dict carrying the full diagnostic set described in the
     module docstring (sans ``source``).
     """
-    policies = construct_policies(
-        [agent.n_states], [len(agent.E)], policy_len=agent.policy_len
-    )
+    policies = construct_policies([agent.n_states], [len(agent.E)], policy_len=agent.policy_len)
     obs_idx = grid.index(env_state)
 
     qs_current = u.infer_states(obs_idx, A, prior)

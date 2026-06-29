@@ -1,6 +1,5 @@
 """Tests for blockference.config."""
 
-
 import pytest
 
 from blockference.config import (
@@ -48,13 +47,15 @@ def test_simulation_config_coerces_lists_to_tuples():
 
 
 def test_experiment_config_from_dict_round_trip():
-    cfg = ExperimentConfig.from_dict({
-        "name": "t",
-        "seed": 1,
-        "grid": {"dimension": 4, "planning_length": 3},
-        "simulation": {"timesteps": 5, "runs": 2, "n_agents": 3, "target": [2, 2]},
-        "output": {"path": "out.csv"},
-    })
+    cfg = ExperimentConfig.from_dict(
+        {
+            "name": "t",
+            "seed": 1,
+            "grid": {"dimension": 4, "planning_length": 3},
+            "simulation": {"timesteps": 5, "runs": 2, "n_agents": 3, "target": [2, 2]},
+            "output": {"path": "out.csv"},
+        }
+    )
     d = cfg.to_dict()
     assert d["name"] == "t"
     assert d["grid"]["dimension"] == 4
@@ -106,14 +107,7 @@ def test_load_non_mapping_raises(tmp_path):
 
 def test_yaml_and_toml_produce_same_shape(tmp_path):
     yml = tmp_path / "a.yml"
-    yml.write_text(
-        "name: x\n"
-        "grid:\n"
-        "  dimension: 3\n"
-        "simulation:\n"
-        "  timesteps: 1\n"
-        "  n_agents: 1\n"
-    )
+    yml.write_text("name: x\ngrid:\n  dimension: 3\nsimulation:\n  timesteps: 1\n  n_agents: 1\n")
     toml = tmp_path / "a.toml"
     toml.write_text(
         'name = "x"\n[grid]\ndimension = 3\n[simulation]\ntimesteps = 1\nn_agents = 1\n'

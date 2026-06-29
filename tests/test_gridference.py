@@ -35,15 +35,15 @@ def test_make_grid_3d():
 @pytest.mark.parametrize(
     "action_id, start, expected",
     [
-        (0, (1, 1), (0, 1)),    # UP
-        (1, (1, 1), (2, 1)),    # DOWN
-        (2, (1, 1), (1, 0)),    # LEFT
-        (3, (1, 1), (1, 2)),    # RIGHT
-        (4, (1, 1), (1, 1)),    # STAY
-        (0, (0, 1), (0, 1)),    # UP at top boundary stays
-        (1, (2, 1), (2, 1)),    # DOWN at bottom boundary stays
-        (2, (1, 0), (1, 0)),    # LEFT at left boundary stays
-        (3, (1, 2), (1, 2)),    # RIGHT at right boundary stays
+        (0, (1, 1), (0, 1)),  # UP
+        (1, (1, 1), (2, 1)),  # DOWN
+        (2, (1, 1), (1, 0)),  # LEFT
+        (3, (1, 1), (1, 2)),  # RIGHT
+        (4, (1, 1), (1, 1)),  # STAY
+        (0, (0, 1), (0, 1)),  # UP at top boundary stays
+        (1, (2, 1), (2, 1)),  # DOWN at bottom boundary stays
+        (2, (1, 0), (1, 0)),  # LEFT at left boundary stays
+        (3, (1, 2), (1, 2)),  # RIGHT at right boundary stays
     ],
 )
 def test_move_actions(action_id, start, expected):
@@ -107,9 +107,7 @@ def test_planning_step_returns_expected_keys(grid_3x3):
     agent.get_C((2, 2))
     agent.get_D((0, 0))
 
-    update = actinf_planning_single(
-        agent, agent.env_state, agent.A, agent.B, agent.C, agent.prior
-    )
+    update = actinf_planning_single(agent, agent.env_state, agent.A, agent.B, agent.C, agent.prior)
 
     expected = {
         "update_prior",

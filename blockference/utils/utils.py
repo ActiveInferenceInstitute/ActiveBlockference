@@ -55,12 +55,17 @@ def plot_likelihood(matrix, xlabels=None, ylabels=None, title_str="Likelihood di
     if ylabels is None:
         ylabels = list(range(matrix.shape[0]))
     if not np.isclose(matrix.sum(axis=0), 1.0).all():
-        raise ValueError(
-            "Distribution not column-normalized (matrix.sum(axis=0) must be 1)."
-        )
+        raise ValueError("Distribution not column-normalized (matrix.sum(axis=0) must be 1).")
     plt.figure(figsize=(6, 6))
-    sns.heatmap(matrix, xticklabels=xlabels, yticklabels=ylabels,
-                cmap="gray", cbar=False, vmin=0.0, vmax=1.0)
+    sns.heatmap(
+        matrix,
+        xticklabels=xlabels,
+        yticklabels=ylabels,
+        cmap="gray",
+        cbar=False,
+        vmin=0.0,
+        vmax=1.0,
+    )
     plt.title(title_str)
     plt.show()
 

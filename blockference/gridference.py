@@ -39,13 +39,13 @@ def _move(action_id, env_state, border):
     Action encoding: 0=UP, 1=DOWN, 2=LEFT, 3=RIGHT, 4=STAY.
     """
     y, x = env_state
-    if action_id == 0:        # UP
+    if action_id == 0:  # UP
         y = y - 1 if y > 0 else y
-    elif action_id == 1:      # DOWN
+    elif action_id == 1:  # DOWN
         y = y + 1 if y < border else y
-    elif action_id == 2:      # LEFT
+    elif action_id == 2:  # LEFT
         x = x - 1 if x > 0 else x
-    elif action_id == 3:      # RIGHT
+    elif action_id == 3:  # RIGHT
         x = x + 1 if x < border else x
     # action_id == 4 (STAY) is a no-op
     return (y, x)
@@ -80,9 +80,7 @@ def actinf_planning_single(agent, env_state, A, B, C, prior):
         ``update_efe_pragmatic``, ``update_q_pi``, ``update_p_u``,
         ``update_obs_idx``.
     """
-    policies = construct_policies(
-        [agent.n_states], [len(agent.E)], policy_len=agent.policy_len
-    )
+    policies = construct_policies([agent.n_states], [len(agent.E)], policy_len=agent.policy_len)
     obs_idx = agent.grid.index(env_state)
 
     qs_current = bu.infer_states(obs_idx, A, prior)
@@ -126,9 +124,7 @@ def actinf_graph(agent_network):
         node_data = agent_network.nodes[node]
         agent = node_data["agent"]
 
-        policies = construct_policies(
-            [agent.n_states], [len(agent.E)], policy_len=agent.policy_len
-        )
+        policies = construct_policies([agent.n_states], [len(agent.E)], policy_len=agent.policy_len)
         obs_idx = agent.grid.index(node_data["env_state"])
 
         qs_current = bu.infer_states(obs_idx, node_data["prior_A"], node_data["prior"])
@@ -146,19 +142,21 @@ def actinf_graph(agent_network):
         next_prior = node_data["prior_B"][:, :, chosen_action].dot(qs_current)
         next_env = _move(chosen_action, node_data["env_state"], agent.border)
 
-        agent_updates.append({
-            "source": node,
-            "update_prior": next_prior,
-            "update_env": next_env,
-            "update_action": int(chosen_action),
-            "update_inference": qs_current,
-            "update_efe": G,
-            "update_efe_epistemic": parts["epistemic"],
-            "update_efe_pragmatic": parts["pragmatic"],
-            "update_q_pi": Q_pi,
-            "update_p_u": P_u,
-            "update_obs_idx": int(obs_idx),
-        })
+        agent_updates.append(
+            {
+                "source": node,
+                "update_prior": next_prior,
+                "update_env": next_env,
+                "update_action": int(chosen_action),
+                "update_inference": qs_current,
+                "update_efe": G,
+                "update_efe_epistemic": parts["epistemic"],
+                "update_efe_pragmatic": parts["pragmatic"],
+                "update_q_pi": Q_pi,
+                "update_p_u": P_u,
+                "update_obs_idx": int(obs_idx),
+            }
+        )
 
     return {"agent_updates": agent_updates}
 

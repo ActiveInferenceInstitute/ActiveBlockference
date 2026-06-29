@@ -128,6 +128,7 @@ def build_state_update_blocks(grid):
     (or composing additional updaters) can reuse the same wiring the
     pipeline relies on.
     """
+
     def policy(params, substep, state_history, previous_state):
         return p_actinf_dict(params, substep, state_history, previous_state, grid)
 
@@ -156,11 +157,13 @@ def _run_cadcad(initial_state, state_update_blocks, params, timesteps, runs):
     from cadCAD.configuration.utils import config_sim
     from cadCAD.engine import ExecutionContext, ExecutionMode, Executor
 
-    sim_config = config_sim({
-        "N": int(runs),
-        "T": range(int(timesteps)),
-        "M": params,
-    })
+    sim_config = config_sim(
+        {
+            "N": int(runs),
+            "T": range(int(timesteps)),
+            "M": params,
+        }
+    )
 
     experiment = Experiment()
     experiment.append_configs(
@@ -205,13 +208,19 @@ def run_experiment(cfg: ExperimentConfig) -> pd.DataFrame:
     engine = (getattr(cfg, "engine", None) or "radcad").lower()
     if engine == "radcad":
         result = _run_radcad(
-            initial_state, state_update_blocks, params,
-            cfg.simulation.timesteps, cfg.simulation.runs,
+            initial_state,
+            state_update_blocks,
+            params,
+            cfg.simulation.timesteps,
+            cfg.simulation.runs,
         )
     elif engine == "cadcad":
         result = _run_cadcad(
-            initial_state, state_update_blocks, params,
-            cfg.simulation.timesteps, cfg.simulation.runs,
+            initial_state,
+            state_update_blocks,
+            params,
+            cfg.simulation.timesteps,
+            cfg.simulation.runs,
         )
     else:
         raise ValueError(f"unknown engine {engine!r}; use 'radcad' or 'cadcad'")
@@ -248,23 +257,25 @@ def run_grid(
     if target and target != ("random",):
         target_value = target  # type: ignore[assignment]
 
-    cfg = ExperimentConfig.from_dict({
-        "name": "run_grid",
-        "seed": seed,
-        "engine": engine,
-        "grid": {
-            "dimension": int(dimension),
-            "planning_length": planning_length,
-        },
-        "simulation": {
-            "timesteps": int(no_timesteps),
-            "runs": runs,
-            "n_agents": int(no_agents),
-            "target": target_value,
-            "initial_state": list(initial_state),
-        },
-        "output": {"path": output_path},
-    })
+    cfg = ExperimentConfig.from_dict(
+        {
+            "name": "run_grid",
+            "seed": seed,
+            "engine": engine,
+            "grid": {
+                "dimension": int(dimension),
+                "planning_length": planning_length,
+            },
+            "simulation": {
+                "timesteps": int(no_timesteps),
+                "runs": runs,
+                "n_agents": int(no_agents),
+                "target": target_value,
+                "initial_state": list(initial_state),
+            },
+            "output": {"path": output_path},
+        }
+    )
     print(
         f"Running Gridference. Grid dimension: {cfg.grid.dimension} | "
         f"Number of agents: {cfg.simulation.n_agents} | "

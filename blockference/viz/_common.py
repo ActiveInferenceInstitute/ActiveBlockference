@@ -32,9 +32,7 @@ def extract_agent_positions(df: pd.DataFrame) -> dict[Any, list[tuple[int, int]]
 
     first = series.iloc[0]
     if not isinstance(first, dict):
-        raise ValueError(
-            f"'env_states' cells must be dicts, got {type(first).__name__}"
-        )
+        raise ValueError(f"'env_states' cells must be dicts, got {type(first).__name__}")
 
     out: dict[Any, list[tuple[int, int]]] = {k: [] for k in first}
     for cell in series:

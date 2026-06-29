@@ -82,7 +82,7 @@ def animate_trajectory(
         for agent_id, traj in positions.items():
             up_to = traj[: frame + 1]
             if up_to:
-                ys, xs = zip(*up_to)
+                ys, xs = zip(*up_to, strict=False)
                 lines[agent_id].set_data(xs, ys)
                 dots[agent_id].set_data([xs[-1]], [ys[-1]])
                 labels[agent_id].set_position((xs[-1] + 0.05, ys[-1] - 0.1))
@@ -101,6 +101,7 @@ def animate_trajectory(
     elif suffix == ".mp4":
         try:
             from matplotlib.animation import FFMpegWriter
+
             anim.save(out_path, writer=FFMpegWriter(fps=fps))
         except (ImportError, RuntimeError) as exc:  # pragma: no cover
             raise RuntimeError(

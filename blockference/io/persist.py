@@ -142,6 +142,7 @@ def _to_jsonable(obj: Any) -> Any:
         return str(obj)
     try:
         import numpy as np
+
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         if isinstance(obj, np.generic):

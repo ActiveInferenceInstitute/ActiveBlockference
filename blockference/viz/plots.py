@@ -55,7 +55,7 @@ def plot_trajectory(
     for i, (agent_id, traj) in enumerate(positions.items()):
         if not traj:
             continue
-        ys, xs = zip(*traj)
+        ys, xs = zip(*traj, strict=False)
         ax.plot(xs, ys, "-o", color=cmap(i % 10), label=f"agent {agent_id}", alpha=0.8)
         ax.scatter([xs[0]], [ys[0]], c="green", s=80, marker="s", zorder=5)
         ax.scatter([xs[-1]], [ys[-1]], c="red", s=80, marker="*", zorder=5)
@@ -89,7 +89,7 @@ def plot_belief_heatmap(
     qs_flat = np.asarray(history[timestep])
     # Prefer the belief vector's own size (always n*n for square grids); fall
     # back to data-driven inference if the caller passed something exotic.
-    n = grid_dim or int(round(qs_flat.size ** 0.5))
+    n = grid_dim or int(round(qs_flat.size**0.5))
     if n * n != qs_flat.size:
         n = grid_dim or infer_grid_dimension(df)
     qs = qs_flat.reshape(n, n)
@@ -125,8 +125,11 @@ def plot_action_distribution(
     cmap = plt.get_cmap("tab10")
     for i, (agent_id, history) in enumerate(actions.items()):
         # Discard cadCAD's initial empty-string action at t=0.
-        ints = [int(a) for a in history if isinstance(a, (int, np.integer)) or
-                (isinstance(a, str) and a.lstrip("-").isdigit())]
+        ints = [
+            int(a)
+            for a in history
+            if isinstance(a, (int, np.integer)) or (isinstance(a, str) and a.lstrip("-").isdigit())
+        ]
         counts = Counter(ints)
         bar_y = [counts.get(a, 0) for a in range(n_actions)]
         offsets = np.arange(n_actions) + i * width

@@ -34,19 +34,21 @@ class TwoMultiGridAgent:
         self.pos_dict = {}
         for i in range(0, len(self.grid)):
             self.pos_dict[i] = self.grid[i]
-        print(f'Position dictionary is {self.pos_dict}')
+        print(f"Position dictionary is {self.pos_dict}")
 
-        self.num_states = grid_len ** 2
+        self.num_states = grid_len**2
 
-        self.current_state = init_pos # make them indexes
-        print(f'Agents are occupying the states {[self.pos_dict[v] for v in init_pos]}')
+        self.current_state = init_pos  # make them indexes
+        print(f"Agents are occupying the states {[self.pos_dict[v] for v in init_pos]}")
 
         self.current_obs = init_obs
-        print(f'Initial observation vectors of the agents: {init_obs}')
+        print(f"Initial observation vectors of the agents: {init_obs}")
 
         self.affordances = ["UP", "DOWN", "LEFT", "RIGHT", "STAY"]
 
-        assert len(self.current_state) == len(agents), "Number of occupied states is not equal to the number of agents"
+        assert len(self.current_state) == len(agents), (
+            "Number of occupied states is not equal to the number of agents"
+        )
 
     def step(self, actions):
         """
@@ -70,7 +72,6 @@ class TwoMultiGridAgent:
 
             x, y = self.pos_dict[self.current_state[agent_idx]]
 
-
             if action_label == "DOWN":
                 next_y = y + 1 if y < self.border else y
                 next_x = x
@@ -87,17 +88,18 @@ class TwoMultiGridAgent:
                 next_x = x
                 next_y = y
             else:
-                raise ValueError(f'Action {action_label} not recognized')
+                raise ValueError(f"Action {action_label} not recognized")
 
             new_location = (next_x, next_y)
-            new_agent_state = list(self.pos_dict.keys())[list(self.pos_dict.values()).index(new_location)] # returns index!
+            new_agent_state = list(self.pos_dict.keys())[
+                list(self.pos_dict.values()).index(new_location)
+            ]  # returns index!
             # check for collisions
             if new_agent_state == other_agent_state:
                 print("Almost collided!")
-                new_agent_state = self.current_state[agent_idx] # i.e. could not perform the action
+                new_agent_state = self.current_state[agent_idx]  # i.e. could not perform the action
                 new_location = (x, y)
             print(f"New location for agent {agent_idx} is {new_location}")
-
 
             new_states.append(new_agent_state)
 
@@ -106,15 +108,21 @@ class TwoMultiGridAgent:
         # Now generate new observations for each agent (after they have both taken a step)
         new_current_obs = []
 
-        for i in range(2): # not general, just for the two agents
+        for i in range(2):  # not general, just for the two agents
             agent_idx = i
             other_agent_idx = 0 if agent_idx == 1 else 1
-            new_current_obs.append([onehot(new_states[agent_idx], self.num_states).astype(int), onehot(new_states[other_agent_idx], self.num_states).astype(int)])
+            new_current_obs.append(
+                [
+                    onehot(new_states[agent_idx], self.num_states).astype(int),
+                    onehot(new_states[other_agent_idx], self.num_states).astype(int),
+                ]
+            )
 
         self.current_obs = new_current_obs
 
-
-        return self.current_obs # update both agents at the same time, need to be optimized in future iterations
+        return (
+            self.current_obs
+        )  # update both agents at the same time, need to be optimized in future iterations
 
     def get_grid(self, grid_len, grid_dim):
         g = list(itertools.product(range(grid_len), repeat=grid_dim))

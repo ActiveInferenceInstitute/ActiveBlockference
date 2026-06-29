@@ -132,18 +132,20 @@ def test_pipeline_writes_run_log_and_extras(tmp_path):
     from blockference.config import ExperimentConfig
     from blockference.pipeline import run_pipeline
 
-    cfg = ExperimentConfig.from_dict({
-        "name": "logged",
-        "seed": 0,
-        "grid": {"dimension": 3, "planning_length": 1},
-        "simulation": {
-            "timesteps": 2,
-            "n_agents": 1,
-            "target": [2, 2],
-            "initial_state": [0, 0],
-        },
-        "output": {"path": "ignored.csv"},
-    })
+    cfg = ExperimentConfig.from_dict(
+        {
+            "name": "logged",
+            "seed": 0,
+            "grid": {"dimension": 3, "planning_length": 1},
+            "simulation": {
+                "timesteps": 2,
+                "n_agents": 1,
+                "target": [2, 2],
+                "initial_state": [0, 0],
+            },
+            "output": {"path": "ignored.csv"},
+        }
+    )
     result = run_pipeline(cfg, output_root=tmp_path, run_name="r")
     p = result.paths
     assert p.run_log.exists() and p.run_log.stat().st_size > 0

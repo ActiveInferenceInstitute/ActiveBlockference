@@ -16,16 +16,18 @@ def _toy_trajectory_df(n_steps=4, n_agents=2):
         inferences.append({i: belief.copy() if t > 0 else "" for i in range(n_agents)})
         agents.append({i: object() for i in range(n_agents)})
         priors.append({i: belief for i in range(n_agents)})
-    return pd.DataFrame({
-        "agents": agents,
-        "priors": priors,
-        "env_states": env_states,
-        "actions": actions,
-        "inferences": inferences,
-        "timestep": list(range(n_steps + 1)),
-        "substep": [0] + [1] * n_steps,
-        "run": [1] * (n_steps + 1),
-    })
+    return pd.DataFrame(
+        {
+            "agents": agents,
+            "priors": priors,
+            "env_states": env_states,
+            "actions": actions,
+            "inferences": inferences,
+            "timestep": list(range(n_steps + 1)),
+            "substep": [0] + [1] * n_steps,
+            "run": [1] * (n_steps + 1),
+        }
+    )
 
 
 def test_plot_trajectory_writes_png(tmp_path):

@@ -38,18 +38,20 @@ def test_run_experiment_with_fixed_target(tmp_path):
     from blockference.config import ExperimentConfig
     from blockference.simulations import run_experiment
 
-    cfg = ExperimentConfig.from_dict({
-        "name": "fixed_target",
-        "seed": 1,
-        "grid": {"dimension": 3, "planning_length": 2},
-        "simulation": {
-            "timesteps": 6,
-            "n_agents": 1,
-            "target": [2, 2],
-            "initial_state": [0, 0],
-        },
-        "output": {"path": str(tmp_path / "fixed.csv")},
-    })
+    cfg = ExperimentConfig.from_dict(
+        {
+            "name": "fixed_target",
+            "seed": 1,
+            "grid": {"dimension": 3, "planning_length": 2},
+            "simulation": {
+                "timesteps": 6,
+                "n_agents": 1,
+                "target": [2, 2],
+                "initial_state": [0, 0],
+            },
+            "output": {"path": str(tmp_path / "fixed.csv")},
+        }
+    )
     df = run_experiment(cfg)
     # Last row's env_states[0] should be the goal (or very close to it).
     last_env = df.iloc[-1]["env_states"]
@@ -62,11 +64,13 @@ def test_run_experiment_writes_to_nested_path(tmp_path):
     from blockference.simulations import run_experiment
 
     out = tmp_path / "deep" / "nested" / "x.csv"
-    cfg = ExperimentConfig.from_dict({
-        "grid": {"dimension": 3},
-        "simulation": {"timesteps": 1, "n_agents": 1, "target": [0, 1]},
-        "output": {"path": str(out)},
-    })
+    cfg = ExperimentConfig.from_dict(
+        {
+            "grid": {"dimension": 3},
+            "simulation": {"timesteps": 1, "n_agents": 1, "target": [0, 1]},
+            "output": {"path": str(out)},
+        }
+    )
     run_experiment(cfg)
     assert out.exists()
 
@@ -77,11 +81,13 @@ def test_run_experiment_no_output(tmp_path, monkeypatch):
     from blockference.simulations import run_experiment
 
     monkeypatch.chdir(tmp_path)
-    cfg = ExperimentConfig.from_dict({
-        "grid": {"dimension": 3},
-        "simulation": {"timesteps": 1, "n_agents": 1, "target": [0, 0]},
-        "output": {"path": None},
-    })
+    cfg = ExperimentConfig.from_dict(
+        {
+            "grid": {"dimension": 3},
+            "simulation": {"timesteps": 1, "n_agents": 1, "target": [0, 0]},
+            "output": {"path": None},
+        }
+    )
     df = run_experiment(cfg)
     assert isinstance(df, pd.DataFrame)
     # No CSV files written
