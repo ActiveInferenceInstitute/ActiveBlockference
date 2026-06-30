@@ -1,0 +1,48 @@
+# AII sidecar — InstituteOS metadata. Schema: instituteos.platform.aii_sidecar
+meta:
+  updated: '2026-06-30'
+repo:
+  name: ActiveBlockference
+  slug: activeblockference
+  full_name: ActiveInferenceInstitute/ActiveBlockference
+  description: '> **Active Inference agents in cadCAD** — discrete-state generative
+    models for > grid-world, multi-agent, and graph-structured environments, expressed
+    as > [cadCAD](https://github.com/cadCAD-org/cadCAD) /…'
+institute:
+  category: research-software
+  maturity: released
+  steward: Active Inference Institute
+ecosystem:
+  links:
+    github: https://github.com/ActiveInferenceInstitute/ActiveBlockference
+    website: https://www.activeinference.org
+artifacts:
+- path: README.md
+  kind: doc
+  description: Repository overview.
+- path: pyproject.toml
+  kind: code
+  description: Python package config.
+- path: LICENSE
+  kind: doc
+  description: License.
+provenance:
+  license: MIT
+instituteos:
+  tags:
+  - active
+  - active-inference
+  - cadcad
+  - inference
+  - simulation
+  - jupyter notebook
+capabilities:
+- python-package
+- tested
+- documentation
+- notebooks
+- dataset
+tasks:
+  test:
+    cmd: python -m pytest
+    description: Run the test suite.
