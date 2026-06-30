@@ -13,6 +13,12 @@ institute:
   maturity: released
   steward: Active Inference Institute
 ecosystem:
+  relations:
+  - repo: ActiveInferenceInstitute/InstituteOS
+    relation: referenced-by
+    note: Federated via the InstituteOS .aii manifest.
+  - repo: ActiveInferenceInstitute/Active_Inference_Ontology
+    note: Uses Active Inference Ontology terms.
   links:
     github: https://github.com/ActiveInferenceInstitute/ActiveBlockference
     website: https://www.activeinference.org
@@ -28,6 +34,8 @@ artifacts:
   description: License.
 provenance:
   license: MIT
+  citation:
+    text: Active Inference Institute — ActiveBlockference.
 instituteos:
   tags:
   - active
