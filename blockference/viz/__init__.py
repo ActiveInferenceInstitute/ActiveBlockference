@@ -9,7 +9,7 @@ from blockference.viz.animation import animate_trajectory
 from blockference.viz.plots import (
     plot_action_distribution,
     plot_belief_heatmap,
-    plot_efe_proxy,
+    plot_efe,
     plot_trajectory,
 )
 
@@ -17,6 +17,6 @@ __all__ = [
     "animate_trajectory",
     "plot_action_distribution",
     "plot_belief_heatmap",
-    "plot_efe_proxy",
+    "plot_efe",
     "plot_trajectory",
 ]

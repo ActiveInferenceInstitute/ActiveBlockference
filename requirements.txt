@@ -1,8 +1,6 @@
 # Runtime requirements for ActiveBlockference.
-# For a uv-managed install with dev/docs extras, prefer:
-#   uv venv && uv pip install -e ".[dev,docs]"
-# A fully-pinned snapshot of the verified environment is kept in
-# requirements.lock (generated via `uv pip freeze`).
+# The authoritative reproducible environment is uv.lock. This file remains a
+# portable lower-bound runtime requirements list for non-uv tooling.
 inferactively-pymdp>=1.0.1
 cadCAD>=0.4.28
 radcad>=0.12

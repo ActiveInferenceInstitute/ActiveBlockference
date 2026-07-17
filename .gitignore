@@ -25,6 +25,8 @@ cad/
 
 # Testing / coverage
 .pytest_cache/
+.ruff_cache/
+docs/_build/
 .coverage
 .coverage.*
 htmlcov/
@@ -47,7 +49,7 @@ output/
 
 # uv
 .uv/
-uv.lock          # opt-in commit per project; we keep requirements.lock instead
+__pycache__/
 
 # OS
 .DS_Store

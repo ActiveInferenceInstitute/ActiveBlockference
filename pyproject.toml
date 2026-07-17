@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "active-blockference"
-version = "0.2.0"
+version = "1.0.0"
 description = "Active Inference agents in cadCAD — discrete-state generative models for grid-world, multi-agent, and graph environments."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -21,7 +21,7 @@ keywords = [
     "computational-neuroscience",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
@@ -53,13 +53,18 @@ dev = [
     "pytest>=7",
     "pytest-cov",
     "ruff",
+    "nbclient",
+    "nbformat",
     "ipykernel",
-    "jupyterlab",
 ]
 docs = [
     "mkdocs",
     "mkdocs-material",
 ]
+
+[project.scripts]
+blockference = "blockference.cli:main"
+grts = "GRTs.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/ActiveInferenceInstitute/ActiveBlockference"
@@ -67,8 +72,8 @@ Issues = "https://github.com/ActiveInferenceInstitute/ActiveBlockference/issues"
 Institute = "https://activeinference.org/"
 
 [tool.setuptools.packages.find]
-include = ["blockference*"]
-exclude = ["tests*", "notebooks*", "GRTs*", "docs*"]
+include = ["blockference*", "GRTs*"]
+exclude = ["tests*", "notebooks*", "docs*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

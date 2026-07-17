@@ -1,4 +1,4 @@
-"""Helpers shared across viz modules — trajectory frame parsing."""
+"""Strict trajectory parsing shared by visual renderers."""
 
 from __future__ import annotations
 
@@ -10,96 +10,114 @@ import pandas as pd
 
 
 def coerce_cell(value: Any) -> Any:
-    """Coerce a cell that may be a Python literal stringified by CSV round-tripping."""
-    if isinstance(value, (dict, list, tuple)):
+    """Decode a nested value written by pandas CSV serialisation."""
+
+    if isinstance(value, (dict, list, tuple, np.ndarray)):
         return value
+    if isinstance(value, float) and np.isnan(value):
+        return None
     if isinstance(value, str):
         try:
             return ast.literal_eval(value)
-        except (ValueError, SyntaxError):
+        except (SyntaxError, ValueError):
             return value
     return value
 
 
+def _mapping_series(df: pd.DataFrame, column: str) -> list[dict[Any, Any]]:
+    if column not in df.columns:
+        raise ValueError(f"trajectory frame must contain {column!r}")
+    cells = [coerce_cell(value) for value in df[column]]
+    if any(not isinstance(cell, dict) for cell in cells):
+        raise ValueError(f"trajectory column {column!r} must contain mappings")
+    return cells
+
+
 def extract_agent_positions(df: pd.DataFrame) -> dict[Any, list[tuple[int, int]]]:
-    """Return ``{agent_id: [(y0, x0), (y1, x1), ...]}`` from a trajectory frame."""
-    if "env_states" not in df.columns:
-        raise ValueError("trajectory frame must contain an 'env_states' column")
+    """Return ``{agent_id: [(y, x), ...]}`` from a trajectory frame."""
 
-    series = df["env_states"].apply(coerce_cell)
-    if series.empty:
-        return {}
-
-    first = series.iloc[0]
-    if not isinstance(first, dict):
-        raise ValueError(f"'env_states' cells must be dicts, got {type(first).__name__}")
-
-    out: dict[Any, list[tuple[int, int]]] = {k: [] for k in first}
-    for cell in series:
-        if not isinstance(cell, dict):
-            continue
-        for k, v in cell.items():
-            if isinstance(v, (list, tuple)) and len(v) == 2:
-                out.setdefault(k, []).append(tuple(int(c) for c in v))
+    cells = _mapping_series(df, "env_states")
+    if not cells:
+        raise ValueError("trajectory frame is empty")
+    out: dict[Any, list[tuple[int, int]]] = {}
+    for cell in cells:
+        for agent_id, value in cell.items():
+            if not isinstance(value, (list, tuple)) or len(value) != 2:
+                raise ValueError(f"agent {agent_id!r} has an invalid coordinate")
+            if any(isinstance(component, bool) or not isinstance(component, (int, np.integer)) for component in value):
+                raise ValueError(f"agent {agent_id!r} has a non-integer coordinate")
+            coordinate = (int(value[0]), int(value[1]))
+            if min(coordinate) < 0:
+                raise ValueError(f"agent {agent_id!r} has a negative coordinate")
+            out.setdefault(agent_id, []).append(coordinate)
+    if not out:
+        raise ValueError("trajectory contains no agent positions")
+    lengths = {len(history) for history in out.values()}
+    if len(lengths) != 1:
+        raise ValueError("agent trajectories have inconsistent lengths")
     return out
 
 
 def extract_action_history(df: pd.DataFrame) -> dict[Any, list[Any]]:
-    """Return ``{agent_id: [a0, a1, ...]}`` from a trajectory frame."""
-    if "actions" not in df.columns:
-        return {}
-    series = df["actions"].apply(coerce_cell)
+    """Return ``{agent_id: [action, ...]}`` from a trajectory frame."""
+
+    cells = _mapping_series(df, "actions")
     out: dict[Any, list[Any]] = {}
-    for cell in series:
-        if not isinstance(cell, dict):
-            continue
-        for k, v in cell.items():
-            out.setdefault(k, []).append(v)
+    for cell in cells:
+        for agent_id, value in cell.items():
+            out.setdefault(agent_id, []).append(value)
+    return out
+
+
+def _extract_vector_history(df: pd.DataFrame, column: str) -> dict[Any, list[np.ndarray]]:
+    cells = _mapping_series(df, column)
+    out: dict[Any, list[np.ndarray]] = {}
+    for cell in cells:
+        for agent_id, value in cell.items():
+            parsed = coerce_cell(value)
+            if parsed is None or (isinstance(parsed, str) and parsed == ""):
+                continue
+            array = np.asarray(parsed, dtype=float)
+            if array.ndim != 1 or array.size == 0 or not np.isfinite(array).all():
+                raise ValueError(f"{column} for agent {agent_id!r} is not a finite vector")
+            out.setdefault(agent_id, []).append(array)
     return out
 
 
 def extract_belief_history(df: pd.DataFrame) -> dict[Any, list[np.ndarray]]:
-    """Return ``{agent_id: [q_s_0, q_s_1, ...]}`` from a trajectory frame.
+    """Return persisted posterior vectors by agent."""
 
-    Beliefs that are stored as the empty string (cadCAD initial state) are
-    skipped so callers can plot from t≥1.
-    """
-    if "inferences" not in df.columns:
-        return {}
-    series = df["inferences"].apply(coerce_cell)
-    out: dict[Any, list[np.ndarray]] = {}
-    for cell in series:
-        if not isinstance(cell, dict):
-            continue
-        for k, v in cell.items():
-            if isinstance(v, (list, tuple)):
-                out.setdefault(k, []).append(np.asarray(v, dtype=float))
-            elif isinstance(v, np.ndarray):
-                out.setdefault(k, []).append(v.astype(float))
-            # silently skip empty-string initial entries
-    return out
+    return _extract_vector_history(df, "inferences")
+
+
+def extract_efe_history(df: pd.DataFrame) -> dict[Any, list[np.ndarray]]:
+    """Return persisted expected-free-energy vectors by agent."""
+
+    return _extract_vector_history(df, "efe")
 
 
 def infer_grid_dimension(df: pd.DataFrame) -> int:
-    """Infer ``n`` (the side length) from a trajectory frame.
+    """Infer a square grid side length from beliefs or positions."""
 
-    Resolution order:
-      1. Belief vector size (always ``n*n`` for a square grid) — most reliable.
-      2. ``max(coordinate) + 1`` over observed positions — falls back here
-         only when no belief history is recorded.
-      3. Hard fallback of 3 when neither signal is available.
-    """
     beliefs = extract_belief_history(df)
-    for history in beliefs.values():
-        if history:
-            n_from_belief = int(round(np.asarray(history[0]).size ** 0.5))
-            if n_from_belief * n_from_belief == np.asarray(history[0]).size:
-                return n_from_belief
-
+    sizes = {int(history[0].size) for history in beliefs.values() if history}
+    for size in sizes:
+        side = int(round(size**0.5))
+        if side * side == size:
+            return side
     positions = extract_agent_positions(df)
-    if positions:
-        flat = [coord for traj in positions.values() for pair in traj for coord in pair]
-        if flat:
-            return int(max(flat) + 1)
+    max_coordinate = max(component for history in positions.values() for pair in history for component in pair)
+    side = max_coordinate + 1
+    if side < 2:
+        raise ValueError("grid dimension must be at least 2")
+    return side
 
-    return 3
+
+__all__ = [
+    "coerce_cell",
+    "extract_action_history",
+    "extract_agent_positions",
+    "extract_belief_history",
+    "extract_efe_history",
+    "infer_grid_dimension",
+]

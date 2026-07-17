@@ -35,14 +35,14 @@ Artefacts emitted
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
-from blockference.config import ExperimentConfig, load_experiment_config
+from blockference.config import ExperimentConfig, OutputConfig, load_experiment_config
 from blockference.io import (
     RunPaths,
     ValidationReport,
@@ -64,7 +64,7 @@ from blockference.viz import (
     animate_trajectory,
     plot_action_distribution,
     plot_belief_heatmap,
-    plot_efe_proxy,
+    plot_efe,
     plot_trajectory,
 )
 from blockference.viz._common import (
@@ -102,6 +102,13 @@ class PipelineResult:
     per_step_report: ValidationReport
     visualisations: dict[str, Path]
     animations: dict[str, Path]
+    validation_report: ValidationReport
+
+    @property
+    def ok(self) -> bool:
+        """Return the aggregate validation verdict."""
+
+        return self.validation_report.ok
 
 
 def summarise_trajectory(df: pd.DataFrame) -> dict:
@@ -170,6 +177,15 @@ def build_per_step_records(df: pd.DataFrame) -> list[dict[str, Any]]:
             q_pi_arr = _as_float_array(q_pis.get(agent_id))
             p_u_arr = _as_float_array(p_us.get(agent_id))
 
+            if (
+                row.get("timestep") == 0
+                and qs_arr is None
+                and efe_arr is None
+                and q_pi_arr is None
+                and p_u_arr is None
+            ):
+                continue
+
             rec: dict[str, Any] = {
                 "run": row.get("run"),
                 "substep": row.get("substep"),
@@ -204,7 +220,7 @@ def render_visualisations(
     affordances: list[str] | None = None,
 ) -> tuple[dict[str, Path], dict[str, Path]]:
     """Render the standard PNG + GIF artefacts. Returns (viz, animations) maps."""
-    paths.ensure()
+    paths.require_tree()
     viz: dict[str, Path] = {}
     anims: dict[str, Path] = {}
 
@@ -214,8 +230,8 @@ def render_visualisations(
     viz["actions"] = plot_action_distribution(
         df, paths.viz_dir / "action_distribution.png", affordances=affordances
     )
-    log.info("rendering EFE proxy (belief entropy)")
-    viz["efe_proxy"] = plot_efe_proxy(df, paths.viz_dir / "efe_proxy.png")
+    log.info("rendering persisted expected free energy")
+    viz["efe"] = plot_efe(df, paths.viz_dir / "efe.png")
 
     beliefs = extract_belief_history(df)
     if beliefs:
@@ -236,11 +252,8 @@ def render_visualisations(
                 timestep=-1,
             )
 
-    try:
-        log.info("rendering trajectory animation")
-        anims["trajectory"] = animate_trajectory(df, paths.animations_dir / "trajectory.gif")
-    except (ValueError, RuntimeError) as exc:
-        log.warning("animation skipped: %s", exc)
+    log.info("rendering trajectory animation")
+    anims["trajectory"] = animate_trajectory(df, paths.animations_dir / "trajectory.gif")
     return viz, anims
 
 
@@ -299,7 +312,7 @@ def persist(
     Returns ``(summary, per_step_records, agents_dict)`` so downstream
     stages can reuse the in-memory state without re-reading the CSV.
     """
-    paths.ensure()
+    paths.require_tree()
     persist_config(cfg, paths)
     log.info("persisted config to %s", paths.config_path)
 
@@ -311,19 +324,16 @@ def persist(
     log.info("persisted summary: %d agents, %d rows", summary["n_agents"], summary["n_rows"])
 
     agents = _extract_agents_dict(df)
-    if agents:
-        persist_generative_model(agents, paths)
-        persist_generative_model_npz(agents, paths)
-        log.info("persisted generative model (JSON + NPZ) for %d agent(s)", len(agents))
-        policies = _extract_policies(agents)
-        if policies:
-            persist_policies(policies, paths)
-            log.info("persisted %d policies of length %d", len(policies), policies[0].shape[0])
+    persist_generative_model(agents, paths)
+    persist_generative_model_npz(agents, paths)
+    log.info("persisted generative model (JSON + NPZ) for %d agent(s)", len(agents))
+    policies = _extract_policies(agents)
+    persist_policies(policies, paths)
+    log.info("persisted %d policies of length %d", len(policies), policies[0].shape[0])
 
     per_step = build_per_step_records(df)
-    if per_step:
-        persist_per_step_records(per_step, paths)
-        log.info("persisted %d per-step records", len(per_step))
+    persist_per_step_records(per_step, paths)
+    log.info("persisted %d per-step records", len(per_step))
     return summary, per_step, agents
 
 
@@ -332,7 +342,9 @@ def validate(
     agents: dict,
     per_step: list[dict[str, Any]],
     paths: RunPaths,
-) -> tuple[ValidationReport, dict[str, ValidationReport], ValidationReport, ValidationReport]:
+    visualisations: dict[str, Path] | None = None,
+    animations: dict[str, Path] | None = None,
+) -> tuple[ValidationReport, dict[str, ValidationReport], ValidationReport, ValidationReport, ValidationReport]:
     """Stage 3: schema + math + per-step + on-disk validation.
 
     Writes ``validation_report.json`` covering all on-disk artefacts and
@@ -362,12 +374,30 @@ def validate(
         log.info("per-step diagnostics OK")
 
     artefacts_report = validate_run_outputs(paths)
-    artefacts_report.write(paths)
     if not artefacts_report.ok:
         log.warning("artefact validation issues: %s", artefacts_report.issues)
     else:
         log.info("artefact validation OK")
-    return schema_report, model_reports, per_step_report, artefacts_report
+    aggregate = ValidationReport()
+    aggregate.merge("trajectory", schema_report)
+    aggregate.add("model.non_empty", bool(model_reports), "no generative models were validated")
+    for agent_id, model_report in model_reports.items():
+        aggregate.merge(f"model.{agent_id}", model_report)
+    aggregate.merge("per_step", per_step_report)
+    aggregate.merge("artefacts", artefacts_report)
+    aggregate.add(
+        "rendering.non_empty",
+        bool(visualisations) and bool(animations),
+        "no visualisation or animation outputs were registered",
+    )
+    for name, output in {**(visualisations or {}), **(animations or {})}.items():
+        aggregate.add(
+            f"rendering.{name}",
+            output.is_file() and output.stat().st_size > 0,
+            str(output),
+        )
+    aggregate.write(paths)
+    return schema_report, model_reports, per_step_report, artefacts_report, aggregate
 
 
 # ---------------------------------------------------------------------------
@@ -392,6 +422,7 @@ def run_pipeline(
         timestamped=timestamped,
     )
 
+    paths.ensure()
     log_handler = configure_run_logging(paths.run_log)
     try:
         log.info("=== ActiveBlockference run start: %s ===", paths.run_name)
@@ -411,25 +442,23 @@ def run_pipeline(
             cfg.simulation.initial_state,
         )
 
-        # Route the simulation's CSV writer through our typed path.
-        cfg.output.path = str(paths.trajectory_csv)
-
-        df = simulate(cfg)
-        summary, per_step, agents = persist(cfg, df, paths)
+        run_cfg = replace(cfg, output=OutputConfig(path=str(paths.trajectory_csv)))
+        df = simulate(run_cfg)
+        summary, per_step, agents = persist(run_cfg, df, paths)
 
         # Visualisations after persistence so the run_log captures both phases.
         visualisations, animations = render_visualisations(
-            df, paths, affordances=cfg.grid.affordances
+            df, paths, affordances=list(run_cfg.grid.affordances)
         )
 
-        schema_report, model_reports, per_step_report, artefacts_report = validate(
-            df, agents, per_step, paths
+        schema_report, model_reports, per_step_report, artefacts_report, aggregate_report = validate(
+            df, agents, per_step, paths, visualisations, animations
         )
 
         log.info("=== ActiveBlockference run complete: %s ===", paths.run_name)
 
         return PipelineResult(
-            config=cfg,
+            config=run_cfg,
             paths=paths,
             trajectory=df,
             summary=summary,
@@ -439,6 +468,7 @@ def run_pipeline(
             per_step_report=per_step_report,
             visualisations=visualisations,
             animations=animations,
+            validation_report=aggregate_report,
         )
     finally:
         remove_handler(log_handler)

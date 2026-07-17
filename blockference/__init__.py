@@ -6,6 +6,7 @@ do ``from blockference import ActiveGridference``.
 
 from blockference.agent import BlockferenceAgent
 from blockference.config import ExperimentConfig, load_experiment_config
+from blockference.envs import GridWorld
 from blockference.gridference import (
     ActiveGridference,
     actinf_graph,
@@ -29,13 +30,15 @@ from blockference.pipeline import (
     simulate,
     validate,
 )
+from blockference.viz import plot_efe
 
-__version__ = "0.5.0"
+__version__ = "1.0.0"
 
 __all__ = [
     "ActiveGridference",
     "BlockferenceAgent",
     "ExperimentConfig",
+    "GridWorld",
     "PipelineResult",
     "RunPaths",
     "ValidationReport",
@@ -44,6 +47,7 @@ __all__ = [
     "build_run_paths",
     "load_experiment_config",
     "make_grid",
+    "plot_efe",
     "persist",
     "render_visualisations",
     "run_pipeline",

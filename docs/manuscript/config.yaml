@@ -1,0 +1,41 @@
+paper:
+  title: "ActiveBlockference: Strict Discrete Active Inference on Deterministic Grid Worlds"
+  subtitle: "A reproducible Python implementation with validated dynamics and artefact round-trips"
+  version: "1.0.0"
+  date: "2026-07-17"
+
+authors:
+  - name: "Active Inference Institute"
+    affiliation: "Active Inference Institute"
+    corresponding: true
+
+keywords:
+  - "active inference"
+  - "expected free energy"
+  - "discrete POMDP"
+  - "grid world"
+  - "multi-agent simulation"
+  - "reproducible computational science"
+  - "cadCAD"
+  - "radCAD"
+
+experiment:
+  engine_comparison: ["radcad", "cadcad"]
+  dimension: 3
+  planning_length: 2
+  timesteps: 6
+  runs: 1
+  agents: 2
+  seed: 17
+  affordances: ["UP", "DOWN", "LEFT", "RIGHT", "STAY"]
+
+render:
+  source_directory: "docs/manuscript"
+  build_directory: "docs/_build/manuscript"
+  figure_format: "svg"
+  numbering: "deterministic-by-source-order"
+
+metadata:
+  license: "MIT"
+  language: "en"
+  source_of_truth: "docs/manuscript/[0-9][0-9]_*.md"

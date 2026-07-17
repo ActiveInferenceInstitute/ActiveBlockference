@@ -89,7 +89,8 @@ The numerical primitives implementing the loop above (``softmax``,
 all live in :mod:`blockference.maths` and :mod:`blockference.utils.utils`.
 They are pure NumPy and have **no pymdp dependency**, so the grid
 pipeline keeps producing reproducible NumPy outputs even as upstream
-pymdp 1.x evolves on its JAX track. See [`migration.md`](migration.md)
+pymdp remains an optional upstream adapter; the grid pipeline uses the package's
+validated NumPy primitives directly.
 for the complete pymdp 0.0.x → 1.0.x mapping.
 
 ## References

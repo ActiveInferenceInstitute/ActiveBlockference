@@ -1,97 +1,94 @@
-"""Single-agent and graph-multi-agent Active Inference on a grid.
+"""Discrete-state Active Inference on a square grid."""
 
-This module provides:
-
-* :class:`ActiveGridference` — a generative-model holder for a discrete
-  grid-world with the canonical Active Inference matrices ``A``, ``B``,
-  ``C``, ``D``, ``E``.
-* :func:`actinf_planning_single` — one inference / planning / action step
-  for a single :class:`ActiveGridference` instance.
-* :func:`actinf_graph` — one inference / planning / action step for every
-  node in a `networkx` graph whose nodes carry agent state.
-
-The functions are designed to be used inside cadCAD policy blocks but are
-also directly callable (see ``notebooks/`` and ``tests/``).
-"""
+from __future__ import annotations
 
 import itertools
+from collections.abc import Sequence
 
 import numpy as np
 
+from blockference.actions import DEFAULT_AFFORDANCES, SUPPORTED_AFFORDANCES, validate_affordances
 from blockference.maths import construct_policies, onehot
 from blockference.utils import utils as bu
 
 __all__ = [
+    "DEFAULT_AFFORDANCES",
+    "SUPPORTED_AFFORDANCES",
     "ActiveGridference",
-    "actinf_planning_single",
     "actinf_graph",
+    "actinf_planning_single",
+    "make_grid",
 ]
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+def _validate_affordances(affordances: Sequence[str]) -> list[str]:
+    return list(validate_affordances(affordances))
 
 
-def _move(action_id, env_state, border):
-    """Apply a 5-action discrete grid move with wall reflection.
+def _move(
+    action_id: int,
+    env_state: tuple[int, int],
+    border: int,
+    affordances: Sequence[str] = DEFAULT_AFFORDANCES,
+) -> tuple[int, int]:
+    """Apply one validated action using the package coordinate convention."""
+    if not isinstance(action_id, (int, np.integer)):
+        raise TypeError("action_id must be an integer")
+    if not isinstance(border, (int, np.integer)) or border < 0:
+        raise ValueError("border must be a non-negative integer")
+    if not isinstance(env_state, (tuple, list)) or len(env_state) != 2:
+        raise ValueError("env_state must be a (y, x) coordinate")
+    if any(isinstance(component, (bool, np.bool_)) or not isinstance(component, (int, np.integer)) for component in env_state):
+        raise TypeError("env_state coordinates must be integers")
+    y, x = (int(env_state[0]), int(env_state[1]))
+    if not (0 <= y <= border and 0 <= x <= border):
+        raise ValueError(f"env_state {(y, x)} is outside a {int(border) + 1}x{int(border) + 1} grid")
+    actions = _validate_affordances(affordances)
+    if not 0 <= int(action_id) < len(actions):
+        raise IndexError(f"action_id {action_id} out of range [0, {len(actions)})")
+    label = actions[int(action_id)]
+    if label == "UP":
+        y = max(0, y - 1)
+    elif label == "DOWN":
+        y = min(int(border), y + 1)
+    elif label == "LEFT":
+        x = max(0, x - 1)
+    elif label == "RIGHT":
+        x = min(int(border), x + 1)
+    return y, x
 
-    Action encoding: 0=UP, 1=DOWN, 2=LEFT, 3=RIGHT, 4=STAY.
-    """
-    y, x = env_state
-    if action_id == 0:  # UP
-        y = y - 1 if y > 0 else y
-    elif action_id == 1:  # DOWN
-        y = y + 1 if y < border else y
-    elif action_id == 2:  # LEFT
-        x = x - 1 if x > 0 else x
-    elif action_id == 3:  # RIGHT
-        x = x + 1 if x < border else x
-    # action_id == 4 (STAY) is a no-op
-    return (y, x)
+
+def _validate_square_grid(grid: Sequence[tuple[int, int]]) -> list[tuple[int, int]]:
+    values = [tuple(location) for location in grid]
+    if not values or any(len(location) != 2 for location in values):
+        raise ValueError("grid must be a non-empty sequence of two-dimensional coordinates")
+    if len(set(values)) != len(values):
+        raise ValueError("grid coordinates must be unique")
+    side = int(round(len(values) ** 0.5))
+    expected = set(itertools.product(range(side), repeat=2))
+    if side * side != len(values) or set(values) != expected:
+        raise ValueError("ActiveGridference requires a complete square grid starting at (0, 0)")
+    return values
 
 
-# ---------------------------------------------------------------------------
-# Single-agent step
-# ---------------------------------------------------------------------------
+def _coordinate(value, name: str) -> tuple[int, int]:
+    if not isinstance(value, (tuple, list)) or len(value) != 2:
+        raise ValueError(f"{name} must be a two-dimensional integer coordinate")
+    if any(isinstance(component, (bool, np.bool_)) or not isinstance(component, (int, np.integer)) for component in value):
+        raise TypeError(f"{name} coordinates must be integers")
+    return int(value[0]), int(value[1])
 
 
-def actinf_planning_single(agent, env_state, A, B, C, prior):
-    """Run one Active Inference planning step for a single agent.
-
-    Parameters
-    ----------
-    agent : ActiveGridference
-        The agent providing ``n_states``, ``E`` (affordances), ``policy_len``
-        and ``border`` (grid boundary index).
-    env_state : tuple[int, int]
-        Current ``(y, x)`` location on the grid.
-    A, B, C : numpy.ndarray
-        Generative-model matrices.
-    prior : numpy.ndarray
-        Prior over hidden states for this timestep.
-
-    Returns
-    -------
-    dict
-        Update payload carrying ``update_prior``, ``update_env``,
-        ``update_action``, ``update_inference``, plus the full per-step
-        diagnostics: ``update_efe`` (G per policy), ``update_efe_epistemic``,
-        ``update_efe_pragmatic``, ``update_q_pi``, ``update_p_u``,
-        ``update_obs_idx``.
-    """
+def _step_agent(agent, prior, A, B, C, env_state, grid):
     policies = construct_policies([agent.n_states], [len(agent.E)], policy_len=agent.policy_len)
-    obs_idx = agent.grid.index(env_state)
-
+    obs_idx = grid.index(tuple(env_state))
     qs_current = bu.infer_states(obs_idx, A, prior)
     G, parts = bu.calculate_G_policies_traced(A, B, C, qs_current, policies=policies)
     Q_pi = bu.softmax(-G)
     P_u = bu.compute_prob_actions(agent.E, policies, Q_pi)
     chosen_action = bu.sample(P_u)
-
     next_prior = B[:, :, chosen_action].dot(qs_current)
-    next_env = _move(chosen_action, env_state, agent.border)
-
+    next_env = _move(chosen_action, tuple(env_state), agent.border, agent.E)
     return {
         "update_prior": next_prior,
         "update_env": next_env,
@@ -106,164 +103,106 @@ def actinf_planning_single(agent, env_state, A, B, C, prior):
     }
 
 
-# ---------------------------------------------------------------------------
-# Multi-agent (graph) step
-# ---------------------------------------------------------------------------
+def actinf_planning_single(agent, env_state, A, B, C, prior):
+    """Run one inference, planning, sampling, and prior-propagation step."""
+    return _step_agent(agent, prior, A, B, C, env_state, agent.grid)
 
 
 def actinf_graph(agent_network):
-    """Run one Active Inference step over every node in ``agent_network``.
-
-    Each node is expected to expose the keys ``agent`` (an
-    :class:`ActiveGridference`), ``env_state``, ``prior``, ``prior_A``,
-    ``prior_B``, ``prior_C``.
-    """
-    agent_updates = []
-
+    """Run one independent Active Inference step for every graph node."""
+    updates = []
     for node in agent_network.nodes:
-        node_data = agent_network.nodes[node]
-        agent = node_data["agent"]
-
-        policies = construct_policies([agent.n_states], [len(agent.E)], policy_len=agent.policy_len)
-        obs_idx = agent.grid.index(node_data["env_state"])
-
-        qs_current = bu.infer_states(obs_idx, node_data["prior_A"], node_data["prior"])
-        G, parts = bu.calculate_G_policies_traced(
-            node_data["prior_A"],
-            node_data["prior_B"],
-            node_data["prior_C"],
-            qs_current,
-            policies=policies,
+        data = agent_network.nodes[node]
+        update = _step_agent(
+            data["agent"],
+            data["prior"],
+            data["prior_A"],
+            data["prior_B"],
+            data["prior_C"],
+            data["env_state"],
+            data["agent"].grid,
         )
-        Q_pi = bu.softmax(-G)
-        P_u = bu.compute_prob_actions(agent.E, policies, Q_pi)
-        chosen_action = bu.sample(P_u)
-
-        next_prior = node_data["prior_B"][:, :, chosen_action].dot(qs_current)
-        next_env = _move(chosen_action, node_data["env_state"], agent.border)
-
-        agent_updates.append(
-            {
-                "source": node,
-                "update_prior": next_prior,
-                "update_env": next_env,
-                "update_action": int(chosen_action),
-                "update_inference": qs_current,
-                "update_efe": G,
-                "update_efe_epistemic": parts["epistemic"],
-                "update_efe_pragmatic": parts["pragmatic"],
-                "update_q_pi": Q_pi,
-                "update_p_u": P_u,
-                "update_obs_idx": int(obs_idx),
-            }
-        )
-
-    return {"agent_updates": agent_updates}
-
-
-# ---------------------------------------------------------------------------
-# Generative-model holder
-# ---------------------------------------------------------------------------
+        update["source"] = node
+        updates.append(update)
+    return {"agent_updates": updates}
 
 
 class ActiveGridference:
-    """Generative model + state container for an Active Inference grid agent.
-
-    The class assembles the canonical discrete-state Active Inference
-    matrices for a 2-D grid-world:
-
-    ====  ====================================================================
-    Sym.  Meaning
-    ====  ====================================================================
-    A     Likelihood ``P(o|s)`` — observation given hidden state.
-    B     Transition ``P(s_t | s_{t-1}, u_{t-1})`` — controllable dynamics.
-    C     Prior preferences over observations.
-    D     Prior over hidden states at the first timestep.
-    E     Affordances (action labels).
-    ====  ====================================================================
-    """
+    """Generative model and mutable state for a square-grid agent."""
 
     def __init__(
         self,
         grid,
         planning_length: int = 2,
-        env_state: tuple = (0, 0),
+        env_state: tuple[int, int] = (0, 0),
+        affordances: Sequence[str] = DEFAULT_AFFORDANCES,
     ) -> None:
-        super().__init__()
-        self.A = None
-        self.B = None
-        self.C = None
-        self.D = None
-        self.E = ["UP", "DOWN", "LEFT", "RIGHT", "STAY"]
-        self.grid = grid
-
-        self.policy_len = planning_length
-
-        # environment
+        if not isinstance(planning_length, (int, np.integer)) or planning_length < 1:
+            raise ValueError("planning_length must be a positive integer")
+        self.grid = _validate_square_grid(grid)
+        self.E = _validate_affordances(affordances)
+        self.policy_len = int(planning_length)
         self.n_states = len(self.grid)
         self.n_observations = len(self.grid)
-        self.border = int(np.sqrt(self.n_states) - 1)
+        self.border = int(round(self.n_states**0.5)) - 1
+        self.env_state = _coordinate(env_state, "env_state")
+        if self.env_state not in self.grid:
+            raise ValueError(f"env_state {self.env_state!r} is not present in grid")
+        self.A: np.ndarray = np.eye(self.n_observations, self.n_states)
+        self.B: np.ndarray = self._build_B()
+        self.C: np.ndarray | None = None
+        self.D: np.ndarray | None = None
+        self.prior: np.ndarray | None = None
+        self.current_action: int | None = None
+        self.current_inference: np.ndarray | None = None
 
-        # active state
-        self.prior = self.D
-        self.current_action = ""
-        self.current_inference = ""
-        self.env_state = env_state
+    def _build_B(self) -> np.ndarray:
+        B = np.zeros((self.n_states, self.n_states, len(self.E)), dtype=float)
+        for action_id in range(len(self.E)):
+            for current_index, location in enumerate(self.grid):
+                next_location = _move(action_id, location, self.border, self.E)
+                B[self.grid.index(next_location), current_index, action_id] = 1.0
+        return B
 
-        if self.grid is not None:
-            self.get_A()
-            self.get_B()
-
-    # ------------------------------------------------------------------
-    # Generative-model construction
-    # ------------------------------------------------------------------
-
-    def get_A(self):
-        """Identity likelihood for fully-observed gridworld."""
+    def get_A(self) -> np.ndarray:
+        """Rebuild and return the identity likelihood matrix."""
         self.A = np.eye(self.n_observations, self.n_states)
+        return self.A
 
-    def get_B(self):
-        """Build the controllable transition tensor B[s', s, a]."""
-        self.B = np.zeros((len(self.grid), len(self.grid), len(self.E)))
+    def get_B(self) -> np.ndarray:
+        """Rebuild and return the affordance-specific transition tensor."""
+        self.B = self._build_B()
+        return self.B
 
-        for action_id, action_label in enumerate(self.E):
-            for curr_state, grid_location in enumerate(self.grid):
-                y, x = grid_location
+    def get_C(self, preferred_state: tuple[int, int]) -> np.ndarray:
+        """Set and return a one-hot preference over observations."""
+        coordinate = _coordinate(preferred_state, "preferred_state")
+        if coordinate not in self.grid:
+            raise ValueError(f"preferred_state {preferred_state!r} is not present in grid")
+        self.C = onehot(self.grid.index(coordinate), self.n_observations)
+        return self.C
 
-                if action_label == "UP":
-                    next_y = y - 1 if y > 0 else y
-                    next_x = x
-                elif action_label == "DOWN":
-                    next_y = y + 1 if y < self.border else y
-                    next_x = x
-                elif action_label == "LEFT":
-                    next_x = x - 1 if x > 0 else x
-                    next_y = y
-                elif action_label == "RIGHT":
-                    next_x = x + 1 if x < self.border else x
-                    next_y = y
-                elif action_label == "STAY":
-                    next_y, next_x = y, x
-                else:
-                    raise ValueError(f"Unknown action label: {action_label}")
+    def get_D(self, initial_state: tuple[int, int]) -> np.ndarray:
+        """Set and return a one-hot prior over hidden states."""
+        coordinate = _coordinate(initial_state, "initial_state")
+        if coordinate not in self.grid:
+            raise ValueError(f"initial_state {initial_state!r} is not present in grid")
+        self.D = onehot(self.grid.index(coordinate), self.n_states)
+        self.prior = self.D.copy()
+        self.env_state = coordinate
+        return self.D
 
-                next_state = self.grid.index((next_y, next_x))
-                self.B[next_state, curr_state, action_id] = 1.0
-
-    def get_C(self, preferred_state: tuple):
-        """Build a one-hot prior preference vector over observations."""
-        self.C = onehot(self.grid.index(preferred_state), self.n_observations)
-
-    def get_D(self, initial_state):
-        """Build a one-hot prior over the initial hidden state."""
-        self.D = onehot(self.grid.index(initial_state), self.n_states)
-        self.prior = self.D
-
-    def get_E(self, actions: list):
-        """Override the affordance set."""
-        self.E = actions
+    def get_E(self, actions: Sequence[str]) -> list[str]:
+        """Set affordances and rebuild the transition tensor."""
+        self.E = _validate_affordances(actions)
+        self.B = self._build_B()
+        return self.E
 
 
 def make_grid(grid_len: int, grid_dim: int = 2):
-    """Convenience: return a list of grid coordinates of length ``grid_len^grid_dim``."""
-    return list(itertools.product(range(grid_len), repeat=grid_dim))
+    """Return Cartesian grid coordinates for positive dimensions."""
+    if not isinstance(grid_len, (int, np.integer)) or grid_len < 1:
+        raise ValueError("grid_len must be a positive integer")
+    if not isinstance(grid_dim, (int, np.integer)) or grid_dim < 1:
+        raise ValueError("grid_dim must be a positive integer")
+    return list(itertools.product(range(int(grid_len)), repeat=int(grid_dim)))

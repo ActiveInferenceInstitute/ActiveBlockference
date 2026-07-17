@@ -1,4 +1,4 @@
-"""Static plots for ActiveBlockference trajectories."""
+"""Static renderers for validated ActiveBlockference trajectories."""
 
 from __future__ import annotations
 
@@ -7,178 +7,151 @@ from pathlib import Path
 
 import matplotlib
 
-matplotlib.use("Agg")  # noqa: E402  — headless rendering for CI / scripts
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-
-from blockference.viz._common import (  # noqa: E402
+from blockference.actions import DEFAULT_AFFORDANCES, validate_affordances
+from blockference.viz._common import (
     extract_action_history,
     extract_agent_positions,
     extract_belief_history,
+    extract_efe_history,
     infer_grid_dimension,
 )
 
 __all__ = [
     "plot_action_distribution",
     "plot_belief_heatmap",
-    "plot_efe_proxy",
+    "plot_efe",
     "plot_trajectory",
 ]
 
 
-def plot_trajectory(
-    df: pd.DataFrame,
-    out_path: str | Path,
-    *,
-    title: str = "Agent trajectories",
-    grid_dim: int | None = None,
-) -> Path:
-    """Plot every agent's path on a square grid, save as PNG."""
-    out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+def _target(out_path: str | Path, suffix: str = ".png") -> Path:
+    path = Path(out_path)
+    if path.suffix.lower() != suffix:
+        raise ValueError(f"output must use the {suffix} extension")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
 
+
+def _grid_size(df: pd.DataFrame, grid_dim: int | None) -> int:
+    inferred = infer_grid_dimension(df)
+    if grid_dim is None:
+        return inferred
+    if isinstance(grid_dim, bool) or not isinstance(grid_dim, int) or grid_dim < 2:
+        raise ValueError("grid_dim must be an integer >= 2")
+    if grid_dim != inferred:
+        raise ValueError(f"grid_dim {grid_dim} does not match trajectory dimension {inferred}")
+    return grid_dim
+
+
+def plot_trajectory(df: pd.DataFrame, out_path: str | Path, *, title: str = "Agent trajectories", grid_dim: int | None = None) -> Path:
+    """Plot every agent path on a validated square grid."""
+
+    path = _target(out_path)
     positions = extract_agent_positions(df)
-    n = grid_dim or infer_grid_dimension(df)
-
+    n = _grid_size(df, grid_dim)
     fig, ax = plt.subplots(figsize=(6, 6))
-    ax.set_xlim(-0.5, n - 0.5)
-    ax.set_ylim(n - 0.5, -0.5)  # invert so (0,0) is top-left like a grid
-    ax.set_xticks(range(n))
-    ax.set_yticks(range(n))
-    ax.grid(True, linestyle="--", alpha=0.4)
-    ax.set_aspect("equal")
-    ax.set_title(title)
+    try:
+        ax.set_xlim(-0.5, n - 0.5)
+        ax.set_ylim(n - 0.5, -0.5)
+        ax.set_xticks(range(n))
+        ax.set_yticks(range(n))
+        ax.grid(True, linestyle="--", alpha=0.4)
+        ax.set_aspect("equal")
+        ax.set_title(title)
+        cmap = plt.get_cmap("tab10")
+        for index, (agent_id, trajectory) in enumerate(positions.items()):
+            ys, xs = zip(*trajectory, strict=True)
+            ax.plot(xs, ys, "-o", color=cmap(index % 10), label=f"agent {agent_id}", alpha=0.8)
+            ax.scatter([xs[0]], [ys[0]], c="green", s=80, marker="s", zorder=5)
+            ax.scatter([xs[-1]], [ys[-1]], c="red", s=80, marker="*", zorder=5)
+        ax.legend(loc="best")
+        fig.tight_layout()
+        fig.savefig(path, dpi=120)
+    finally:
+        plt.close(fig)
+    return path
 
-    cmap = plt.get_cmap("tab10")
-    for i, (agent_id, traj) in enumerate(positions.items()):
-        if not traj:
-            continue
-        ys, xs = zip(*traj, strict=False)
-        ax.plot(xs, ys, "-o", color=cmap(i % 10), label=f"agent {agent_id}", alpha=0.8)
-        ax.scatter([xs[0]], [ys[0]], c="green", s=80, marker="s", zorder=5)
-        ax.scatter([xs[-1]], [ys[-1]], c="red", s=80, marker="*", zorder=5)
-    ax.legend(loc="best")
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=120)
-    plt.close(fig)
-    return out_path
 
+def plot_belief_heatmap(df: pd.DataFrame, out_path: str | Path, *, agent_id: object | None = None, timestep: int = -1, grid_dim: int | None = None, title: str | None = None) -> Path:
+    """Render one persisted posterior vector as a grid heatmap."""
 
-def plot_belief_heatmap(
-    df: pd.DataFrame,
-    out_path: str | Path,
-    *,
-    agent_id: object | None = None,
-    timestep: int = -1,
-    grid_dim: int | None = None,
-    title: str | None = None,
-) -> Path:
-    """Render the belief vector at ``timestep`` as an n×n heatmap."""
-    out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+    path = _target(out_path)
     beliefs = extract_belief_history(df)
     if not beliefs:
-        raise ValueError("no belief history found in trajectory frame")
-    if agent_id is None:
-        agent_id = next(iter(beliefs))
-    history = beliefs[agent_id]
-    if not history:
-        raise ValueError(f"agent {agent_id!r} has no belief history")
-    qs_flat = np.asarray(history[timestep])
-    # Prefer the belief vector's own size (always n*n for square grids); fall
-    # back to data-driven inference if the caller passed something exotic.
-    n = grid_dim or int(round(qs_flat.size**0.5))
-    if n * n != qs_flat.size:
-        n = grid_dim or infer_grid_dimension(df)
-    qs = qs_flat.reshape(n, n)
-
+        raise ValueError("trajectory contains no posterior vectors")
+    selected = next(iter(beliefs)) if agent_id is None else agent_id
+    if selected not in beliefs or not beliefs[selected]:
+        raise ValueError(f"agent {selected!r} has no posterior history")
+    vector = beliefs[selected][timestep]
+    n = _grid_size(df, grid_dim)
+    if vector.size != n * n:
+        raise ValueError("posterior vector size does not match the grid")
     fig, ax = plt.subplots(figsize=(5, 5))
-    im = ax.imshow(qs, cmap="viridis", vmin=0.0, vmax=qs.max())
-    ax.set_title(title or f"q(s) for agent {agent_id} @ step {timestep}")
-    ax.set_xticks(range(n))
-    ax.set_yticks(range(n))
-    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=120)
-    plt.close(fig)
-    return out_path
+    try:
+        image = ax.imshow(vector.reshape(n, n), cmap="viridis", vmin=0.0, vmax=max(float(vector.max()), 1.0))
+        ax.set_title(title or f"q(s) for agent {selected} @ step {timestep}")
+        ax.set_xticks(range(n))
+        ax.set_yticks(range(n))
+        fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
+        fig.tight_layout()
+        fig.savefig(path, dpi=120)
+    finally:
+        plt.close(fig)
+    return path
 
 
-def plot_action_distribution(
-    df: pd.DataFrame,
-    out_path: str | Path,
-    *,
-    affordances: list[str] | None = None,
-    title: str = "Action frequency per agent",
-) -> Path:
-    """Bar-chart action frequencies, one bar group per agent."""
-    out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+def plot_action_distribution(df: pd.DataFrame, out_path: str | Path, *, affordances=None, title: str = "Action frequency per agent") -> Path:
+    """Plot action frequencies using the configured action vocabulary."""
 
+    path = _target(out_path)
+    labels = validate_affordances(DEFAULT_AFFORDANCES if affordances is None else affordances)
     actions = extract_action_history(df)
-    affordances = affordances or ["UP", "DOWN", "LEFT", "RIGHT", "STAY"]
-    n_actions = len(affordances)
     fig, ax = plt.subplots(figsize=(7, 4))
-    width = 0.8 / max(len(actions), 1)
-    cmap = plt.get_cmap("tab10")
-    for i, (agent_id, history) in enumerate(actions.items()):
-        # Discard cadCAD's initial empty-string action at t=0.
-        ints = [
-            int(a)
-            for a in history
-            if isinstance(a, (int, np.integer)) or (isinstance(a, str) and a.lstrip("-").isdigit())
-        ]
-        counts = Counter(ints)
-        bar_y = [counts.get(a, 0) for a in range(n_actions)]
-        offsets = np.arange(n_actions) + i * width
-        ax.bar(offsets, bar_y, width=width, label=f"agent {agent_id}", color=cmap(i % 10))
-    ax.set_xticks(np.arange(n_actions) + (len(actions) - 1) * width / 2)
-    ax.set_xticklabels(affordances)
-    ax.set_ylabel("count")
-    ax.set_title(title)
-    ax.legend(loc="best")
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=120)
-    plt.close(fig)
-    return out_path
+    try:
+        width = 0.8 / max(len(actions), 1)
+        cmap = plt.get_cmap("tab10")
+        for index, (agent_id, history) in enumerate(actions.items()):
+            integers = [int(value) for value in history if isinstance(value, (int, np.integer))]
+            counts = Counter(integers)
+            offsets = np.arange(len(labels)) + index * width
+            ax.bar(offsets, [counts.get(action, 0) for action in range(len(labels))], width=width, label=f"agent {agent_id}", color=cmap(index % 10))
+        ax.set_xticks(np.arange(len(labels)) + (len(actions) - 1) * width / 2)
+        ax.set_xticklabels(labels)
+        ax.set_ylabel("count")
+        ax.set_title(title)
+        ax.legend(loc="best")
+        fig.tight_layout()
+        fig.savefig(path, dpi=120)
+    finally:
+        plt.close(fig)
+    return path
 
 
-def plot_efe_proxy(
-    df: pd.DataFrame,
-    out_path: str | Path,
-    *,
-    title: str = "Belief entropy over time (EFE proxy)",
-) -> Path:
-    """Plot per-agent posterior entropy at every step.
+def plot_efe(df: pd.DataFrame, out_path: str | Path, *, title: str = "Expected free energy over time") -> Path:
+    """Plot the minimum persisted EFE value for each agent and timestep."""
 
-    True expected-free-energy traces are not stored on cadCAD frames by
-    default; we plot the entropy of the inferred posterior ``q(s)`` as
-    a model-free proxy that decreases as the agent becomes confident.
-    """
-    out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    beliefs = extract_belief_history(df)
+    path = _target(out_path)
+    efe_history = extract_efe_history(df)
+    if not efe_history:
+        raise ValueError("trajectory contains no persisted EFE vectors")
     fig, ax = plt.subplots(figsize=(7, 4))
-    cmap = plt.get_cmap("tab10")
-    for i, (agent_id, history) in enumerate(beliefs.items()):
-        if not history:
-            continue
-        ents = [-_safe_xlogx(np.asarray(qs)).sum() for qs in history]
-        ax.plot(range(len(ents)), ents, "-o", color=cmap(i % 10), label=f"agent {agent_id}")
-    ax.set_xlabel("step")
-    ax.set_ylabel("H[q(s)]  (nats)")
-    ax.set_title(title)
-    ax.grid(True, alpha=0.3)
-    ax.legend(loc="best")
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=120)
-    plt.close(fig)
-    return out_path
-
-
-def _safe_xlogx(p: np.ndarray) -> np.ndarray:
-    p = np.clip(p, 1e-16, 1.0)
-    return p * np.log(p)
+    try:
+        cmap = plt.get_cmap("tab10")
+        for index, (agent_id, history) in enumerate(efe_history.items()):
+            values = [float(vector.min()) for vector in history]
+            ax.plot(range(len(values)), values, "-o", color=cmap(index % 10), label=f"agent {agent_id}")
+        ax.set_xlabel("step")
+        ax.set_ylabel("min G(π) (nats)")
+        ax.set_title(title)
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc="best")
+        fig.tight_layout()
+        fig.savefig(path, dpi=120)
+    finally:
+        plt.close(fig)
+    return path

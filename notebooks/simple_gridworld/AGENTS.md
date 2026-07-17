@@ -1,10 +1,5 @@
-# AGENTS.md — `notebooks/simple_gridworld/`
+# Grid notebook guidance
 
-Same rules as the parent `notebooks/AGENTS.md`, plus:
-
-* These notebooks form a **pedagogical sequence**. Renaming or reordering
-  changes the learning path — coordinate via an issue first.
-* Imports should prefer `from blockference import ...`. Notebooks
-  predating the package layout may still use `sys.path.insert`; flag them
-  for migration.
-* Coordinate convention: `(y, x)` everywhere, matching the library.
+These notebooks teach the current `GridWorld`, `ActiveGridference`, and
+pipeline APIs. Coordinates are `(y, x)`, and examples must use configured
+affordances and deterministic seeded execution.

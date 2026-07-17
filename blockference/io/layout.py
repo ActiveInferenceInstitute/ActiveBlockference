@@ -23,7 +23,7 @@ locations and creates the directories on demand.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 __all__ = ["RunPaths", "build_run_paths"]
@@ -35,6 +35,14 @@ class RunPaths:
 
     root: Path
     run_name: str
+
+    def __post_init__(self) -> None:
+        root = Path(self.root)
+        if not isinstance(self.run_name, str) or not self.run_name.strip():
+            raise ValueError("run_name must be a non-empty string")
+        if self.run_name in {".", ".."} or Path(self.run_name).name != self.run_name or any(char in self.run_name for char in "/\\\x00"):
+            raise ValueError("run_name must be a single safe path component")
+        object.__setattr__(self, "root", root)
 
     @property
     def run_dir(self) -> Path:
@@ -102,6 +110,14 @@ class RunPaths:
             d.mkdir(parents=True, exist_ok=True)
         return self
 
+    def require_tree(self) -> RunPaths:
+        """Require the complete directory tree before persistence begins."""
+
+        missing = [str(path) for path in (self.run_dir, self.data_dir, self.viz_dir, self.animations_dir) if not path.is_dir()]
+        if missing:
+            raise FileNotFoundError(f"RunPaths tree is not prepared: {', '.join(missing)}")
+        return self
+
 
 def build_run_paths(
     root: str | Path = "output",
@@ -121,8 +137,17 @@ def build_run_paths(
     timestamped :
         If True, append a UTC timestamp suffix to make the directory unique.
     """
-    name = run_name or "run"
+    name = "run" if run_name is None else run_name
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("run_name must be a non-empty string")
+    if name in {".", ".."} or Path(name).name != name or any(char in name for char in "/\\\x00"):
+        raise ValueError("run_name must be a single safe path component")
+    if not all(char.isprintable() for char in name):
+        raise ValueError("run_name must contain printable characters only")
     if timestamped:
-        ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         name = f"{name}-{ts}"
-    return RunPaths(root=Path(root), run_name=name).ensure()
+    root_path = Path(root)
+    if any(part == ".." for part in root_path.parts):
+        raise ValueError("output root must not contain parent-directory traversal")
+    return RunPaths(root=root_path, run_name=name)

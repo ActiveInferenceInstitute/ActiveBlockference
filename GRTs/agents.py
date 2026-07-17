@@ -1,182 +1,187 @@
-# Tools
+"""Optional research orchestration with a deterministic local provider."""
+
+from __future__ import annotations
+
+import csv
+import json
 import os
-from contextlib import contextmanager
-from typing import Optional
-from langchain.agents import tool
-from langchain.tools.file_management.read import ReadFileTool
-from langchain.tools.file_management.write import WriteFileTool
-
-# General 
-import os
-import pandas as pd
-from langchain.experimental.autonomous_agents.autogpt.agent import AutoGPT
-from langchain.chat_models import ChatOpenAI
-
-from langchain.agents.agent_toolkits.pandas.base import create_pandas_dataframe_agent
-from langchain.docstore.document import Document
-import asyncio
-import nest_asyncio
-
-from langchain.tools import BaseTool, DuckDuckGoSearchRun
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-
-from pydantic import Field
-from langchain.chains.qa_with_sources.loading import load_qa_with_sources_chain, BaseCombineDocumentsChain
-
-# Memory
-import faiss
-from langchain.vectorstores import FAISS
-from langchain.docstore import InMemoryDocstore
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.tools.human.tool import HumanInputRun
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Protocol
 
 
-@contextmanager
-def pushd(new_dir):
-    """Context manager for changing the current working directory."""
-    prev_dir = os.getcwd()
-    os.chdir(new_dir)
-    try:
-        yield
-    finally:
-        os.chdir(prev_dir)
+class ResearchProvider(Protocol):
+    """Provider interface used by the local orchestration workflow."""
 
-@tool
+    def complete(self, prompt: str) -> str:
+        """Return a response for a research prompt."""
+
+
+@dataclass(frozen=True)
+class ResearchWorkspace:
+    """Explicit file locations for a research exchange."""
+
+    root: Path
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "root", Path(self.root))
+
+    @property
+    def project_description(self) -> Path:
+        return self.root / "O_Project_description.txt"
+
+    @property
+    def requests(self) -> Path:
+        return self.root / "requests.txt"
+
+    @property
+    def research_data(self) -> Path:
+        return self.root / "research_data.txt"
+
+    @property
+    def report(self) -> Path:
+        return self.root / "report.txt"
+
+    def prepare(self) -> None:
+        """Create the workspace and required input files."""
+
+        self.root.mkdir(parents=True, exist_ok=True)
+        if not self.requests.exists():
+            self.requests.write_text("Summarize the supplied research corpus.\n", encoding="utf-8")
+        if not self.research_data.exists():
+            self.research_data.write_text("", encoding="utf-8")
+
+
+class OfflineCorpusProvider:
+    """Deterministic provider that answers from a local text corpus."""
+
+    def __init__(self, corpus: str | Path | None = None) -> None:
+        if corpus is None:
+            self.corpus = (
+                "Active inference links observations, beliefs, actions, and expected free energy."
+            )
+        else:
+            corpus_path = Path(corpus)
+            self.corpus = (
+                corpus_path.read_text(encoding="utf-8") if corpus_path.is_file() else str(corpus)
+            )
+
+    def complete(self, prompt: str) -> str:
+        """Return stable corpus sentences selected by prompt terms."""
+
+        terms = {word.lower().strip(".,:;!?()[]{}") for word in prompt.split() if len(word) > 2}
+        sentences = [
+            sentence.strip()
+            for sentence in self.corpus.replace("\n", " ").split(".")
+            if sentence.strip()
+        ]
+        ranked = sorted(
+            enumerate(sentences),
+            key=lambda item: (-sum(term in item[1].lower() for term in terms), item[0]),
+        )
+        selected = [sentence for _, sentence in ranked[:3]]
+        return (
+            "Offline corpus synthesis:\n"
+            + ". ".join(selected)
+            + ("." if selected else " No matching corpus text.")
+        )
+
+
+class OpenAIProvider:
+    """Explicit OpenAI provider requiring the optional SDK and API key."""
+
+    def __init__(self, model: str = "gpt-4o-mini", api_key: str | None = None) -> None:
+        key = api_key or os.environ.get("OPENAI_API_KEY")
+        if not key:
+            raise RuntimeError("OpenAI provider requires OPENAI_API_KEY")
+        try:
+            from openai import OpenAI
+        except ImportError as exc:
+            raise RuntimeError("OpenAI provider requires the optional openai package") from exc
+        self.model = model
+        self.client = OpenAI(api_key=key)
+
+    def complete(self, prompt: str) -> str:
+        """Send one prompt to the configured OpenAI model."""
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        content = response.choices[0].message.content
+        if not content:
+            raise RuntimeError("OpenAI provider returned an empty response")
+        return content
+
+
 def process_csv(
-    csv_file_path: str, instructions: str, output_path: Optional[str] = None
+    csv_file_path: str | Path, instructions: str = "", output_path: str | Path | None = None
 ) -> str:
-    """Process a CSV by with pandas in a limited REPL.\
- Only use this after writing data to disk as a csv file.\
- Any figures must be saved to disk to be viewed by the human.\
- Instructions should be written in natural language, not code. Assume the dataframe is already loaded."""
-    with pushd(ROOT_DIR):
-        try:
-            df = pd.read_csv(csv_file_path)
-        except Exception as e:
-            return f"Error: {e}"
-        agent = create_pandas_dataframe_agent(llm, df, max_iterations=30, verbose=True)
-        if output_path is not None:
-            instructions += f" Save output to disk at {output_path}"
-        try:
-            result = agent.run(instructions)
-            return result
-        except Exception as e:
-            return f"Error: {e}"
+    """Produce deterministic structural analysis for a CSV file."""
 
-async def async_load_playwright(url: str) -> str:
-    """Load the specified URLs using Playwright and parse using BeautifulSoup."""
-    from bs4 import BeautifulSoup
-    from playwright.async_api import async_playwright
-
-    results = ""
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        try:
-            page = await browser.new_page()
-            await page.goto(url)
-
-            page_source = await page.content()
-            soup = BeautifulSoup(page_source, "html.parser")
-
-            for script in soup(["script", "style"]):
-                script.extract()
-
-            text = soup.get_text()
-            lines = (line.strip() for line in text.splitlines())
-            chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-            results = "\n".join(chunk for chunk in chunks if chunk)
-        except Exception as e:
-            results = f"Error: {e}"
-        await browser.close()
-    return results
-
-def run_async(coro):
-    event_loop = asyncio.get_event_loop()
-    return event_loop.run_until_complete(coro)
-
-@tool
-def browse_web_page(url: str) -> str:
-    """Verbose way to scrape a whole webpage. Likely to cause issues parsing."""
-    return run_async(async_load_playwright(url))
-
-def _get_text_splitter():
-    return RecursiveCharacterTextSplitter(
-        # Set a really small chunk size, just to show.
-        chunk_size = 500,
-        chunk_overlap  = 20,
-        length_function = len,
-    )
+    path = Path(csv_file_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"CSV file not found: {path}")
+    with path.open(newline="", encoding="utf-8") as stream:
+        rows = list(csv.reader(stream))
+    if not rows:
+        raise ValueError("CSV file is empty")
+    header = rows[0]
+    result = {
+        "file": str(path),
+        "rows": max(len(rows) - 1, 0),
+        "columns": header,
+        "instructions": instructions,
+    }
+    text = json.dumps(result, indent=2)
+    if output_path is not None:
+        output = Path(output_path)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(text + "\n", encoding="utf-8")
+    return text
 
 
-class WebpageQATool(BaseTool):
-    name = "query_webpage"
-    description = "Browse a webpage and retrieve the information relevant to the question."
-    text_splitter: RecursiveCharacterTextSplitter = Field(default_factory=_get_text_splitter)
-    qa_chain: BaseCombineDocumentsChain
-    
-    def _run(self, url: str, question: str) -> str:
-        """Useful for browsing websites and scraping the text information."""
-        result = browse_web_page.run(url)
-        docs = [Document(page_content=result, metadata={"source": url})]
-        web_docs = self.text_splitter.split_documents(docs)
-        results = []
-        # TODO: Handle this with a MapReduceChain
-        for i in range(0, len(web_docs), 4):
-            input_docs = web_docs[i:i+4]
-            window_result = self.qa_chain({"input_documents": input_docs, "question": question}, return_only_outputs=True)
-            results.append(f"Response from window {i} - {window_result}")
-        results_docs = [Document(page_content="\n".join(results), metadata={"source": url})]
-        return self.qa_chain({"input_documents": results_docs, "question": question}, return_only_outputs=True)
-    
-    async def _arun(self, url: str, question: str) -> str:
-        raise NotImplementedError
+@dataclass
+class ResearchOrchestrator:
+    """Coordinate request, corpus, and report files through one provider."""
 
-        
-def setup_agents(llm, folder):
+    provider: ResearchProvider
+    workspace: ResearchWorkspace
 
-    query_website_tool = WebpageQATool(qa_chain=load_qa_with_sources_chain(llm))
+    def run(self) -> Path:
+        """Process the current request and write a report."""
 
-    web_search = DuckDuckGoSearchRun()
+        self.workspace.prepare()
+        request = self.workspace.requests.read_text(encoding="utf-8").strip()
+        corpus = ""
+        if self.workspace.project_description.exists():
+            corpus = self.workspace.project_description.read_text(encoding="utf-8")
+        prompt = f"Request:\n{request}\nCorpus:\n{corpus}"
+        answer = self.provider.complete(prompt)
+        self.workspace.research_data.write_text(answer + "\n", encoding="utf-8")
+        report = f"Research report\n\nRequest\n{request}\n\nFindings\n{answer}\n"
+        self.workspace.report.write_text(report, encoding="utf-8")
+        return self.workspace.report
 
-    embeddings_model = OpenAIEmbeddings()
-    embedding_size = 1536
-    index = faiss.IndexFlatL2(embedding_size)
-    vectorstore = FAISS(embeddings_model.embed_query, index, InMemoryDocstore({}), {})
-    
-    tools_admin = [
-        # web_search,
-        WriteFileTool(root_dir=folder),
-        ReadFileTool(root_dir=folder),
-        process_csv,
-        query_website_tool,
-        # HumanInputRun(), # Activate if you want the permit asking for help from the human
-    ]
 
-    tools_research = [
-        web_search,
-        WriteFileTool(root_dir=folder),
-        ReadFileTool(root_dir=folder),
-        process_csv,
-        query_website_tool,
-        # HumanInputRun(), # Activate if you want the permit asking for help from the human
-    ]
-    
-    agent_admin = AutoGPT.from_llm_and_tools(
-        ai_name="Professor Karl",
-        ai_role="Formulates research questions and approaches, dispatches requests to research assistant via requests.txt file, uses research_data.txt to parse research information, writes report in report.txt.",
-        tools=tools_admin,
-        llm=llm,
-        memory=vectorstore.as_retriever(search_kwargs={"k": 8}),
-        # human_in_the_loop=True, # Set to True if you want to add feedback at each step.
-    )
+def build_provider(
+    name: str, *, corpus: str | Path | None = None, model: str = "gpt-4o-mini"
+) -> ResearchProvider:
+    """Build an explicitly selected provider."""
 
-    agent_research = AutoGPT.from_llm_and_tools(
-        ai_name="Research Assistant Joe",
-        ai_role="Reads requests in requests.txt, performs online research and data gathering and writes outputs in research_data.txt.",
-        tools=tools_research,
-        llm=llm,
-        memory=vectorstore.as_retriever(search_kwargs={"k": 8}),
-        # human_in_the_loop=True, # Set to True if you want to add feedback at each step.
-    )
-    
-    return agent_admin, agent_research
+    if name == "offline":
+        return OfflineCorpusProvider(corpus)
+    if name == "openai":
+        return OpenAIProvider(model=model)
+    raise ValueError("provider must be 'offline' or 'openai'")
+
+
+__all__ = [
+    "OfflineCorpusProvider",
+    "OpenAIProvider",
+    "ResearchOrchestrator",
+    "ResearchProvider",
+    "ResearchWorkspace",
+    "build_provider",
+    "process_csv",
+]

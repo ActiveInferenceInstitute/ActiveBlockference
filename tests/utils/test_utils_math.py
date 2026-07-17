@@ -39,7 +39,7 @@ def test_get_expected_states_propagates_through_B():
     n = 3
     qs = np.array([1.0, 0.0, 0.0])
     B = np.zeros((n, n, 1))
-    B[:, :, 0] = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0]])  # shift down
+    B[:, :, 0] = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 1]])  # shift down; bounded at the end
     qs_next = u.get_expected_states(B, qs, 0)
     assert np.allclose(qs_next, [0, 1, 0])
 

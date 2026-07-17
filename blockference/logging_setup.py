@@ -67,14 +67,11 @@ def configure_run_logging(
 
 
 def remove_handler(handler: logging.Handler | None) -> None:
-    """Detach and close a handler. Safe to call with ``None``."""
+    """Detach and close a handler when one is supplied."""
     if handler is None:
         return
     logging.getLogger("blockference").removeHandler(handler)
-    try:
-        handler.close()
-    except Exception:  # pragma: no cover
-        pass
+    handler.close()
 
 
 __all__ = [

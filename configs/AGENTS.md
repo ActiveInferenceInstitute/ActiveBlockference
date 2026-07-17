@@ -22,7 +22,7 @@
 
 1. Copy `example.yml`.
 2. Edit values; keep keys sorted under each section.
-3. Run `uv run python -m blockference.simulations.grid_sim configs/<your>.yml`
+3. Run `uv run blockference pipeline --config configs/<your>.yml`
    and confirm a CSV is produced.
 4. Add a row to `README.md`.
 

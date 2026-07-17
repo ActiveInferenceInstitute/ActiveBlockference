@@ -27,29 +27,36 @@ jobs:
         uses: astral-sh/setup-uv@v3
         with:
           enable-cache: true
-          cache-dependency-glob: "**/pyproject.toml"
+          cache-dependency-glob: "uv.lock"
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
-      - name: Create venv + install package
-        run: |
-          uv venv --python ${{ matrix.python-version }}
-          uv pip install -e ".[dev]"
+      - name: Install locked package and development dependencies
+        run: uv sync --locked --extra dev --python ${{ matrix.python-version }}
 
       - name: Lint
-        run: uv run ruff check blockference tests
+        run: uv run ruff check blockference tests GRTs scripts
 
       - name: Run tests with coverage
         run: uv run pytest --cov=blockference --cov-report=xml --cov-report=term
 
       - name: Smoke-run the full pipeline
         run: |
-          uv run python -m blockference.simulations.grid_sim \
-            --pipeline configs/smoke.yml --run-name ci_smoke
+          uv run blockference pipeline --config configs/smoke.yml \
+            --run-name ci_smoke
           test -f output/ci_smoke/data/trajectory.csv
           test -f output/ci_smoke/animations/trajectory.gif
           test -f output/ci_smoke/validation_report.json
+
+      - name: Execute notebooks
+        run: uv run python scripts/execute_notebooks.py
+
+      - name: Validate and compose manuscript
+        run: |
+          uv run python scripts/validate_manuscript.py
+          uv run python scripts/build_manuscript.py
+          uv run python scripts/build_manuscript.py --check
 
       - name: Upload coverage
         if: matrix.python-version == '3.11'

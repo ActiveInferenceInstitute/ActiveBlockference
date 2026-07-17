@@ -26,32 +26,44 @@ __all__ = [
 
 def persist_config(cfg: ExperimentConfig, paths: RunPaths) -> Path:
     """Write the run's config back to disk so the artefacts are self-describing."""
-    paths.ensure()
+    paths.require_tree()
     with paths.config_path.open("w", encoding="utf-8") as fh:
         yaml.safe_dump(_to_jsonable(cfg.to_dict()), fh, sort_keys=False)
     return paths.config_path
 
 
 def persist_dataframe(df: pd.DataFrame, paths: RunPaths) -> dict[str, Path]:
-    """Write the trajectory frame as CSV (always) and Parquet (if pyarrow)."""
-    paths.ensure()
+    """Write a documented nested-value trajectory as CSV and optional Parquet."""
+    paths.require_tree()
     written: dict[str, Path] = {}
-    df.to_csv(paths.trajectory_csv, index=False)
+    serialised = df.copy()
+    for column in ("agents", "priors", "env_states", "actions", "inferences", "efe", "efe_epistemic", "efe_pragmatic", "q_pi", "p_u", "obs_idx"):
+        if column not in serialised:
+            continue
+        if column == "agents":
+            serialised[column] = serialised[column].map(
+                lambda value: {str(key): {"agent_id": str(key)} for key in value}
+                if isinstance(value, dict)
+                else value
+            )
+        else:
+            serialised[column] = serialised[column].map(_to_jsonable)
+    serialised.to_csv(paths.trajectory_csv, index=False)
     written["csv"] = paths.trajectory_csv
     try:
-        df.to_parquet(paths.trajectory_parquet, index=False)
+        serialised.to_parquet(paths.trajectory_parquet, index=False)
         written["parquet"] = paths.trajectory_parquet
-    except (ImportError, ValueError):
-        # parquet writer (pyarrow/fastparquet) not installed or schema incompatible
+    except ImportError:
+        # Parquet is an explicitly optional acceleration format.
         pass
     return written
 
 
 def persist_summary(summary: dict[str, Any], paths: RunPaths) -> Path:
     """Write the per-run summary JSON (number of agents, final positions, ...)."""
-    paths.ensure()
+    paths.require_tree()
     with paths.summary_json.open("w", encoding="utf-8") as fh:
-        json.dump(_to_jsonable(summary), fh, indent=2, default=str)
+        json.dump(_to_jsonable(summary), fh, indent=2)
     return paths.summary_json
 
 
@@ -64,7 +76,9 @@ def persist_generative_model(agents: dict, paths: RunPaths) -> Path:
         ``{agent_id: ActiveGridference}`` mapping. Only the public matrices
         are serialised; per-step state is captured in :func:`persist_per_step_records`.
     """
-    paths.ensure()
+    paths.require_tree()
+    if not agents:
+        raise ValueError("at least one agent is required to persist a generative model")
     payload: dict[str, Any] = {}
     for agent_id, agent in agents.items():
         payload[str(agent_id)] = {
@@ -89,12 +103,15 @@ def persist_per_step_records(records: list[dict[str, Any]], paths: RunPaths) -> 
     Always writes CSV; additionally writes Parquet when pyarrow is
     available for lossless float round-trip of any vector-valued columns.
     """
-    paths.ensure()
+    paths.require_tree()
+    if not records:
+        raise ValueError("at least one per-step record is required")
     df = pd.DataFrame(records)
     df.to_csv(paths.per_step_csv, index=False)
     try:
         df.to_parquet(paths.per_step_parquet, index=False)
-    except (ImportError, ValueError):
+    except ImportError:
+        # Parquet is an explicitly optional acceleration format.
         pass
     return paths.per_step_csv
 
@@ -107,7 +124,9 @@ def persist_generative_model_npz(agents: dict, paths: RunPaths) -> Path:
     drift). Useful when downstream consumers want to instantiate a pymdp
     ``Agent`` from the persisted matrices.
     """
-    paths.ensure()
+    paths.require_tree()
+    if not agents:
+        raise ValueError("at least one agent is required to persist matrices")
     payload: dict[str, np.ndarray] = {}
     for agent_id, agent in agents.items():
         prefix = f"agent_{agent_id}"
@@ -125,7 +144,9 @@ def persist_generative_model_npz(agents: dict, paths: RunPaths) -> Path:
 
 def persist_policies(policies: list, paths: RunPaths) -> Path:
     """Persist the enumerated policy set."""
-    paths.ensure()
+    paths.require_tree()
+    if not policies:
+        raise ValueError("at least one policy is required")
     payload = [_to_jsonable(p) for p in policies]
     with paths.policies_json.open("w", encoding="utf-8") as fh:
         json.dump({"n_policies": len(policies), "policies": payload}, fh, indent=2)
@@ -140,13 +161,8 @@ def _to_jsonable(obj: Any) -> Any:
         return [_to_jsonable(v) for v in obj]
     if isinstance(obj, Path):
         return str(obj)
-    try:
-        import numpy as np
-
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        if isinstance(obj, np.generic):
-            return obj.item()
-    except ImportError:  # pragma: no cover
-        pass
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, np.generic):
+        return obj.item()
     return obj

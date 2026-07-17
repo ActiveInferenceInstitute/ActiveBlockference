@@ -1,6 +1,5 @@
-"""Environment classes for ActiveBlockference simulations."""
+"""Environment implementations."""
 
-from blockference.envs.grid_env import GridAgent
-from blockference.envs.grid_env_multi import TwoMultiGridAgent
+from blockference.envs.grid_world import GridWorld, resolve_moves
 
-__all__ = ["GridAgent", "TwoMultiGridAgent"]
+__all__ = ["GridWorld", "resolve_moves"]

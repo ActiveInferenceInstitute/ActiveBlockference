@@ -1,3 +1,4 @@
 # workflows
 
-Contents of this directory support the instituteos repository. For agent conventions see [`AGENTS.md`](AGENTS.md); for the repository overview see the root [`README.md`](../../../../../README.md) and [`AGENTS.md`](../../../../../AGENTS.md).
+The workflow installs the locked environment, runs Ruff and pytest, and checks
+the complete smoke artefact tree through the package CLI.
