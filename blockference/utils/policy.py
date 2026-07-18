@@ -19,13 +19,18 @@ the pipeline can persist downstream:
 ``update_obs_idx``    flattened observation index used by the inference step
 """
 
+from __future__ import annotations
+
+from typing import Any
+
 from blockference.envs import resolve_moves
-from blockference.gridference import _step_agent
+from blockference.gridference import AgentUpdate, _step_agent
+from blockference.maths import onehot
 
 __all__ = ["p_actinf_single", "p_actinf_dict"]
 
 
-def p_actinf_single(params, substep, state_history, previous_state, act, grid):
+def p_actinf_single(params, substep, state_history, previous_state, act, grid) -> AgentUpdate:
     """Single-agent Active Inference cadCAD policy.
 
     Expects ``previous_state`` to contain ``env_state``, ``prior``,
@@ -39,10 +44,11 @@ def p_actinf_single(params, substep, state_history, previous_state, act, grid):
         C=previous_state["prior_C"],
         env_state=previous_state["env_state"],
         grid=grid,
+        rng=params.get("_rng") if isinstance(params, dict) else None,
     )
 
 
-def p_actinf_dict(params, substep, state_history, previous_state, grid):
+def p_actinf_dict(params, substep, state_history, previous_state, grid, *, rng=None) -> dict[str, Any]:
     """Multi-agent Active Inference cadCAD policy (dict-based agent registry).
 
     ``previous_state['agents']`` must be a ``dict[source_id -> agent]``.
@@ -58,6 +64,7 @@ def p_actinf_dict(params, substep, state_history, previous_state, grid):
             C=agent.C,
             env_state=agent.env_state,
             grid=grid,
+            rng=rng,
         )
         upd["source"] = source
         agent_updates.append(upd)
@@ -70,5 +77,10 @@ def p_actinf_dict(params, substep, state_history, previous_state, grid):
         affordances=next(iter(agents.values())).E,
     )
     for upd in agent_updates:
-        upd["update_env"] = resolved[upd["source"]]
+        resolved_state = resolved[upd["source"]]
+        upd["update_env"] = resolved_state
+        # Collision resolution is part of the realized world transition. The
+        # prior must describe that transition, not the hypothetical unblocked
+        # action used while planning.
+        upd["update_prior"] = onehot(grid.index(resolved_state), upd["update_prior"].size)
     return {"agent_updates": agent_updates}

@@ -24,10 +24,12 @@ print(cfg.simulation.n_agents, cfg.output.path)
 
 Each dataclass enforces invariants in `__post_init__`:
 
-* `dimension >= 2`, `planning_length >= 1`.
+* `dimension >= 2`, `planning_length >= 1`, and `max_policies >= 1`.
 * `timesteps >= 1`, `runs >= 1`, `n_agents >= 1`.
 * List fields read from YAML are coerced to tuples where the schema
   expects coordinates.
+* `simulation.initial_states`, when supplied, must contain exactly one
+  coordinate per configured agent; otherwise `initial_state` is broadcast.
 
 If validation fails, the loader raises `ValueError` *immediately*; the
 caller never sees a partially-valid config.

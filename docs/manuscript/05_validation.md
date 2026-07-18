@@ -16,9 +16,10 @@ and only if every check is true.
 :::
 
 The validator parses the on-disk values again. It rejects missing or malformed
-trajectory columns, empty frames, invalid coordinates, missing diagnostic
-vectors, inconsistent EFE decompositions, invalid stochastic matrices,
-missing required files, invalid image/GIF signatures, and incomplete logs.
+trajectory columns, inconsistent agent registries, empty frames, invalid
+coordinates, missing or dimensionally inconsistent diagnostic vectors,
+inconsistent EFE decompositions, invalid stochastic matrices, missing required
+files, invalid image/GIF signatures, and incomplete logs.
 This second parse is important: a successful Python call is not evidence that
 the files a researcher will receive are complete.
 

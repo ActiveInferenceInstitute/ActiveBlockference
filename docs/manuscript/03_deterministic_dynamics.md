@@ -68,7 +68,9 @@ boundaries, and simultaneous swaps.
 5. Marginalise the first policy action and sample one action.
 6. Propagate the prior through the selected $B^{(u)}$ slice.
 7. Resolve all environment proposals simultaneously.
-8. Persist the posterior, prior, action, EFE vector, decomposition, and state.
+8. If collision resolution rejects a proposal, replace that predicted prior
+   with the one-hot prior at the realized coordinate.
+9. Persist the posterior, prior, action, EFE vector, decomposition, and state.
 :::
 
 The graph and dictionary multi-agent paths call the same one-agent inference

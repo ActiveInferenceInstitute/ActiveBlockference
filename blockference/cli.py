@@ -26,6 +26,7 @@ def _parser() -> argparse.ArgumentParser:
     pipeline.add_argument("--output-root", type=Path, default=Path("output"))
     pipeline.add_argument("--run-name")
     pipeline.add_argument("--timestamped", action="store_true")
+    pipeline.add_argument("--reuse", action="store_true", help="allow reuse of an existing run tree")
 
     validation = commands.add_parser("validation", help="validate a persisted run tree")
     validation.add_argument("--run-dir", type=Path, required=True)
@@ -49,6 +50,7 @@ def main(argv: list[str] | None = None) -> int:
             output_root=args.output_root,
             run_name=args.run_name,
             timestamped=args.timestamped,
+            reuse=args.reuse,
         )
         print(json.dumps({"ok": result.ok, "run_dir": str(result.paths.run_dir)}))
         return 0 if result.ok else 1

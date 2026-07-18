@@ -5,18 +5,19 @@ uses `uv sync --locked --extra dev` for development. The release procedure is:
 
 ```bash
 uv sync --locked --extra dev
-uv run ruff check blockference tests GRTs scripts
-uv run pytest -q
-uv run python scripts/execute_notebooks.py
-uv run python scripts/validate_manuscript.py
-uv run python scripts/build_manuscript.py
-uv run python scripts/build_manuscript.py --check
-uv run blockference pipeline --config configs/smoke.yml --output-root /tmp/activeblockference --run-name smoke
+uv run python scripts/release_check.py
 ```
 
-The last command emits a run tree whose `validation_report.json` is the single
-artefact-level release verdict. The output root is intentionally outside the
-repository in this example, so generated runs do not become source files.
+The canonical command emits a run tree whose completed `manifest.json` and
+independently written `validation_report.json` agree. `PipelineResult.ok` and
+`ValidationReport.ok` remain the only release verdicts. The smoke output root
+is temporary, so generated runs do not become source files.
+
+The seed is consumed by an experiment-local NumPy generator. Repeating a
+configuration therefore repeats targets and sampled actions without changing
+the caller's process-global Python or NumPy random streams. For multi-agent
+experiments, use `simulation.initial_states` when the starting coordinates must
+be distinct or otherwise explicit.
 
 ## Provenance of the figures
 

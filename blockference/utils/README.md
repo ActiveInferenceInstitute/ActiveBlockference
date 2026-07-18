@@ -10,7 +10,9 @@ Three concerns share this folder, each in its own module:
 
 ## Math layer (`utils.py`)
 
-Builds on `pymdp.maths`/`pymdp.utils`. Key functions:
+The grid math layer is self-contained NumPy code. It does not import pymdp;
+the separate `BlockferenceAgent` adapter is the only upstream integration.
+Key functions:
 
 * `infer_states(observation_index, A, prior)` — softmax(log A + log prior).
 * `entropy(A)` — column-wise entropy of an observation model.
@@ -35,6 +37,10 @@ def p_actinf_single(params, substep, state_history, previous_state, act, grid):
 is the list of coordinate tuples used to translate `(y, x) ↔ index`.
 
 ## Mutual-information CLI (`mutual_info.py`)
+
+`calculate_mi(X, y)` uses a fixed sklearn random state by default so repeated
+analysis of the same numeric table is reproducible. Pass `random_state=None`
+only when stochastic estimator behavior is intentional.
 
 ```bash
 python -m blockference.utils.mutual_info path/to/trace.csv --target action

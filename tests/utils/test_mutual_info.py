@@ -16,7 +16,9 @@ def test_calculate_mi_returns_series_with_index():
     )
     y = X["informative"].copy()
     scores = calculate_mi(X, y)
+    repeated = calculate_mi(X, y)
     assert isinstance(scores, pd.Series)
+    assert scores.equals(repeated)
     assert set(scores.index) == {"informative", "noise"}
     # the informative column must score higher than pure noise
     assert scores["informative"] > scores["noise"]

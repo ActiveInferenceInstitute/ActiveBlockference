@@ -5,11 +5,14 @@
 * `blockference.GridWorld(dimension, positions, affordances=...)` stores
   `(y, x)` positions and applies deterministic simultaneous actions.
 * `blockference.ActiveGridference(grid, planning_length, env_state,
-  affordances)` owns `A`, `B`, `C`, `D`, and `E`. Updating `E` rebuilds `B`.
-* `blockference.BlockferenceAgent(A, B, **kwargs)` is the explicit upstream
-  pymdp adapter.
+  affordances, max_policies)` owns `A`, `B`, `C`, `D`, and `E`. Updating `E`
+  rebuilds `B`; `max_policies` prevents unbounded policy enumeration.
+* `blockference.BlockferenceAgent(A, B, **kwargs)` is the optional upstream
+  pymdp adapter. Install `active-blockference[pymdp]` to use it.
 * `blockference.ExperimentConfig.from_dict(mapping)` rejects unknown keys and
   validates dimensions, coordinates, action labels, engine, and paths.
+  `simulation.initial_states` can provide one start coordinate per agent;
+  otherwise `simulation.initial_state` is broadcast.
 
 ## Execution
 
@@ -28,8 +31,10 @@ print(result.ok, result.paths.run_dir)
 ```
 
 `run_grid(dimension, n_agents, timesteps, *, output_path, planning_length,
-target, initial_state, affordances, seed, runs, engine)` is the typed primitive
-wrapper. Engine names are `radcad` and `cadcad`.
+max_policies, target, initial_state, initial_states, affordances, seed, runs,
+engine)` is the typed primitive wrapper. Engine names are `radcad` and `cadcad`.
+
+Run the complete local release gate with `uv run python scripts/release_check.py`.
 
 ## CLI
 

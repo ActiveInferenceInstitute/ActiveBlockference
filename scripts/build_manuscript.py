@@ -214,9 +214,25 @@ def _save_figure(fig: object, path: Path) -> None:
 
 
 def _normalise_svg(path: Path) -> None:
-    """Remove generator-specific trailing spaces from a tracked SVG asset."""
+    """Make a generated SVG stable across processes and build dates."""
 
-    lines = path.read_text(encoding="utf-8").splitlines()
+    text = path.read_text(encoding="utf-8")
+    text = re.sub(
+        r"<dc:date>[^<]+</dc:date>",
+        "<dc:date>1970-01-01T00:00:00</dc:date>",
+        text,
+    )
+    dynamic_id = re.compile(r"(?:p|m)[0-9a-f]{10}|C\d+_\d+_[0-9a-f]{10}")
+    replacements: dict[str, str] = {}
+
+    def replace_id(match: re.Match[str]) -> str:
+        value = match.group(0)
+        if value not in replacements:
+            replacements[value] = f"generated_{len(replacements) + 1}"
+        return replacements[value]
+
+    text = dynamic_id.sub(replace_id, text)
+    lines = text.splitlines()
     path.write_text("\n".join(line.rstrip() for line in lines) + "\n", encoding="utf-8")
 
 
@@ -331,29 +347,10 @@ def build_figures(output_dir: Path = FIGURE_DIR) -> list[Path]:
     _save_figure(fig, path)
     paths.append(path)
 
-    from blockference.config import ExperimentConfig
+    from blockference.config import load_experiment_config
     from blockference.simulations.grid_sim import run_experiment
 
-    cfg = ExperimentConfig.from_dict(
-        {
-            "name": "manuscript",
-            "seed": 17,
-            "engine": "radcad",
-            "grid": {
-                "dimension": 3,
-                "planning_length": 2,
-                "affordances": ["UP", "DOWN", "LEFT", "RIGHT", "STAY"],
-            },
-            "simulation": {
-                "timesteps": 6,
-                "runs": 1,
-                "n_agents": 2,
-                "target": [2, 2],
-                "initial_state": [0, 0],
-            },
-            "output": {"path": None},
-        }
-    )
+    cfg = load_experiment_config(REPO_ROOT / "configs" / "manuscript.yml")
     frame = run_experiment(cfg)
 
     def as_mapping(value):

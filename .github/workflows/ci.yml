@@ -35,28 +35,8 @@ jobs:
       - name: Install locked package and development dependencies
         run: uv sync --locked --extra dev --python ${{ matrix.python-version }}
 
-      - name: Lint
-        run: uv run ruff check blockference tests GRTs scripts
-
-      - name: Run tests with coverage
-        run: uv run pytest --cov=blockference --cov-report=xml --cov-report=term
-
-      - name: Smoke-run the full pipeline
-        run: |
-          uv run blockference pipeline --config configs/smoke.yml \
-            --run-name ci_smoke
-          test -f output/ci_smoke/data/trajectory.csv
-          test -f output/ci_smoke/animations/trajectory.gif
-          test -f output/ci_smoke/validation_report.json
-
-      - name: Execute notebooks
-        run: uv run python scripts/execute_notebooks.py
-
-      - name: Validate and compose manuscript
-        run: |
-          uv run python scripts/validate_manuscript.py
-          uv run python scripts/build_manuscript.py
-          uv run python scripts/build_manuscript.py --check
+      - name: Run canonical release gate
+        run: uv run python scripts/release_check.py
 
       - name: Upload coverage
         if: matrix.python-version == '3.11'

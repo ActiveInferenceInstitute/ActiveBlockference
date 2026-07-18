@@ -8,7 +8,7 @@ contributions from researchers, engineers, and AI agents alike.
 
 1. Open or comment on an issue describing what you want to do.
 2. Fork → branch → code → test → PR.
-3. Run `pytest` and `ruff check blockference tests` before pushing.
+3. Run `uv run python scripts/release_check.py` before pushing.
 4. Keep PRs scoped: one logical change per PR.
 
 ## Detailed flow
@@ -20,7 +20,8 @@ git clone https://github.com/<you>/ActiveBlockference.git
 cd ActiveBlockference
 uv venv --python 3.11
 uv pip install -e ".[dev,docs]"
-uv run pytest                   # baseline; should be green
+uv sync --locked --extra dev
+uv run pytest --cov=blockference --cov-fail-under=90
 ```
 
 ### 2. Branch
@@ -76,7 +77,8 @@ with:
 
 * Reproducer (minimal Python snippet or notebook cell).
 * Expected vs. observed behaviour.
-* Versions (`python -V`, `pip show inferactively-pymdp cadCAD radcad`).
+* Versions (`python -V`, `pip show cadCAD radcad`). `pymdp` is optional and
+  should be reported only when the adapter extra is being debugged.
 
 ## Code of conduct
 

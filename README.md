@@ -11,6 +11,7 @@ artefacts, and fail-closed validation.
 uv sync --locked --extra dev
 uv run pytest
 uv run ruff check blockference tests
+uv run python scripts/release_check.py
 uv run blockference pipeline --config configs/smoke.yml --output-root output
 ```
 
@@ -24,8 +25,19 @@ blockference validation --run-dir output/gridworld_example
 
 The pipeline emits `config.yml`, CSV trajectory and per-step diagnostics, JSON
 summary/model/policies, an NPZ model archive, PNG visualisations, a GIF, a log,
-and one aggregate `validation_report.json`. Parquet is an optional additional
-format; CSV and JSON remain required.
+`manifest.json`, and one aggregate `validation_report.json`. Parquet is an
+optional additional format; CSV and JSON remain required. A non-empty run
+directory is refused unless `--reuse` is supplied explicitly.
+
+For multi-agent runs, `simulation.initial_state` remains the compatibility
+default and is broadcast to every agent. Use `simulation.initial_states` to
+record distinct starts explicitly. A seeded run owns its random generator and
+does not alter the caller's global random state.
+
+The grid implementation is self-contained. Install `active-blockference[pymdp]`
+only when using the optional `BlockferenceAgent` adapter; install
+`active-blockference[research]` for the explicitly selected OpenAI GRTs
+provider. Offline tests and the release gate never require either extra.
 
 ## Python API
 

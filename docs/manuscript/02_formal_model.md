@@ -78,8 +78,8 @@ $$ {#eq:policy-and-action-posteriors}
 
 The policy and action distributions in [@eq:policy-and-action-posteriors] are
 used by the action sampler, which draws from $P(u_t)$ after a final positivity and
-normalisation check. A seeded NumPy generator controls stochastic choices in
-the simulation boundary.
+normalisation check. Each simulation owns a NumPy generator for stochastic
+targets and actions; it does not mutate process-global random state.
 
 ## Model fields and implementation mapping
 

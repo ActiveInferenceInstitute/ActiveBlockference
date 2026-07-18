@@ -14,6 +14,8 @@ Every experiment produces an artefact tree of the form::
             belief_heatmap_t<###>.png
         animations/
             trajectory.gif
+        manifest.json
+        run.log
         validation_report.json
 
 The :class:`RunPaths` dataclass exposes typed accessors for each of these
@@ -81,6 +83,10 @@ class RunPaths:
         return self.run_dir / "validation_report.json"
 
     @property
+    def manifest_json(self) -> Path:
+        return self.run_dir / "manifest.json"
+
+    @property
     def run_log(self) -> Path:
         return self.run_dir / "run.log"
 
@@ -104,8 +110,14 @@ class RunPaths:
     def policies_json(self) -> Path:
         return self.data_dir / "policies.json"
 
-    def ensure(self) -> RunPaths:
-        """Create every directory in the layout. Idempotent."""
+    def ensure(self, *, allow_existing: bool = False) -> RunPaths:
+        """Create every directory, refusing accidental non-empty reuse."""
+
+        if self.run_dir.exists() and any(self.run_dir.iterdir()) and not allow_existing:
+            raise FileExistsError(
+                f"run directory is not empty: {self.run_dir}; "
+                "choose a new run name or explicitly allow reuse"
+            )
         for d in (self.run_dir, self.data_dir, self.viz_dir, self.animations_dir):
             d.mkdir(parents=True, exist_ok=True)
         return self

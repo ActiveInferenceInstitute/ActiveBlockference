@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-import random as rand
+import contextlib
+import io
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -44,26 +47,48 @@ def build_initial_state(
     initial_state,
     planning_length: int,
     affordances=DEFAULT_AFFORDANCES,
+    max_policies: int = 100_000,
+    initial_states: Sequence[Sequence[int]] | None = None,
+    rng: np.random.Generator | None = None,
 ):
-    """Construct the initial cadCAD state for a multi-agent grid world."""
+    """Construct the initial cadCAD state for a multi-agent grid world.
+
+    ``initial_states`` makes each agent's starting coordinate explicit. When it
+    is omitted, the legacy ``initial_state`` coordinate is used for every
+    agent. Random targets are drawn from the supplied experiment-local
+    generator, so this function does not mutate process-global RNG state.
+    """
 
     if len(grid) != int(dimension) ** 2:
         raise ValueError("grid must contain exactly dimension squared coordinates")
-    state = {"agents": {}, **{key: {} for key, _ in PER_STEP_FIELDS}}
+    if isinstance(n_agents, bool) or not isinstance(n_agents, int) or n_agents < 1:
+        raise ValueError("n_agents must be a positive integer")
+    generator = np.random.default_rng() if rng is None else rng
+    if initial_states is None:
+        starts = [tuple(initial_state)] * n_agents
+    else:
+        starts = [tuple(value) for value in initial_states]
+        if len(starts) != n_agents:
+            raise ValueError("initial_states must contain exactly one coordinate per agent")
+        if len(set(starts)) != len(starts):
+            raise ValueError("initial_states must contain unique coordinates")
+    state: dict[str, Any] = {"agents": {}, **{key: {} for key, _ in PER_STEP_FIELDS}}
     for agent_id in range(int(n_agents)):
         agent = ActiveGridference(
             grid,
             planning_length=planning_length,
             affordances=affordances,
+            max_policies=max_policies,
         )
-        preferred = (
-            (rand.randrange(int(dimension)), rand.randrange(int(dimension)))
-            if target == "random"
-            else tuple(target)
-        )
+        if target == "random":
+            random_target = generator.integers(0, int(dimension), size=2)
+            preferred = (int(random_target[0]), int(random_target[1]))
+        else:
+            preferred = (int(target[0]), int(target[1]))
         agent.get_C(preferred)
-        agent.get_D(tuple(initial_state))
+        agent.get_D(starts[agent_id])  # type: ignore[arg-type]
         state["agents"][agent_id] = agent
+        assert agent.D is not None
         state["priors"][agent_id] = agent.D.copy()
         state["env_states"][agent_id] = agent.env_state
         state["inferences"][agent_id] = agent.current_inference
@@ -97,11 +122,13 @@ def _agents_state_update(params, substep, state_history, previous_state, policy_
     return "agents", agents_new
 
 
-def build_state_update_blocks(grid):
+def build_state_update_blocks(
+    grid, *, rng: np.random.Generator | None = None
+) -> list[dict[str, Any]]:
     """Assemble the canonical multi-agent state-update block."""
 
     def policy(params, substep, state_history, previous_state):
-        return p_actinf_dict(params, substep, state_history, previous_state, grid)
+        return p_actinf_dict(params, substep, state_history, previous_state, grid, rng=rng)
 
     variables = {"agents": _agents_state_update}
     for key, update_key in PER_STEP_FIELDS:
@@ -109,7 +136,13 @@ def build_state_update_blocks(grid):
     return [{"policies": {"p_actinf": policy}, "variables": variables}]
 
 
-def _run_radcad(initial_state, state_update_blocks, params, timesteps, runs):
+def _run_radcad(
+    initial_state: dict[str, Any],
+    state_update_blocks: list[dict[str, Any]],
+    params: dict[str, Any],
+    timesteps: int,
+    runs: int,
+) -> pd.DataFrame:
     from radcad import Model, Simulation
 
     model = Model(
@@ -120,7 +153,13 @@ def _run_radcad(initial_state, state_update_blocks, params, timesteps, runs):
     return Simulation(model=model, timesteps=int(timesteps), runs=int(runs)).run()
 
 
-def _run_cadcad(initial_state, state_update_blocks, params, timesteps, runs):
+def _run_cadcad(
+    initial_state: dict[str, Any],
+    state_update_blocks: list[dict[str, Any]],
+    params: dict[str, Any],
+    timesteps: int,
+    runs: int,
+) -> pd.DataFrame:
     """Drive the same state-update blocks through cadCAD."""
 
     from cadCAD.configuration import Experiment
@@ -138,50 +177,65 @@ def _run_cadcad(initial_state, state_update_blocks, params, timesteps, runs):
         exec_context=ExecutionContext(context=ExecutionMode().local_mode),
         configs=experiment.configs,
     )
-    raw_result, _tensor_field, _sessions = executor.execute()
+    # cadCAD prints a banner and progress bars directly to stdout. Library
+    # callers and the CLI promise structured output, so keep that backend
+    # chatter inside the adapter boundary.
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        raw_result, _tensor_field, _sessions = executor.execute()
     return raw_result
 
 
 def run_experiment(cfg: ExperimentConfig) -> pd.DataFrame:
-    """Run a validated configuration and optionally write a header-only CSV-safe frame."""
+    """Run a validated configuration and optionally write its trajectory CSV.
+
+    Each configured run receives an independent child stream derived from the
+    experiment seed. This makes run ``1`` invariant when later runs are added
+    and keeps both simulation backends on the same random schedule.
+    """
 
     if not isinstance(cfg, ExperimentConfig):
         raise TypeError("cfg must be an ExperimentConfig")
-    if cfg.seed is not None:
-        rand.seed(cfg.seed)
-        np.random.seed(cfg.seed)
-
     grid = make_grid(cfg.grid.dimension, 2)
-    initial_state = build_initial_state(
-        grid=grid,
-        n_agents=cfg.simulation.n_agents,
-        dimension=cfg.grid.dimension,
-        target=cfg.simulation.target,
-        initial_state=cfg.simulation.initial_state,
-        planning_length=cfg.grid.planning_length,
-        affordances=cfg.grid.affordances,
-    )
-    params = {"preferred_state": [grid], "initial_state": [grid], "noise": [0]}
-    state_update_blocks = build_state_update_blocks(grid)
-    if cfg.engine == "radcad":
-        result = _run_radcad(
-            initial_state,
-            state_update_blocks,
-            params,
-            cfg.simulation.timesteps,
-            cfg.simulation.runs,
+    run_seeds = np.random.SeedSequence(cfg.seed).spawn(cfg.simulation.runs)
+    frames: list[pd.DataFrame] = []
+    for run_index, run_seed in enumerate(run_seeds, start=1):
+        rng = np.random.default_rng(run_seed)
+        initial_state = build_initial_state(
+            grid=grid,
+            n_agents=cfg.simulation.n_agents,
+            dimension=cfg.grid.dimension,
+            target=cfg.simulation.target,
+            initial_state=cfg.simulation.initial_state,
+            planning_length=cfg.grid.planning_length,
+            affordances=cfg.grid.affordances,
+            max_policies=cfg.grid.max_policies,
+            initial_states=cfg.simulation.initial_states,
+            rng=rng,
         )
-    elif cfg.engine == "cadcad":
-        result = _run_cadcad(
-            initial_state,
-            state_update_blocks,
-            params,
-            cfg.simulation.timesteps,
-            cfg.simulation.runs,
-        )
-    else:
-        raise ValueError(f"unknown engine {cfg.engine!r}")
-    frame = pd.DataFrame(result)
+        params = {"preferred_state": [grid], "initial_state": [grid], "noise": [0]}
+        state_update_blocks = build_state_update_blocks(grid, rng=rng)
+        if cfg.engine == "radcad":
+            result = _run_radcad(
+                initial_state,
+                state_update_blocks,
+                params,
+                cfg.simulation.timesteps,
+                1,
+            )
+        elif cfg.engine == "cadcad":
+            result = _run_cadcad(
+                initial_state,
+                state_update_blocks,
+                params,
+                cfg.simulation.timesteps,
+                1,
+            )
+        else:
+            raise ValueError(f"unknown engine {cfg.engine!r}")
+        frame = pd.DataFrame(result)
+        frame["run"] = run_index
+        frames.append(frame)
+    frame = pd.concat(frames, ignore_index=True)
     if cfg.output.path:
         output = Path(cfg.output.path)
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -196,8 +250,10 @@ def run_grid(
     *,
     output_path: str | None = "result.csv",
     planning_length: int = 2,
+    max_policies: int = 100_000,
     target: str | tuple[int, int] = "random",
     initial_state: tuple[int, int] = (0, 0),
+    initial_states: Sequence[Sequence[int]] | None = None,
     affordances=DEFAULT_AFFORDANCES,
     seed: int | None = None,
     runs: int = 1,
@@ -213,6 +269,7 @@ def run_grid(
             "grid": {
                 "dimension": dimension,
                 "planning_length": planning_length,
+                "max_policies": max_policies,
                 "affordances": list(affordances),
             },
             "simulation": {
@@ -221,6 +278,11 @@ def run_grid(
                 "n_agents": n_agents,
                 "target": target,
                 "initial_state": list(initial_state),
+                **(
+                    {"initial_states": [list(value) for value in initial_states]}
+                    if initial_states is not None
+                    else {}
+                ),
             },
             "output": {"path": output_path},
         }

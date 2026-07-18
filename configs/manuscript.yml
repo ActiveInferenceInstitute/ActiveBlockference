@@ -1,0 +1,18 @@
+# Canonical executable configuration for the manuscript experiment.
+name: manuscript
+seed: 17
+engine: radcad
+grid:
+  dimension: 3
+  planning_length: 2
+  max_policies: 100000
+  affordances: [UP, DOWN, LEFT, RIGHT, STAY]
+simulation:
+  timesteps: 6
+  runs: 1
+  n_agents: 2
+  target: [2, 2]
+  initial_state: [0, 0]
+  initial_states: [[0, 0], [2, 2]]
+output:
+  path: null

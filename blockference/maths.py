@@ -93,9 +93,9 @@ def sample(p: np.ndarray, rng: np.random.Generator | None = None) -> int:
 
 def onehot(index: int, size: int) -> np.ndarray:
     """Return a length-``size`` one-hot vector."""
-    if not isinstance(index, (int, np.integer)):
+    if isinstance(index, (bool, np.bool_)) or not isinstance(index, (int, np.integer)):
         raise TypeError(f"onehot index must be an integer, got {type(index).__name__}")
-    if not isinstance(size, (int, np.integer)) or size < 1:
+    if isinstance(size, (bool, np.bool_)) or not isinstance(size, (int, np.integer)) or size < 1:
         raise ValueError(f"onehot size must be a positive integer, got {size!r}")
     if not 0 <= int(index) < int(size):
         raise IndexError(f"onehot index {index} out of range [0, {size})")
@@ -109,19 +109,35 @@ def construct_policies(
     num_controls: Sequence[int] | None = None,
     policy_len: int = 1,
     control_fac_idx: Sequence[int] | None = None,
+    max_policies: int | None = 100_000,
 ) -> list[np.ndarray]:
-    """Enumerate every policy for the supplied control-factor cardinalities."""
+    """Enumerate every policy for the supplied control-factor cardinalities.
+
+    ``max_policies`` is a fail-closed guard against accidental exponential
+    allocations. Pass ``None`` only when an explicitly bounded caller has
+    already established that enumeration is safe.
+    """
     if num_controls is None:
         raise ValueError("construct_policies: num_controls is required")
-    if not isinstance(policy_len, (int, np.integer)) or policy_len < 1:
+    if (
+        isinstance(policy_len, (bool, np.bool_))
+        or not isinstance(policy_len, (int, np.integer))
+        or policy_len < 1
+    ):
         raise ValueError(f"construct_policies: policy_len must be >= 1, got {policy_len!r}")
+    if max_policies is not None and (
+        isinstance(max_policies, (bool, np.bool_))
+        or not isinstance(max_policies, (int, np.integer))
+        or max_policies < 1
+    ):
+        raise ValueError("construct_policies: max_policies must be a positive integer or None")
     if len(num_states) == 0 or len(num_controls) != len(num_states):
         raise ValueError("num_states and num_controls must be non-empty sequences of equal length")
     for count in num_states:
-        if not isinstance(count, (int, np.integer)) or count < 1:
+        if isinstance(count, (bool, np.bool_)) or not isinstance(count, (int, np.integer)) or count < 1:
             raise ValueError("num_states entries must be positive integers")
     for count in num_controls:
-        if not isinstance(count, (int, np.integer)) or count < 1:
+        if isinstance(count, (bool, np.bool_)) or not isinstance(count, (int, np.integer)) or count < 1:
             raise ValueError("num_controls entries must be positive integers")
 
     if control_fac_idx is None:
@@ -129,7 +145,9 @@ def construct_policies(
     else:
         controllable = set(control_fac_idx)
         if any(
-            not isinstance(index, (int, np.integer)) or not 0 <= int(index) < len(num_states)
+            isinstance(index, (bool, np.bool_))
+            or not isinstance(index, (int, np.integer))
+            or not 0 <= int(index) < len(num_states)
             for index in controllable
         ):
             raise ValueError("control_fac_idx contains an invalid factor index")
@@ -138,6 +156,15 @@ def construct_policies(
         range(int(num_controls[f])) if f in controllable else range(1)
         for f in range(len(num_states))
     ]
+    per_step_count = 1
+    for values in per_step_ranges:
+        per_step_count *= len(values)
+    policy_count = per_step_count ** int(policy_len)
+    if max_policies is not None and policy_count > int(max_policies):
+        raise ValueError(
+            "construct_policies would enumerate "
+            f"{policy_count} policies, exceeding max_policies={int(max_policies)}"
+        )
     per_step = list(product(*per_step_ranges))
     return [
         np.asarray(actions, dtype=int).reshape(int(policy_len), len(num_states))

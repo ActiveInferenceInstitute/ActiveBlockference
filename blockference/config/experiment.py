@@ -31,7 +31,9 @@ def _positive_int(value: Any, field_name: str) -> int:
 def _coordinate(value: Any, field_name: str) -> tuple[int, int]:
     if isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple)):
         raise TypeError(f"{field_name} must be a two-item coordinate")
-    if len(value) != 2 or any(isinstance(item, bool) or not isinstance(item, int) for item in value):
+    if len(value) != 2 or any(
+        isinstance(item, bool) or not isinstance(item, int) for item in value
+    ):
         raise ValueError(f"{field_name} must contain exactly two integer coordinates")
     return int(value[0]), int(value[1])
 
@@ -56,6 +58,7 @@ class GridConfig:
 
     dimension: int = 3
     planning_length: int = 2
+    max_policies: int = 100_000
     affordances: tuple[str, ...] = field(default_factory=lambda: DEFAULT_AFFORDANCES)
 
     def __post_init__(self) -> None:
@@ -63,6 +66,7 @@ class GridConfig:
         if self.dimension < 2:
             raise ValueError("grid.dimension must be >= 2")
         self.planning_length = _positive_int(self.planning_length, "grid.planning_length")
+        self.max_policies = _positive_int(self.max_policies, "grid.max_policies")
         if isinstance(self.affordances, (str, bytes)):
             raise TypeError("grid.affordances must be a sequence of action labels")
         self.affordances = validate_affordances(self.affordances)
@@ -77,6 +81,7 @@ class SimulationConfig:
     n_agents: int = 1
     target: str | tuple[int, int] = "random"
     initial_state: tuple[int, int] = (0, 0)
+    initial_states: tuple[tuple[int, int], ...] | None = None
 
     def __post_init__(self) -> None:
         self.timesteps = _positive_int(self.timesteps, "simulation.timesteps")
@@ -85,6 +90,33 @@ class SimulationConfig:
         self.initial_state = _coordinate(self.initial_state, "simulation.initial_state")
         if self.target != "random":
             self.target = _coordinate(self.target, "simulation.target")
+        if self.initial_states is not None:
+            if isinstance(self.initial_states, (str, bytes)):
+                raise TypeError("simulation.initial_states must be a sequence of coordinates")
+            try:
+                values = tuple(
+                    _coordinate(value, f"simulation.initial_states[{index}]")
+                    for index, value in enumerate(self.initial_states)
+                )
+            except TypeError as exc:
+                raise TypeError(
+                    "simulation.initial_states must be a sequence of coordinates"
+                ) from exc
+            if len(values) != self.n_agents:
+                raise ValueError(
+                    "simulation.initial_states must contain exactly one coordinate per agent"
+                )
+            if len(set(values)) != len(values):
+                raise ValueError("simulation.initial_states must contain unique coordinates")
+            self.initial_states = values
+
+    @property
+    def resolved_initial_states(self) -> tuple[tuple[int, int], ...]:
+        """Return one initial coordinate for every configured agent."""
+
+        if self.initial_states is not None:
+            return self.initial_states
+        return (self.initial_state,) * self.n_agents
 
 
 @dataclass
@@ -118,7 +150,9 @@ class ExperimentConfig:
             raise ValueError("name must be a single safe path component")
         if not all(char.isprintable() for char in self.name):
             raise ValueError("name must contain printable characters only")
-        if self.seed is not None and (isinstance(self.seed, bool) or not isinstance(self.seed, int)):
+        if self.seed is not None and (
+            isinstance(self.seed, bool) or not isinstance(self.seed, int)
+        ):
             raise TypeError("seed must be an integer or null")
         if not isinstance(self.grid, GridConfig):
             raise TypeError("grid must be a GridConfig")
@@ -133,9 +167,16 @@ class ExperimentConfig:
 
     def _validate_coordinates(self) -> None:
         border = self.grid.dimension - 1
-        for field_name, coordinate in (("simulation.initial_state", self.simulation.initial_state),):
+        for field_name, coordinate in (
+            ("simulation.initial_state", self.simulation.initial_state),
+        ):
             if not all(0 <= value <= border for value in coordinate):
                 raise ValueError(f"{field_name} {coordinate} is outside the configured grid")
+        for index, coordinate in enumerate(self.simulation.resolved_initial_states):
+            if not all(0 <= value <= border for value in coordinate):
+                raise ValueError(
+                    f"simulation.initial_states[{index}] {coordinate} is outside the configured grid"
+                )
         if self.simulation.target != "random":
             target = self.simulation.target
             assert isinstance(target, tuple)
@@ -148,12 +189,22 @@ class ExperimentConfig:
 
         if not isinstance(data, Mapping):
             raise TypeError("config root must be a mapping")
-        _reject_unknown(data, {"name", "seed", "engine", "grid", "simulation", "output"}, "configuration")
+        _reject_unknown(
+            data, {"name", "seed", "engine", "grid", "simulation", "output"}, "configuration"
+        )
         grid_data = _mapping(data.get("grid"), "grid")
         sim_data = _mapping(data.get("simulation"), "simulation")
         output_data = _mapping(data.get("output"), "output")
-        _reject_unknown(grid_data, {"dimension", "planning_length", "affordances"}, "grid")
-        _reject_unknown(sim_data, {"timesteps", "runs", "n_agents", "target", "initial_state"}, "simulation")
+        _reject_unknown(
+            grid_data,
+            {"dimension", "planning_length", "max_policies", "affordances"},
+            "grid",
+        )
+        _reject_unknown(
+            sim_data,
+            {"timesteps", "runs", "n_agents", "target", "initial_state", "initial_states"},
+            "simulation",
+        )
         _reject_unknown(output_data, {"path"}, "output")
         return cls(
             name=data.get("name", "unnamed"),
@@ -170,6 +221,10 @@ class ExperimentConfig:
         data = asdict(self)
         data["grid"]["affordances"] = list(data["grid"]["affordances"])
         data["simulation"]["initial_state"] = list(data["simulation"]["initial_state"])
+        if data["simulation"]["initial_states"] is not None:
+            data["simulation"]["initial_states"] = [
+                list(coordinate) for coordinate in data["simulation"]["initial_states"]
+            ]
         if data["simulation"]["target"] != "random":
             data["simulation"]["target"] = list(data["simulation"]["target"])
         return data

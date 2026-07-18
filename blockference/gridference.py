@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import itertools
 from collections.abc import Sequence
+from typing import Any, TypedDict, cast
 
 import numpy as np
 
@@ -15,10 +16,27 @@ __all__ = [
     "DEFAULT_AFFORDANCES",
     "SUPPORTED_AFFORDANCES",
     "ActiveGridference",
+    "AgentUpdate",
     "actinf_graph",
     "actinf_planning_single",
     "make_grid",
 ]
+
+
+class AgentUpdate(TypedDict, total=False):
+    """CadCAD-compatible update envelope shared by all simulation backends."""
+
+    source: Any
+    update_prior: np.ndarray
+    update_env: tuple[int, int]
+    update_action: int
+    update_inference: np.ndarray
+    update_efe: np.ndarray
+    update_efe_epistemic: np.ndarray
+    update_efe_pragmatic: np.ndarray
+    update_q_pi: np.ndarray
+    update_p_u: np.ndarray
+    update_obs_idx: int
 
 
 def _validate_affordances(affordances: Sequence[str]) -> list[str]:
@@ -32,17 +50,26 @@ def _move(
     affordances: Sequence[str] = DEFAULT_AFFORDANCES,
 ) -> tuple[int, int]:
     """Apply one validated action using the package coordinate convention."""
-    if not isinstance(action_id, (int, np.integer)):
+    if isinstance(action_id, (bool, np.bool_)) or not isinstance(action_id, (int, np.integer)):
         raise TypeError("action_id must be an integer")
-    if not isinstance(border, (int, np.integer)) or border < 0:
+    if (
+        isinstance(border, (bool, np.bool_))
+        or not isinstance(border, (int, np.integer))
+        or border < 0
+    ):
         raise ValueError("border must be a non-negative integer")
     if not isinstance(env_state, (tuple, list)) or len(env_state) != 2:
         raise ValueError("env_state must be a (y, x) coordinate")
-    if any(isinstance(component, (bool, np.bool_)) or not isinstance(component, (int, np.integer)) for component in env_state):
+    if any(
+        isinstance(component, (bool, np.bool_)) or not isinstance(component, (int, np.integer))
+        for component in env_state
+    ):
         raise TypeError("env_state coordinates must be integers")
     y, x = (int(env_state[0]), int(env_state[1]))
     if not (0 <= y <= border and 0 <= x <= border):
-        raise ValueError(f"env_state {(y, x)} is outside a {int(border) + 1}x{int(border) + 1} grid")
+        raise ValueError(
+            f"env_state {(y, x)} is outside a {int(border) + 1}x{int(border) + 1} grid"
+        )
     actions = _validate_affordances(affordances)
     if not 0 <= int(action_id) < len(actions):
         raise IndexError(f"action_id {action_id} out of range [0, {len(actions)})")
@@ -68,25 +95,33 @@ def _validate_square_grid(grid: Sequence[tuple[int, int]]) -> list[tuple[int, in
     expected = set(itertools.product(range(side), repeat=2))
     if side * side != len(values) or set(values) != expected:
         raise ValueError("ActiveGridference requires a complete square grid starting at (0, 0)")
-    return values
+    return cast(list[tuple[int, int]], values)
 
 
 def _coordinate(value, name: str) -> tuple[int, int]:
     if not isinstance(value, (tuple, list)) or len(value) != 2:
         raise ValueError(f"{name} must be a two-dimensional integer coordinate")
-    if any(isinstance(component, (bool, np.bool_)) or not isinstance(component, (int, np.integer)) for component in value):
+    if any(
+        isinstance(component, (bool, np.bool_)) or not isinstance(component, (int, np.integer))
+        for component in value
+    ):
         raise TypeError(f"{name} coordinates must be integers")
     return int(value[0]), int(value[1])
 
 
-def _step_agent(agent, prior, A, B, C, env_state, grid):
-    policies = construct_policies([agent.n_states], [len(agent.E)], policy_len=agent.policy_len)
+def _step_agent(agent, prior, A, B, C, env_state, grid, *, rng=None) -> AgentUpdate:
+    policies = construct_policies(
+        [agent.n_states],
+        [len(agent.E)],
+        policy_len=agent.policy_len,
+        max_policies=getattr(agent, "max_policies", 100_000),
+    )
     obs_idx = grid.index(tuple(env_state))
     qs_current = bu.infer_states(obs_idx, A, prior)
     G, parts = bu.calculate_G_policies_traced(A, B, C, qs_current, policies=policies)
     Q_pi = bu.softmax(-G)
     P_u = bu.compute_prob_actions(agent.E, policies, Q_pi)
-    chosen_action = bu.sample(P_u)
+    chosen_action = bu.sample(P_u, rng=rng)
     next_prior = B[:, :, chosen_action].dot(qs_current)
     next_env = _move(chosen_action, tuple(env_state), agent.border, agent.E)
     return {
@@ -103,12 +138,14 @@ def _step_agent(agent, prior, A, B, C, env_state, grid):
     }
 
 
-def actinf_planning_single(agent, env_state, A, B, C, prior):
+def actinf_planning_single(
+    agent, env_state, A, B, C, prior, *, rng=None
+) -> AgentUpdate:
     """Run one inference, planning, sampling, and prior-propagation step."""
-    return _step_agent(agent, prior, A, B, C, env_state, agent.grid)
+    return _step_agent(agent, prior, A, B, C, env_state, agent.grid, rng=rng)
 
 
-def actinf_graph(agent_network):
+def actinf_graph(agent_network, *, rng=None) -> dict[str, list[AgentUpdate]]:
     """Run one independent Active Inference step for every graph node."""
     updates = []
     for node in agent_network.nodes:
@@ -121,6 +158,7 @@ def actinf_graph(agent_network):
             data["prior_C"],
             data["env_state"],
             data["agent"].grid,
+            rng=rng,
         )
         update["source"] = node
         updates.append(update)
@@ -136,11 +174,23 @@ class ActiveGridference:
         planning_length: int = 2,
         env_state: tuple[int, int] = (0, 0),
         affordances: Sequence[str] = DEFAULT_AFFORDANCES,
+        max_policies: int = 100_000,
     ) -> None:
-        if not isinstance(planning_length, (int, np.integer)) or planning_length < 1:
+        if (
+            isinstance(planning_length, (bool, np.bool_))
+            or not isinstance(planning_length, (int, np.integer))
+            or planning_length < 1
+        ):
             raise ValueError("planning_length must be a positive integer")
         self.grid = _validate_square_grid(grid)
         self.E = _validate_affordances(affordances)
+        if (
+            isinstance(max_policies, (bool, np.bool_))
+            or not isinstance(max_policies, (int, np.integer))
+            or max_policies < 1
+        ):
+            raise ValueError("max_policies must be a positive integer")
+        self.max_policies = int(max_policies)
         self.policy_len = int(planning_length)
         self.n_states = len(self.grid)
         self.n_observations = len(self.grid)
@@ -199,10 +249,18 @@ class ActiveGridference:
         return self.E
 
 
-def make_grid(grid_len: int, grid_dim: int = 2):
+def make_grid(grid_len: int, grid_dim: int = 2) -> list[tuple[int, ...]]:
     """Return Cartesian grid coordinates for positive dimensions."""
-    if not isinstance(grid_len, (int, np.integer)) or grid_len < 1:
+    if (
+        isinstance(grid_len, (bool, np.bool_))
+        or not isinstance(grid_len, (int, np.integer))
+        or grid_len < 1
+    ):
         raise ValueError("grid_len must be a positive integer")
-    if not isinstance(grid_dim, (int, np.integer)) or grid_dim < 1:
+    if (
+        isinstance(grid_dim, (bool, np.bool_))
+        or not isinstance(grid_dim, (int, np.integer))
+        or grid_dim < 1
+    ):
         raise ValueError("grid_dim must be a positive integer")
-    return list(itertools.product(range(int(grid_len)), repeat=int(grid_dim)))
+    return list(itertools.product(range(int(grid_len)), repeat=int(grid_dim)))  # type: ignore[return-value]

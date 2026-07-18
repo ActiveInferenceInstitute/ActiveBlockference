@@ -34,6 +34,12 @@ complete `RunPaths` directory tree before persistence. Direct simulation CSVs
 are written with `index=False`, which makes the CSV a real row-wise artefact
 rather than a DataFrame debugging dump.
 
+The simulation boundary accepts a legacy `initial_state` coordinate and
+broadcasts it to all agents. A caller can instead provide
+`simulation.initial_states` with one coordinate per agent. Random targets and
+sampled actions use one generator owned by the run; collision correction is
+applied before the next prior is persisted.
+
 ## Persistence contract
 
 One canonical run has these required files:
@@ -42,6 +48,7 @@ One canonical run has these required files:
 run/
 |-- config.yml
 |-- run.log
+|-- manifest.json
 |-- validation_report.json
 |-- data/
 |   |-- trajectory.csv

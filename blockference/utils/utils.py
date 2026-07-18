@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from blockference.maths import log_stable, norm_dist, onehot, sample, softmax
@@ -41,7 +43,15 @@ def _probability_vector(value, *, name: str, expected_size: int | None = None) -
     return array
 
 
-def plot_likelihood(matrix, xlabels=None, ylabels=None, title_str="Likelihood distribution (A)"):
+def _integer_index(value, *, name: str) -> int:
+    """Return an integer index without accepting booleans or fractional values."""
+
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, np.integer)):
+        raise TypeError(f"{name} must be an integer")
+    return int(value)
+
+
+def plot_likelihood(matrix, xlabels=None, ylabels=None, title_str="Likelihood distribution (A)") -> Any:
     """Render a column-normalised likelihood matrix."""
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -60,7 +70,7 @@ def plot_likelihood(matrix, xlabels=None, ylabels=None, title_str="Likelihood di
     return fig
 
 
-def plot_grid(grid_locations, num_x=None, num_y=None):
+def plot_grid(grid_locations, num_x=None, num_y=None) -> Any:
     """Render a labelled two-dimensional coordinate grid."""
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -82,7 +92,7 @@ def plot_grid(grid_locations, num_x=None, num_y=None):
     return fig
 
 
-def plot_point_on_grid(state_vector, grid_locations):
+def plot_point_on_grid(state_vector, grid_locations) -> Any:
     """Render the most probable state on its coordinate grid."""
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -101,7 +111,7 @@ def plot_point_on_grid(state_vector, grid_locations):
     return fig
 
 
-def plot_beliefs(belief_dist, title_str: str = ""):
+def plot_beliefs(belief_dist, title_str: str = "") -> Any:
     """Render a one-dimensional belief distribution."""
     import matplotlib.pyplot as plt
 
@@ -122,9 +132,10 @@ def get_expected_states(B: np.ndarray, qs_current: np.ndarray, action: int) -> n
         raise ValueError("B must have shape (n_states, n_states, n_actions)")
     if not np.isfinite(B).all() or (B < 0).any() or not np.allclose(B.sum(axis=0), 1.0, atol=1e-8):
         raise ValueError("B must be finite, non-negative, and column-stochastic")
-    if not 0 <= int(action) < B.shape[2]:
+    action_index = _integer_index(action, name="action")
+    if not 0 <= action_index < B.shape[2]:
         raise IndexError(f"action {action} is out of range")
-    result = B[:, :, int(action)].dot(qs)
+    result = B[:, :, action_index].dot(qs)
     return norm_dist(result)
 
 
@@ -162,13 +173,14 @@ def infer_states(observation_index: int, A: np.ndarray, prior: np.ndarray) -> np
     state_prior = _probability_vector(prior, name="prior")
     if matrix.ndim != 2 or matrix.shape[1] != state_prior.size:
         raise ValueError("A must have shape (n_observations, n_states)")
-    if not 0 <= int(observation_index) < matrix.shape[0]:
+    observation = _integer_index(observation_index, name="observation_index")
+    if not 0 <= observation < matrix.shape[0]:
         raise IndexError(f"observation_index {observation_index} is out of range")
     if (matrix < 0).any() or not np.isfinite(matrix).all():
         raise ValueError("A must be finite and non-negative")
     if not np.allclose(matrix.sum(axis=0), 1.0, atol=1e-8):
         raise ValueError("A must be column-normalised")
-    return softmax(log_stable(matrix[int(observation_index), :]) + log_stable(state_prior))
+    return softmax(log_stable(matrix[observation, :]) + log_stable(state_prior))
 
 
 def _validate_model(A, B, C, qs_current):
@@ -211,12 +223,12 @@ def _calculate_policy_terms(A, B, C, qs_current, policies):
     epistemic = np.zeros(len(policies), dtype=float)
     pragmatic = np.zeros(len(policies), dtype=float)
     for policy_id, policy in enumerate(policies):
-        policy = np.asarray(policy, dtype=int)
+        policy = np.asarray(policy)
         if policy.ndim != 2 or policy.shape[1] != 1 or policy.shape[0] < 1:
             raise ValueError("each policy must have shape (policy_len, 1)")
         qs_pi = qs
         for timestep, action in enumerate(policy[:, 0]):
-            qs_pi = get_expected_states(B, qs if timestep == 0 else qs_pi, int(action))
+            qs_pi = get_expected_states(B, qs if timestep == 0 else qs_pi, action)
             qo_pi = get_expected_observations(A, qs_pi)
             epistemic[policy_id] += ambiguity.dot(qs_pi)
             pragmatic[policy_id] += kl_divergence(qo_pi, C)
@@ -229,7 +241,9 @@ def calculate_G_policies(A, B, C, qs_current, policies) -> np.ndarray:
     return epistemic + pragmatic
 
 
-def calculate_G_policies_traced(A, B, C, qs_current, policies):
+def calculate_G_policies_traced(
+    A, B, C, qs_current, policies
+) -> tuple[np.ndarray, dict[str, np.ndarray]]:
     """Return policy EFE and its epistemic/pragmatic decomposition."""
     epistemic, pragmatic = _calculate_policy_terms(A, B, C, qs_current, policies)
     return epistemic + pragmatic, {"epistemic": epistemic, "pragmatic": pragmatic}
@@ -242,10 +256,10 @@ def compute_prob_actions(actions, policies, Q_pi: np.ndarray) -> np.ndarray:
         raise ValueError("actions must be non-empty")
     probabilities = np.zeros(len(actions), dtype=float)
     for policy_id, policy in enumerate(policies):
-        policy = np.asarray(policy, dtype=int)
+        policy = np.asarray(policy)
         if policy.ndim != 2 or policy.shape[1] < 1 or policy.shape[0] < 1:
             raise ValueError("each policy must contain at least one action")
-        action = int(policy[0, 0])
+        action = _integer_index(policy[0, 0], name="policy action")
         if not 0 <= action < len(actions):
             raise IndexError(f"policy action {action} is out of range")
         probabilities[action] += posterior[policy_id]

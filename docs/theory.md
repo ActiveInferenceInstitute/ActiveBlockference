@@ -22,7 +22,7 @@ ActiveBlockference works with a discrete POMDP factored as:
 |--------|-----------------------------------------------------|------------------------------------------------------------------------------------|
 | **A**  | `P(o ∣ s)`                                          | Likelihood — probability of an observation given a hidden state.                   |
 | **B**  | `P(s_t ∣ s_{t-1}, u_{t-1})`                         | Controllable transitions — how actions move hidden state.                          |
-| **C**  | `log P̃(o)` (preferences over observations)          | Prior preference — what the agent *wants* to observe.                              |
+| **C**  | `P̃(o)` (normalised preferences over observations)  | Prior preference — what the agent *wants* to observe.                              |
 | **D**  | `P(s_0)`                                            | Prior over the initial hidden state.                                               |
 | **E**  | action labels                                        | Affordances — the action set; in `ActiveGridference`: `UP, DOWN, LEFT, RIGHT, STAY`. |
 
@@ -56,6 +56,17 @@ The corresponding code paths:
 * Steps 2–6 multi-agent (dict): `p_actinf_dict` in
   `blockference/utils/policy.py`.
 
+### Sign and normalisation conventions
+
+The implementation stores lower expected free energy as better: policy
+posteriors are `Q(π) = softmax(-G(π))`, and action marginalisation preserves
+that posterior mass. `G` is the elementwise sum of the persisted epistemic
+and pragmatic vectors; both components may be inspected independently, while
+the total is the quantity minimised. `norm_dist` normalises each non-negative
+slice and represents an all-zero slice by a uniform distribution. This
+explicit fallback is deterministic and prevents an undefined posterior from
+entering the loop.
+
 ## Why expected free energy decomposes into epistemic + pragmatic
 
 `G(π)` admits the rewriting:
@@ -87,11 +98,9 @@ The numerical primitives implementing the loop above (``softmax``,
 ``log_stable``, ``infer_states``, ``calculate_G_policies``,
 ``compute_prob_actions``, ``sample``, ``onehot``, ``construct_policies``)
 all live in :mod:`blockference.maths` and :mod:`blockference.utils.utils`.
-They are pure NumPy and have **no pymdp dependency**, so the grid
-pipeline keeps producing reproducible NumPy outputs even as upstream
-pymdp remains an optional upstream adapter; the grid pipeline uses the package's
-validated NumPy primitives directly.
-for the complete pymdp 0.0.x → 1.0.x mapping.
+They are pure NumPy and do not depend on pymdp, so the grid pipeline uses its
+own validated numerical contract while :class:`BlockferenceAgent` remains a
+narrow adapter for callers that need the upstream pymdp ecosystem.
 
 ## References
 

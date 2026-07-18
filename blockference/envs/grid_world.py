@@ -50,6 +50,8 @@ def resolve_moves(
         agent_id: _coordinate(position, f"positions[{agent_id!r}]", dimension)
         for agent_id, position in positions.items()
     }
+    if len(set(current.values())) != len(current):
+        raise ValueError("positions must contain a unique coordinate for every agent")
     proposed = {
         agent_id: _move(action, current[agent_id], dimension - 1, action_labels)
         for agent_id, action in actions.items()
@@ -87,6 +89,8 @@ class GridWorld:
         self.positions: dict[Hashable, tuple[int, int]] = {}
         for agent_id, position in (positions or {}).items():
             self.positions[agent_id] = _coordinate(position, f"positions[{agent_id!r}]", dimension)
+        if len(set(self.positions.values())) != len(self.positions):
+            raise ValueError("positions must contain a unique coordinate for every agent")
 
     @property
     def grid(self) -> tuple[tuple[int, int], ...]:

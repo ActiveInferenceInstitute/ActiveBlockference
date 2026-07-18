@@ -20,13 +20,18 @@ keywords:
   - "radCAD"
 
 experiment:
+  config_path: "configs/manuscript.yml"
+  engine: "radcad"
   engine_comparison: ["radcad", "cadcad"]
   dimension: 3
   planning_length: 2
+  max_policies: 100000
   timesteps: 6
   runs: 1
   agents: 2
   seed: 17
+  target: [2, 2]
+  initial_states: [[0, 0], [2, 2]]
   affordances: ["UP", "DOWN", "LEFT", "RIGHT", "STAY"]
 
 render:

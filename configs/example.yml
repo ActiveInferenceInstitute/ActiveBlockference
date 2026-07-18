@@ -17,6 +17,8 @@ simulation:
   n_agents: 2
   target: random          # or a [y, x] coordinate, e.g. [2, 2]
   initial_state: [0, 0]
+  # Optional explicit starts, one coordinate per agent:
+  # initial_states: [[0, 0], [2, 2]]
 
 output:
   # When using --pipeline this is overridden to output/<name>/data/trajectory.csv.

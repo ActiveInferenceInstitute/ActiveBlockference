@@ -29,6 +29,7 @@ Artefacts emitted
 * ``data/per_step.csv`` / ``.parquet``    — per-(agent, t) EFE / qs / Q_pi / P_u / action
 * ``data/policies.json``                  — enumerated policy set
 * ``viz/*.png`` and ``animations/trajectory.gif``
+* ``manifest.json``                        — hashes and sizes for stable artifacts
 * ``run.log``                             — structured logs from this run
 * ``validation_report.json``              — schema + math + artefact validation
 """
@@ -37,7 +38,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 import numpy as np
 import pandas as pd
@@ -51,6 +52,7 @@ from blockference.io import (
     persist_dataframe,
     persist_generative_model,
     persist_generative_model_npz,
+    persist_manifest,
     persist_per_step_records,
     persist_policies,
     persist_summary,
@@ -75,6 +77,7 @@ from blockference.viz._common import (
 
 __all__ = [
     "PipelineResult",
+    "PerStepRecord",
     "build_per_step_records",
     "persist",
     "render_visualisations",
@@ -83,6 +86,25 @@ __all__ = [
     "summarise_trajectory",
     "validate",
 ]
+
+
+class PerStepRecord(TypedDict, total=False):
+    """Lossless per-agent diagnostic record at one simulation step."""
+
+    run: int
+    substep: int
+    timestep: int
+    agent_id: Any
+    env_state: tuple[int, int]
+    action: int
+    obs_idx: int
+    posterior: list[float]
+    prior: list[float]
+    efe: list[float]
+    efe_epistemic: list[float]
+    efe_pragmatic: list[float]
+    q_pi: list[float]
+    p_u: list[float]
 
 
 log = get_logger(__name__)
@@ -344,7 +366,13 @@ def validate(
     paths: RunPaths,
     visualisations: dict[str, Path] | None = None,
     animations: dict[str, Path] | None = None,
-) -> tuple[ValidationReport, dict[str, ValidationReport], ValidationReport, ValidationReport, ValidationReport]:
+) -> tuple[
+    ValidationReport,
+    dict[str, ValidationReport],
+    ValidationReport,
+    ValidationReport,
+    ValidationReport,
+]:
     """Stage 3: schema + math + per-step + on-disk validation.
 
     Writes ``validation_report.json`` covering all on-disk artefacts and
@@ -367,7 +395,12 @@ def validate(
         else:
             log.info("generative model invariants OK for agent %s", agent_id)
 
-    per_step_report = validate_per_step_records(per_step)
+    first_agent = next(iter(agents.values()), None)
+    per_step_report = validate_per_step_records(
+        per_step,
+        n_states=getattr(first_agent, "n_states", None),
+        n_actions=len(getattr(first_agent, "E", [])) if first_agent is not None else None,
+    )
     if not per_step_report.ok:
         log.warning("per-step diagnostics issues: %s", per_step_report.issues)
     else:
@@ -411,6 +444,7 @@ def run_pipeline(
     output_root: str | Path = "output",
     run_name: str | None = None,
     timestamped: bool = False,
+    reuse: bool = False,
 ) -> PipelineResult:
     """Run an experiment end-to-end and emit a fully populated ``output/`` tree."""
     if not isinstance(cfg, ExperimentConfig):
@@ -422,24 +456,25 @@ def run_pipeline(
         timestamped=timestamped,
     )
 
-    paths.ensure()
+    paths.ensure(allow_existing=reuse)
     log_handler = configure_run_logging(paths.run_log)
     try:
         log.info("=== ActiveBlockference run start: %s ===", paths.run_name)
         log.info("config: name=%s seed=%s engine=%s", cfg.name, cfg.seed, cfg.engine)
         log.info(
-            "grid: dim=%d planning_length=%d affordances=%s",
+            "grid: dim=%d planning_length=%d max_policies=%d affordances=%s",
             cfg.grid.dimension,
             cfg.grid.planning_length,
+            cfg.grid.max_policies,
             cfg.grid.affordances,
         )
         log.info(
-            "simulation: timesteps=%d runs=%d n_agents=%d target=%s initial_state=%s",
+            "simulation: timesteps=%d runs=%d n_agents=%d target=%s initial_states=%s",
             cfg.simulation.timesteps,
             cfg.simulation.runs,
             cfg.simulation.n_agents,
             cfg.simulation.target,
-            cfg.simulation.initial_state,
+            cfg.simulation.resolved_initial_states,
         )
 
         run_cfg = replace(cfg, output=OutputConfig(path=str(paths.trajectory_csv)))
@@ -450,9 +485,10 @@ def run_pipeline(
         visualisations, animations = render_visualisations(
             df, paths, affordances=list(run_cfg.grid.affordances)
         )
+        persist_manifest(paths)
 
-        schema_report, model_reports, per_step_report, artefacts_report, aggregate_report = validate(
-            df, agents, per_step, paths, visualisations, animations
+        schema_report, model_reports, per_step_report, artefacts_report, aggregate_report = (
+            validate(df, agents, per_step, paths, visualisations, animations)
         )
 
         log.info("=== ActiveBlockference run complete: %s ===", paths.run_name)

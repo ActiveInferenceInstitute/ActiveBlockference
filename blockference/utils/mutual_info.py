@@ -14,20 +14,27 @@ import numpy as np
 import pandas as pd
 from sklearn.feature_selection import mutual_info_regression
 
+__all__ = ["calculate_mi"]
 
-def calculate_mi(X: pd.DataFrame, y: pd.Series) -> pd.Series:
+
+def calculate_mi(X: pd.DataFrame, y: pd.Series, *, random_state: int | None = 0) -> pd.Series:
     """Compute mutual information between every column of ``X`` and ``y``.
 
     Object/categorical columns are factorised before scoring.
     """
+    if not isinstance(X, pd.DataFrame) or not isinstance(y, (pd.Series, np.ndarray, list, tuple)):
+        raise TypeError("X must be a DataFrame and y must be a one-dimensional sequence")
+    if len(X) != len(y):
+        raise ValueError("X and y must contain the same number of rows")
+    if X.empty or X.shape[1] == 0:
+        raise ValueError("X must contain at least one feature column")
     X = X.copy()
-    discrete_features = []
     for colname in X.select_dtypes("object").columns:
         X[colname], _ = X[colname].factorize()
     discrete_features = [ptype.kind in ("i", "u", "b") for ptype in X.dtypes]
 
     mi_scores = mutual_info_regression(
-        X.to_numpy(), np.asarray(y), discrete_features=discrete_features
+        X.to_numpy(), np.asarray(y), discrete_features=discrete_features, random_state=random_state
     )
     return pd.Series(mi_scores, name="MI Scores", index=X.columns).sort_values(ascending=False)
 
