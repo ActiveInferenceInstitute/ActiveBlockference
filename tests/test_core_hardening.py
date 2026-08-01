@@ -227,3 +227,115 @@ def test_persisted_model_validation_fails_closed_on_malformed_payload(tmp_path):
 def test_run_name_stays_inside_output_root(tmp_path):
     with pytest.raises(ValueError):
         build_run_paths(tmp_path, "../escape")
+
+
+def test_random_target_is_bounded_and_seeded():
+    config = ExperimentConfig.from_dict(
+        {
+            "seed": 5,
+            "grid": {"dimension": 3, "planning_length": 1},
+            "simulation": {
+                "timesteps": 2,
+                "runs": 1,
+                "n_agents": 2,
+                "target": "random",
+                "initial_states": [[0, 0], [2, 2]],
+            },
+            "output": {"path": None},
+        }
+    )
+    frame = run_experiment(config)
+    for _, row in frame.iterrows():
+        for position in row["env_states"].values():
+            assert 0 <= position[0] < 3 and 0 <= position[1] < 3
+    repeated = run_experiment(config)
+    assert frame["env_states"].astype(str).tolist() == repeated["env_states"].astype(str).tolist()
+
+
+def test_multi_agent_requires_distinct_initial_states():
+    config = ExperimentConfig.from_dict(
+        {"simulation": {"n_agents": 2, "initial_state": [0, 0]}, "output": {"path": None}}
+    )
+    with pytest.raises(ValueError, match="distinct starting coordinates"):
+        run_experiment(config)
+
+
+def test_gridworld_conforms_to_discrete_environment_protocol_and_serialises():
+    from blockference.envs import DiscreteEnvironment
+    from blockference.envs.grid_world import GridWorld
+
+    world = GridWorld(3, {0: (0, 0), 1: (2, 2)})
+    assert isinstance(world, DiscreteEnvironment)
+    assert world.stochastic is False
+    payload = world.serialize()
+    assert payload["dimension"] == 3
+    restored = GridWorld.load(payload)
+    assert isinstance(restored, DiscreteEnvironment)
+    # Serialization stringifies agent keys for JSON; values round-trip losslessly.
+    assert set(restored.current_state.values()) == {(0, 0), (2, 2)}
+    assert restored.affordances == world.affordances
+    assert restored.stochastic == world.stochastic
+
+
+def test_p_actinf_single_returns_full_update_envelope():
+    from blockference.utils.policy import p_actinf_single
+
+    grid = make_grid(2)
+    agent = ActiveGridference(grid, planning_length=1, max_policies=20)
+    agent.get_C((1, 1))
+    agent.get_D((0, 0))
+    previous = {
+        "env_state": agent.env_state,
+        "prior": agent.D.copy(),
+        "prior_A": agent.A,
+        "prior_B": agent.B,
+        "prior_C": agent.C,
+    }
+    update = p_actinf_single({}, 0, [], previous, agent, grid)
+    assert {"update_prior", "update_env", "update_action", "update_efe"} <= set(update)
+    assert isinstance(update["update_action"], int)
+    assert tuple(update["update_env"]) == (0, 0) or tuple(update["update_env"]) in grid
+    assert np.isclose(update["update_prior"].sum(), 1.0)
+
+
+def test_optimized_transition_parity_with_brute_force():
+    from blockference.gridference import ActiveGridference, _move
+
+    for side in (2, 3, 4):
+        grid = make_grid(side)
+        for affordances in (
+            ["UP", "DOWN", "LEFT", "RIGHT", "STAY"],
+            ["RIGHT", "STAY"],
+            ["UP", "STAY"],
+        ):
+            agent = ActiveGridference(grid, affordances=affordances)
+            # Independent brute-force reference using list.index (pre-optimisation).
+            reference = np.zeros((len(grid), len(grid), len(affordances)), dtype=float)
+            for action_id in range(len(affordances)):
+                for current_index, location in enumerate(grid):
+                    next_location = _move(action_id, location, side - 1, affordances)
+                    reference[grid.index(next_location), current_index, action_id] = 1.0
+            assert np.array_equal(agent.B, reference)
+            # The precomputed coordinate index agrees with list.index everywhere.
+            for location in grid:
+                assert agent._coordinate_index[location] == grid.index(location)
+
+
+def test_step_update_protocol_aligns_across_adapters():
+    from blockference.gridference import CORE_UPDATE_FIELDS
+    from blockference.simulations.grid_sim import PER_STEP_FIELDS
+
+    assert {key for _, key in PER_STEP_FIELDS} == set(CORE_UPDATE_FIELDS)
+    assert len(CORE_UPDATE_FIELDS) == 10
+
+
+def test_update_envelope_validation_fails_closed():
+    from blockference.gridference import CORE_UPDATE_FIELDS, validate_update_envelope
+
+    with pytest.raises(ValueError, match="missing protocol fields"):
+        validate_update_envelope({"update_prior": np.zeros(2)})
+    complete = {field: np.zeros(2) for field in CORE_UPDATE_FIELDS}
+    with pytest.raises(ValueError, match="'source'"):
+        validate_update_envelope(complete, require_source=True)
+    validate_update_envelope(complete)
+    validate_update_envelope({**complete, "source": 0}, require_source=True)

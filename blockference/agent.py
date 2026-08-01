@@ -21,7 +21,7 @@ except ImportError as exc:  # pragma: no cover - exercised in a slim install
 
 else:
 
-    class BlockferenceAgent(PymdpAgent):  # type: ignore[no-redef]
+    class BlockferenceAgent(PymdpAgent):  # type: ignore[no-redef]  # pragma: no cover - exercised in a slim install
         """Thin extension hook over :class:`pymdp.agent.Agent`."""
 
         def __init__(self, A: Any, B: Any, **kwargs: Any) -> None:

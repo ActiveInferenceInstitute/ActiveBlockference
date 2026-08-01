@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
+import os
+import tempfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +19,7 @@ from blockference.config import ExperimentConfig
 from blockference.io.layout import RunPaths
 
 __all__ = [
+    "atomic_replace",
     "persist_config",
     "persist_dataframe",
     "persist_generative_model",
@@ -26,25 +31,50 @@ __all__ = [
 ]
 
 
+def atomic_replace(path: Path, writer: Callable[[Path], None]) -> Path:
+    """Write ``path`` through a sibling temporary file and publish atomically.
+
+    The payload is written to a unique temporary file in the same directory and
+    then ``os.replace``-d into place, so a reader or a crashed process only ever
+    observes either the previous complete file or the new complete file — never
+    a partially written one. The temporary file is removed on failure.
+    """
+    directory = path.parent
+    directory.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=directory
+    )
+    os.close(descriptor)
+    temporary = Path(temporary_name)
+    try:
+        writer(temporary)
+        os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+    return path
+
+
 def _atomic_json(path: Path, payload: Any) -> Path:
     """Write JSON through a sibling temporary file and publish it atomically."""
 
-    temporary = path.with_name(f".{path.name}.tmp")
-    with temporary.open("w", encoding="utf-8") as stream:
-        json.dump(payload, stream, indent=2)
-        stream.write("\n")
-    temporary.replace(path)
-    return path
+    def _write(target: Path) -> None:
+        with target.open("w", encoding="utf-8") as stream:
+            json.dump(payload, stream, indent=2)
+            stream.write("\n")
+
+    return atomic_replace(path, _write)
 
 
 def persist_config(cfg: ExperimentConfig, paths: RunPaths) -> Path:
     """Write the run's config back to disk so the artefacts are self-describing."""
     paths.require_tree()
-    temporary = paths.config_path.with_name(f".{paths.config_path.name}.tmp")
-    with temporary.open("w", encoding="utf-8") as fh:
-        yaml.safe_dump(_to_jsonable(cfg.to_dict()), fh, sort_keys=False)
-    temporary.replace(paths.config_path)
-    return paths.config_path
+
+    def _write(target: Path) -> None:
+        with target.open("w", encoding="utf-8") as fh:
+            yaml.safe_dump(_to_jsonable(cfg.to_dict()), fh, sort_keys=False)
+
+    return atomic_replace(paths.config_path, _write)
 
 
 def persist_dataframe(df: pd.DataFrame, paths: RunPaths) -> dict[str, Path]:
@@ -63,10 +93,12 @@ def persist_dataframe(df: pd.DataFrame, paths: RunPaths) -> dict[str, Path]:
             )
         else:
             serialised[column] = serialised[column].map(_to_jsonable)
-    serialised.to_csv(paths.trajectory_csv, index=False)
+    atomic_replace(paths.trajectory_csv, lambda target: serialised.to_csv(target, index=False))
     written["csv"] = paths.trajectory_csv
     try:
-        serialised.to_parquet(paths.trajectory_parquet, index=False)
+        atomic_replace(
+            paths.trajectory_parquet, lambda target: serialised.to_parquet(target, index=False)
+        )
         written["parquet"] = paths.trajectory_parquet
     except ImportError:
         # Parquet is an explicitly optional acceleration format.
@@ -118,9 +150,9 @@ def persist_per_step_records(records: list[dict[str, Any]], paths: RunPaths) -> 
     if not records:
         raise ValueError("at least one per-step record is required")
     df = pd.DataFrame(records)
-    df.to_csv(paths.per_step_csv, index=False)
+    atomic_replace(paths.per_step_csv, lambda target: df.to_csv(target, index=False))
     try:
-        df.to_parquet(paths.per_step_parquet, index=False)
+        atomic_replace(paths.per_step_parquet, lambda target: df.to_parquet(target, index=False))
     except ImportError:
         # Parquet is an explicitly optional acceleration format.
         pass
@@ -149,8 +181,14 @@ def persist_generative_model_npz(agents: dict, paths: RunPaths) -> Path:
         E = getattr(agent, "E", None)
         if E is not None:
             payload[f"{prefix}/E"] = np.asarray(E)
-    np.savez_compressed(paths.matrices_npz, **payload)  # type: ignore[arg-type]
-    return paths.matrices_npz
+    buffer = io.BytesIO()
+    np.savez_compressed(buffer, **payload)  # type: ignore[arg-type]
+    bytes_payload = buffer.getvalue()
+
+    def _write(target: Path) -> None:
+        target.write_bytes(bytes_payload)
+
+    return atomic_replace(paths.matrices_npz, _write)
 
 
 def persist_manifest(paths: RunPaths) -> Path:
@@ -172,12 +210,13 @@ def persist_manifest(paths: RunPaths) -> Path:
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         files.append({"path": relative, "sha256": digest, "size_bytes": path.stat().st_size})
     payload = {"version": 1, "complete": True, "files": files}
-    temporary = paths.manifest_json.with_suffix(".json.tmp")
-    with temporary.open("w", encoding="utf-8") as stream:
-        json.dump(payload, stream, indent=2, sort_keys=True)
-        stream.write("\n")
-    temporary.replace(paths.manifest_json)
-    return paths.manifest_json
+
+    def _write(target: Path) -> None:
+        with target.open("w", encoding="utf-8") as stream:
+            json.dump(payload, stream, indent=2, sort_keys=True)
+            stream.write("\n")
+
+    return atomic_replace(paths.manifest_json, _write)
 
 
 def persist_policies(policies: list, paths: RunPaths) -> Path:

@@ -72,6 +72,15 @@ def build_initial_state(
             raise ValueError("initial_states must contain exactly one coordinate per agent")
         if len(set(starts)) != len(starts):
             raise ValueError("initial_states must contain unique coordinates")
+    # The simultaneous-transition environment requires a unique starting cell
+    # per agent. The broadcast ``initial_state`` default places every agent on
+    # the same cell for ``n_agents > 1``, so fail here with a clear message
+    # instead of surfacing an obscure collision error inside a backend.
+    if len(set(starts)) != len(starts):
+        raise ValueError(
+            "n_agents > 1 requires distinct starting coordinates; provide "
+            "initial_states with one unique coordinate per agent"
+        )
     state: dict[str, Any] = {"agents": {}, **{key: {} for key, _ in PER_STEP_FIELDS}}
     for agent_id in range(int(n_agents)):
         agent = ActiveGridference(

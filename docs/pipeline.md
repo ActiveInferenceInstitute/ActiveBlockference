@@ -26,9 +26,11 @@ output:
 ```
 
 Unknown keys, unsafe names, invalid coordinates, unsupported actions, invalid
-engines, malformed paths, and an incorrectly sized `initial_states` list are
-rejected before execution. If `initial_states` is omitted, the legacy
-`initial_state` coordinate is used for every agent.
+engines, malformed paths, and an incorrectly sized or duplicate `initial_states`
+list are rejected. A multi-agent run (`n_agents > 1`) requires one distinct
+`simulation.initial_states` coordinate per agent; the legacy `initial_state`
+broadcast default is valid only for a single agent and otherwise fails fast
+with an explicit error before any simulation backend runs.
 
 ## Required run tree
 
@@ -61,6 +63,11 @@ The aggregate `ValidationReport.ok` is the conjunction of trajectory schema,
 generative-model invariants, complete per-step diagnostics, parsed artefacts,
 and rendered files. `PipelineResult.ok` returns that value, and the `pipeline`
 CLI exits with status 1 when it is false.
+
+These verdicts certify software and artefact integrity only. They do not — and
+cannot — certify the empirical adequacy of a scientific hypothesis. Any
+adequacy claim must carry its own independent datasets, provenance, and
+sensitivity analyses documented separately from `PipelineResult.ok`.
 
 `manifest.json` records SHA-256 digests and byte sizes for every required
 stable artifact. It is written after persistence and rendering complete; the

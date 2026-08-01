@@ -29,15 +29,34 @@ summary/model/policies, an NPZ model archive, PNG visualisations, a GIF, a log,
 optional additional format; CSV and JSON remain required. A non-empty run
 directory is refused unless `--reuse` is supplied explicitly.
 
-For multi-agent runs, `simulation.initial_state` remains the compatibility
-default and is broadcast to every agent. Use `simulation.initial_states` to
-record distinct starts explicitly. A seeded run owns its random generator and
-does not alter the caller's global random state.
+For single-agent runs, `simulation.initial_state` remains the compatibility
+default. For multi-agent runs (`n_agents > 1`) the simultaneous-transition
+environment requires a unique starting cell per agent, so use
+`simulation.initial_states` with one distinct coordinate per agent; a
+multi-agent run without it fails fast with an explicit error. A seeded run owns
+its random generator and does not alter the caller's global random state.
 
 The grid implementation is self-contained. Install `active-blockference[pymdp]`
 only when using the optional `BlockferenceAgent` adapter; install
 `active-blockference[research]` for the explicitly selected OpenAI GRTs
 provider. Offline tests and the release gate never require either extra.
+
+## Reliability and contracts
+
+* All JSON, CSV, NPZ, config, model, and render artefacts are published
+  **atomically** through a sibling temporary file and renamed into place, so an
+  interrupted run can never leave a partially written file (a leftover temp file
+  is flagged as drift by validation).
+* `ValidationReport.ok` and `PipelineResult.ok` certify **software and artefact
+  integrity only** — never the empirical adequacy of a scientific hypothesis.
+* `blockference.io.parse_trajectory_records` normalizes a persisted trajectory
+  into typed, deterministically ordered `TrajectoryRecord` values so backend
+  (radCAD vs cadCAD) and persistence round-trips are compared on values, not
+  stringified cells.
+* `GridWorld` conforms to the `blockference.envs.DiscreteEnvironment` protocol
+  (state identity, observations, simultaneous actions, collision resolution,
+  and lossless `serialize`/`load`), so future environments can be added behind
+  the same contract instead of special-casing the grid.
 
 ## Python API
 

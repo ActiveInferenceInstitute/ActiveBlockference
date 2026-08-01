@@ -80,12 +80,14 @@ class GridWorld:
         positions: Mapping[Hashable, Sequence[int]] | None = None,
         *,
         affordances: Sequence[str] = DEFAULT_AFFORDANCES,
+        stochastic: bool = False,
     ) -> None:
         if isinstance(dimension, bool) or not isinstance(dimension, int) or dimension < 2:
             raise ValueError("dimension must be an integer >= 2")
         self.dimension = dimension
         self.border = dimension - 1
         self.affordances = validate_affordances(affordances)
+        self.stochastic = bool(stochastic)
         self.positions: dict[Hashable, tuple[int, int]] = {}
         for agent_id, position in (positions or {}).items():
             self.positions[agent_id] = _coordinate(position, f"positions[{agent_id!r}]", dimension)
@@ -120,6 +122,30 @@ class GridWorld:
             self.affordances,
         )
         return self.current_state
+
+    def serialize(self) -> dict:
+        """Return a JSON-safe, lossless description of the environment state."""
+        return {
+            "dimension": self.dimension,
+            "affordances": list(self.affordances),
+            "stochastic": self.stochastic,
+            "positions": {str(agent_id): list(pos) for agent_id, pos in self.positions.items()},
+        }
+
+    @classmethod
+    def load(cls, payload: dict) -> GridWorld:
+        """Reconstruct a :class:`GridWorld` from a :meth:`serialize` payload."""
+        if not isinstance(payload, dict):
+            raise TypeError("GridWorld payload must be a mapping")
+        positions = {
+            key: value for key, value in payload.get("positions", {}).items()
+        }
+        return cls(
+            payload["dimension"],
+            positions,
+            affordances=payload.get("affordances", DEFAULT_AFFORDANCES),
+            stochastic=bool(payload.get("stochastic", False)),
+        )
 
 
 __all__ = ["GridWorld", "resolve_moves"]

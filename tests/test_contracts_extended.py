@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import runpy
+from pathlib import Path
 from types import SimpleNamespace
 
 import networkx as nx
@@ -315,6 +316,75 @@ def test_viz_common_and_renderers_reject_bad_inputs_and_write_outputs(tmp_path):
         animate_trajectory(frame, tmp_path / "bad.svg")
     with pytest.raises(ValueError):
         infer_grid_dimension(pd.DataFrame({"env_states": [{0: (0, 0)}], "inferences": [{0: [1, 0, 0]}]}))
+
+
+def test_viz_common_rejects_nonfinite_and_singleton_grids():
+    from blockference.io.persist import _to_jsonable
+
+    frame = _frame().copy()
+    frame.at[0, "inferences"] = {0: [1.0, float("nan"), 0.0, 0.0]}
+    with pytest.raises(ValueError, match="finite vector"):
+        extract_belief_history(frame)
+    assert _to_jsonable({0: (0, 1)}) == {"0": [0, 1]}
+    assert _to_jsonable(np.float64(3.5)) == 3.5
+    assert _to_jsonable(Path("abc/def")) == "abc/def"
+
+
+def test_atomic_replace_publishes_and_leaves_no_temp(tmp_path):
+    from blockference.io.persist import atomic_replace
+
+    target = tmp_path / "out.json"
+    returned = atomic_replace(target, lambda p: p.write_text("{}", encoding="utf-8"))
+    assert returned == target
+    assert target.read_text(encoding="utf-8") == "{}"
+    leftovers = [p.name for p in tmp_path.iterdir()]
+    assert leftovers == ["out.json"]
+
+
+def test_atomic_replace_cleans_temp_and_keeps_previous_on_failure(tmp_path):
+    from blockference.io.persist import atomic_replace
+
+    target = tmp_path / "out.json"
+    target.write_text("original", encoding="utf-8")
+
+    def failing_writer(path):
+        path.write_text("partial", encoding="utf-8")
+        raise RuntimeError("simulated interruption")
+
+    with pytest.raises(RuntimeError, match="simulated interruption"):
+        atomic_replace(target, failing_writer)
+    # Previous complete file is untouched and the temp file is cleaned up.
+    assert target.read_text(encoding="utf-8") == "original"
+    assert [p.name for p in tmp_path.iterdir()] == ["out.json"]
+
+
+def test_atomic_npz_round_trip_is_loadable(tmp_path):
+    paths = build_run_paths(tmp_path, "npz").ensure()
+    agent = ActiveGridference(make_grid(2), planning_length=1)
+    agent.get_C((1, 1))
+    agent.get_D((0, 0))
+    persist_generative_model_npz({0: agent}, paths)
+    with np.load(paths.matrices_npz, allow_pickle=False) as archive:
+        assert set(archive.files) == {"agent_0/A", "agent_0/B", "agent_0/C", "agent_0/D", "agent_0/E"}
+        assert archive["agent_0/A"].shape == (4, 4)
+
+
+def test_trajectory_schema_typed_round_trip(tmp_path):
+    from blockference.io import build_run_paths, parse_trajectory_records, persist_dataframe
+
+    frame = _frame()
+    records = parse_trajectory_records(frame)
+    assert len(records) == 1
+    rec = records[0]
+    assert rec.run == 1 and rec.env_state == (0, 0) and rec.action == 3 and rec.obs_idx == 0
+    assert rec.agent_id == "0"
+    assert rec.posterior == (1.0, 0.0, 0.0, 0.0)
+    assert rec.prior == (1.0, 0.0, 0.0, 0.0)
+    # The CSV round-trip preserves the same typed values.
+    paths = build_run_paths(tmp_path, "schema").ensure()
+    persist_dataframe(frame, paths)
+    reloaded = pd.read_csv(paths.trajectory_csv)
+    assert parse_trajectory_records(reloaded) == records
 
 
 def test_plot_helpers_and_mutual_information_edges(tmp_path):

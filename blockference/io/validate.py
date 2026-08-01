@@ -494,9 +494,12 @@ def _validate_manifest(paths: RunPaths) -> ValidationReport:
     return report
 
 
-def validate_run_outputs(paths: RunPaths) -> ValidationReport:
-    """Parse and validate every required artefact in a run tree."""
+def validate_tree_structure(paths: RunPaths) -> ValidationReport:
+    """Validate that the canonical run-tree directories exist.
 
+    This is the first, cheapest boundary: no point parsing artefacts whose
+    directory tree was never created.
+    """
     report = ValidationReport()
     report.artefacts = {"run_dir": str(paths.run_dir), "data_dir": str(paths.data_dir)}
     for name, path in {
@@ -506,6 +509,12 @@ def validate_run_outputs(paths: RunPaths) -> ValidationReport:
         "animations_dir": paths.animations_dir,
     }.items():
         report.add(f"{name}_exists", path.is_dir())
+    return report
+
+
+def validate_artifact_presence(paths: RunPaths) -> ValidationReport:
+    """Validate that every required artefact is present and non-empty."""
+    report = ValidationReport()
     required_files = {
         "config": paths.config_path,
         "trajectory_csv": paths.trajectory_csv,
@@ -526,7 +535,12 @@ def validate_run_outputs(paths: RunPaths) -> ValidationReport:
             else _file_nonempty(path)
         )
         report.add(f"{name}_present", valid, str(path))
+    return report
 
+
+def validate_config_boundary(paths: RunPaths) -> tuple[ValidationReport, Any]:
+    """Parse the persisted config file and return ``(report, config)``."""
+    report = ValidationReport()
     config = None
     if _file_nonempty(paths.config_path):
         try:
@@ -534,7 +548,14 @@ def validate_run_outputs(paths: RunPaths) -> ValidationReport:
             report.add("config_parses", True)
         except (OSError, TypeError, ValueError, yaml.YAMLError) as exc:
             report.add("config_parses", False, str(exc))
+    return report, config
 
+
+def validate_trajectory_boundary(
+    paths: RunPaths, config: Any
+) -> tuple[ValidationReport, Any, dict[str, Any] | None]:
+    """Parse the persisted trajectory and summary; return ``(report, trajectory, summary)``."""
+    report = ValidationReport()
     trajectory = None
     summary_payload: dict[str, Any] | None = None
     if _file_nonempty(paths.trajectory_csv):
@@ -557,7 +578,18 @@ def validate_run_outputs(paths: RunPaths) -> ValidationReport:
             )
         except (OSError, json.JSONDecodeError) as exc:
             report.add("summary_parses", False, str(exc))
+    return report, trajectory, summary_payload
 
+
+def validate_model_boundary(
+    paths: RunPaths, config: Any
+) -> tuple[ValidationReport, dict[str, Any] | None]:
+    """Validate the persisted generative model JSON and its NPZ archive.
+
+    Returns ``(report, model_payload)`` so the aggregator can run the
+    config-vs-model cross-checks against the parsed payload.
+    """
+    report = ValidationReport()
     model_payload = None
     if _file_nonempty(paths.matrices_json):
         try:
@@ -628,10 +660,20 @@ def validate_run_outputs(paths: RunPaths) -> ValidationReport:
             )
         except (OSError, ValueError, KeyError) as exc:
             report.add("generative_model_npz_parses", False, str(exc))
+    return report, model_payload
 
+
+def validate_manifest_boundary(paths: RunPaths) -> ValidationReport:
+    """Validate the manifest's version, digest integrity, and set completeness."""
+    report = ValidationReport()
     if _file_nonempty(paths.manifest_json):
         report.merge("manifest", _validate_manifest(paths))
+    return report
 
+
+def validate_policies_boundary(paths: RunPaths) -> ValidationReport:
+    """Validate the persisted policy set JSON."""
+    report = ValidationReport()
     if _file_nonempty(paths.policies_json):
         try:
             policy_payload = json.loads(paths.policies_json.read_text(encoding="utf-8"))
@@ -644,7 +686,14 @@ def validate_run_outputs(paths: RunPaths) -> ValidationReport:
             )
         except (OSError, json.JSONDecodeError) as exc:
             report.add("policies_parses", False, str(exc))
+    return report
 
+
+def validate_per_step_boundary(
+    paths: RunPaths, config: Any, trajectory: Any
+) -> ValidationReport:
+    """Parse and validate the persisted per-step diagnostics records."""
+    report = ValidationReport()
     if _file_nonempty(paths.per_step_csv):
         try:
             per_step_frame = pd.read_csv(paths.per_step_csv)
@@ -671,97 +720,156 @@ def validate_run_outputs(paths: RunPaths) -> ValidationReport:
                 )
         except (OSError, pd.errors.ParserError, ValueError) as exc:
             report.add("per_step_csv_parses", False, str(exc))
-
-    if config is not None and trajectory is not None and "env_states" in trajectory:
-        first_env = _literal(trajectory.iloc[0]["env_states"]) if not trajectory.empty else None
-        agent_ids = set(first_env) if isinstance(first_env, dict) else set()
-        report.add(
-            "configured_agent_count",
-            len(agent_ids) == config.simulation.n_agents,
-            f"trajectory has {len(agent_ids)} agents; config expects {config.simulation.n_agents}",
-        )
-        out_of_bounds = 0
-        for value in trajectory["env_states"]:
-            states = _literal(value)
-            if not isinstance(states, dict):
-                continue
-            for coordinate in states.values():
-                parsed = _coordinate(coordinate)
-                if parsed is None or not all(
-                    0 <= component < config.grid.dimension for component in parsed
-                ):
-                    out_of_bounds += 1
-        report.add(
-            "configured_coordinate_bounds",
-            out_of_bounds == 0,
-            f"{out_of_bounds} coordinates exceed the configured grid",
-        )
-        expected_starts = {
-            index: coordinate
-            for index, coordinate in enumerate(config.simulation.resolved_initial_states)
-        }
-        actual_starts = {
-            int(agent_id): _coordinate(coordinate)
-            for agent_id, coordinate in (first_env or {}).items()
-            if isinstance(agent_id, (int, np.integer, str)) and str(agent_id).isdigit()
-        }
-        report.add(
-            "configured_initial_states",
-            actual_starts == expected_starts,
-            "trajectory first-row positions do not match configured starts",
-        )
-        if summary_payload is not None:
-            report.add(
-                "summary_row_count",
-                summary_payload.get("n_rows") == len(trajectory),
-                "summary n_rows does not match trajectory rows",
-            )
-            report.add(
-                "summary_agent_count",
-                summary_payload.get("n_agents") == len(agent_ids),
-                "summary n_agents does not match trajectory agents",
-            )
-            report.add(
-                "summary_grid_dimension",
-                summary_payload.get("grid_dimension") == config.grid.dimension,
-                "summary grid_dimension does not match configuration",
-            )
-
-    if config is not None and isinstance(model_payload, dict):
-        expected_agents = {str(index) for index in range(config.simulation.n_agents)}
-        report.add(
-            "configured_model_agents",
-            set(model_payload) == expected_agents,
-            "generative model agent IDs do not match configuration",
-        )
-        expected_states = config.grid.dimension**2
-        bad_dimensions = 0
-        for payload in model_payload.values():
-            if not isinstance(payload, dict):
-                continue
-            try:
-                matches = (
-                    int(payload.get("n_states", -1)) == expected_states
-                    and int(payload.get("n_observations", -1)) == expected_states
-                    and len(payload.get("E", [])) == len(config.grid.affordances)
-                )
-            except (TypeError, ValueError):
-                matches = False
-            bad_dimensions += int(not matches)
-        report.add(
-            "configured_model_dimensions",
-            bad_dimensions == 0,
-            f"{bad_dimensions} model payloads disagree with configuration",
-        )
-
     return report
+
+
+def validate_config_trajectory_agreement(
+    config: Any,
+    trajectory: Any,
+    summary_payload: dict[str, Any] | None,
+) -> ValidationReport:
+    """Cross-check trajectory contents and summary against the persisted config."""
+    report = ValidationReport()
+    if config is None or trajectory is None or "env_states" not in trajectory:
+        return report
+    first_env = _literal(trajectory.iloc[0]["env_states"]) if not trajectory.empty else None
+    agent_ids = set(first_env) if isinstance(first_env, dict) else set()
+    report.add(
+        "configured_agent_count",
+        len(agent_ids) == config.simulation.n_agents,
+        f"trajectory has {len(agent_ids)} agents; config expects {config.simulation.n_agents}",
+    )
+    out_of_bounds = 0
+    for value in trajectory["env_states"]:
+        states = _literal(value)
+        if not isinstance(states, dict):
+            continue
+        for coordinate in states.values():
+            parsed = _coordinate(coordinate)
+            if parsed is None or not all(
+                0 <= component < config.grid.dimension for component in parsed
+            ):
+                out_of_bounds += 1
+    report.add(
+        "configured_coordinate_bounds",
+        out_of_bounds == 0,
+        f"{out_of_bounds} coordinates exceed the configured grid",
+    )
+    expected_starts = {
+        index: coordinate
+        for index, coordinate in enumerate(config.simulation.resolved_initial_states)
+    }
+    actual_starts = {
+        int(agent_id): _coordinate(coordinate)
+        for agent_id, coordinate in (first_env or {}).items()
+        if isinstance(agent_id, (int, np.integer, str)) and str(agent_id).isdigit()
+    }
+    report.add(
+        "configured_initial_states",
+        actual_starts == expected_starts,
+        "trajectory first-row positions do not match configured starts",
+    )
+    if summary_payload is not None:
+        report.add(
+            "summary_row_count",
+            summary_payload.get("n_rows") == len(trajectory),
+            "summary n_rows does not match trajectory rows",
+        )
+        report.add(
+            "summary_agent_count",
+            summary_payload.get("n_agents") == len(agent_ids),
+            "summary n_agents does not match trajectory agents",
+        )
+        report.add(
+            "summary_grid_dimension",
+            summary_payload.get("grid_dimension") == config.grid.dimension,
+            "summary grid_dimension does not match configuration",
+        )
+    return report
+
+
+def validate_config_model_agreement(
+    config: Any, model_payload: dict[str, Any] | None
+) -> ValidationReport:
+    """Cross-check the persisted generative model against the persisted config."""
+    report = ValidationReport()
+    if config is None or not isinstance(model_payload, dict):
+        return report
+    expected_agents = {str(index) for index in range(config.simulation.n_agents)}
+    report.add(
+        "configured_model_agents",
+        set(model_payload) == expected_agents,
+        "generative model agent IDs do not match configuration",
+    )
+    expected_states = config.grid.dimension**2
+    bad_dimensions = 0
+    for payload in model_payload.values():
+        if not isinstance(payload, dict):
+            continue
+        try:
+            matches = (
+                int(payload.get("n_states", -1)) == expected_states
+                and int(payload.get("n_observations", -1)) == expected_states
+                and len(payload.get("E", [])) == len(config.grid.affordances)
+            )
+        except (TypeError, ValueError):
+            matches = False
+        bad_dimensions += int(not matches)
+    report.add(
+        "configured_model_dimensions",
+        bad_dimensions == 0,
+        f"{bad_dimensions} model payloads disagree with configuration",
+    )
+    return report
+
+
+def validate_run_outputs(paths: RunPaths) -> ValidationReport:
+    """Parse and validate every required artefact in a run tree.
+
+    Thin aggregator over the focused per-boundary validators below. Each stage
+    returns a ``ValidationReport`` and the aggregate merges them so that every
+    failed check (tree, presence, config, trajectory, model, manifest,
+    policies, per-step, and the config cross-checks) is recorded fail-closed.
+    """
+    aggregate = ValidationReport()
+    aggregate.artefacts = {"run_dir": str(paths.run_dir), "data_dir": str(paths.data_dir)}
+    stages = [
+        validate_tree_structure(paths),
+        validate_artifact_presence(paths),
+    ]
+    config_report, config = validate_config_boundary(paths)
+    trajectory_report, trajectory, summary_payload = validate_trajectory_boundary(paths, config)
+    model_report, model_payload = validate_model_boundary(paths, config)
+    stages += [
+        config_report,
+        trajectory_report,
+        model_report,
+        validate_manifest_boundary(paths),
+        validate_policies_boundary(paths),
+        validate_per_step_boundary(paths, config, trajectory),
+        validate_config_trajectory_agreement(config, trajectory, summary_payload),
+        validate_config_model_agreement(config, model_payload),
+    ]
+    for stage in stages:
+        aggregate.merge("artefacts", stage)
+    return aggregate
 
 
 __all__ = [
     "REQUIRED_TRAJECTORY_COLUMNS",
     "ValidationReport",
+    "validate_artifact_presence",
+    "validate_config_boundary",
+    "validate_config_model_agreement",
+    "validate_config_trajectory_agreement",
     "validate_generative_model",
+    "validate_manifest_boundary",
+    "validate_model_boundary",
+    "validate_per_step_boundary",
     "validate_per_step_records",
+    "validate_policies_boundary",
     "validate_run_outputs",
+    "validate_trajectory_boundary",
     "validate_trajectory_dataframe",
+    "validate_tree_structure",
 ]

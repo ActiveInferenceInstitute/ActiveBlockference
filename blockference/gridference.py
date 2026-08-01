@@ -15,18 +15,40 @@ from blockference.utils import utils as bu
 __all__ = [
     "DEFAULT_AFFORDANCES",
     "SUPPORTED_AFFORDANCES",
+    "CORE_UPDATE_FIELDS",
     "ActiveGridference",
     "AgentUpdate",
+    "CoreAgentUpdate",
     "actinf_graph",
     "actinf_planning_single",
     "make_grid",
 ]
 
+# Canonical per-step diagnostic fields every Active Inference adapter must emit.
+# This is the formalized step/update protocol shared by the single-agent, graph,
+# and dict adapters and consumed by the cadCAD/radCAD state updaters.
+CORE_UPDATE_FIELDS: tuple[str, ...] = (
+    "update_prior",
+    "update_env",
+    "update_action",
+    "update_inference",
+    "update_efe",
+    "update_efe_epistemic",
+    "update_efe_pragmatic",
+    "update_q_pi",
+    "update_p_u",
+    "update_obs_idx",
+)
 
-class AgentUpdate(TypedDict, total=False):
-    """CadCAD-compatible update envelope shared by all simulation backends."""
 
-    source: Any
+class CoreAgentUpdate(TypedDict):
+    """Required per-step update envelope emitted by every adapter.
+
+    All ten fields are always produced by :func:`_step_agent`; adapters may add
+    the optional ``source`` key (via :class:`AgentUpdate`) to attribute an
+    update to a specific agent in a multi-agent run.
+    """
+
     update_prior: np.ndarray
     update_env: tuple[int, int]
     update_action: int
@@ -37,6 +59,12 @@ class AgentUpdate(TypedDict, total=False):
     update_q_pi: np.ndarray
     update_p_u: np.ndarray
     update_obs_idx: int
+
+
+class AgentUpdate(CoreAgentUpdate, total=False):
+    """CadCAD-compatible update envelope shared by all simulation backends."""
+
+    source: Any
 
 
 def _validate_affordances(affordances: Sequence[str]) -> list[str]:
@@ -109,6 +137,17 @@ def _coordinate(value, name: str) -> tuple[int, int]:
     return int(value[0]), int(value[1])
 
 
+def _coordinate_index(grid: Sequence[tuple[int, int]]) -> dict[tuple[int, int], int]:
+    """Return a coordinate→linear-index lookup for a grid coordinate list.
+
+    Used by :class:`ActiveGridference` to turn repeated O(n) ``list.index``
+    scans (the hot path of transition construction and observation lookup)
+    into O(1) dictionary lookups. Order is preserved exactly, so the mapping is
+    bit-for-bit identical to ``grid.index``.
+    """
+    return {location: index for index, location in enumerate(grid)}
+
+
 def _step_agent(agent, prior, A, B, C, env_state, grid, *, rng=None) -> AgentUpdate:
     policies = construct_policies(
         [agent.n_states],
@@ -116,7 +155,7 @@ def _step_agent(agent, prior, A, B, C, env_state, grid, *, rng=None) -> AgentUpd
         policy_len=agent.policy_len,
         max_policies=getattr(agent, "max_policies", 100_000),
     )
-    obs_idx = grid.index(tuple(env_state))
+    obs_idx = agent._obs_index(env_state)
     qs_current = bu.infer_states(obs_idx, A, prior)
     G, parts = bu.calculate_G_policies_traced(A, B, C, qs_current, policies=policies)
     Q_pi = bu.softmax(-G)
@@ -124,7 +163,7 @@ def _step_agent(agent, prior, A, B, C, env_state, grid, *, rng=None) -> AgentUpd
     chosen_action = bu.sample(P_u, rng=rng)
     next_prior = B[:, :, chosen_action].dot(qs_current)
     next_env = _move(chosen_action, tuple(env_state), agent.border, agent.E)
-    return {
+    update: AgentUpdate = {
         "update_prior": next_prior,
         "update_env": next_env,
         "update_action": int(chosen_action),
@@ -136,6 +175,17 @@ def _step_agent(agent, prior, A, B, C, env_state, grid, *, rng=None) -> AgentUpd
         "update_p_u": P_u,
         "update_obs_idx": int(obs_idx),
     }
+    validate_update_envelope(update)
+    return update
+
+
+def validate_update_envelope(update: Any, *, require_source: bool = False) -> None:
+    """Fail closed if an update lacks the canonical step/update protocol fields."""
+    missing = [field for field in CORE_UPDATE_FIELDS if field not in update]
+    if missing:
+        raise ValueError(f"update envelope is missing protocol fields: {missing}")
+    if require_source and "source" not in update:
+        raise ValueError("update envelope requires a 'source' field")
 
 
 def actinf_planning_single(
@@ -183,6 +233,7 @@ class ActiveGridference:
         ):
             raise ValueError("planning_length must be a positive integer")
         self.grid = _validate_square_grid(grid)
+        self._coordinate_index = _coordinate_index(self.grid)
         self.E = _validate_affordances(affordances)
         if (
             isinstance(max_policies, (bool, np.bool_))
@@ -196,7 +247,7 @@ class ActiveGridference:
         self.n_observations = len(self.grid)
         self.border = int(round(self.n_states**0.5)) - 1
         self.env_state = _coordinate(env_state, "env_state")
-        if self.env_state not in self.grid:
+        if self.env_state not in self._coordinate_index:
             raise ValueError(f"env_state {self.env_state!r} is not present in grid")
         self.A: np.ndarray = np.eye(self.n_observations, self.n_states)
         self.B: np.ndarray = self._build_B()
@@ -206,12 +257,16 @@ class ActiveGridference:
         self.current_action: int | None = None
         self.current_inference: np.ndarray | None = None
 
+    def _obs_index(self, coordinate: tuple[int, int]) -> int:
+        """Return the linear observation/state index for a grid coordinate."""
+        return self._coordinate_index[coordinate]
+
     def _build_B(self) -> np.ndarray:
         B = np.zeros((self.n_states, self.n_states, len(self.E)), dtype=float)
         for action_id in range(len(self.E)):
             for current_index, location in enumerate(self.grid):
                 next_location = _move(action_id, location, self.border, self.E)
-                B[self.grid.index(next_location), current_index, action_id] = 1.0
+                B[self._coordinate_index[next_location], current_index, action_id] = 1.0
         return B
 
     def get_A(self) -> np.ndarray:
@@ -227,17 +282,17 @@ class ActiveGridference:
     def get_C(self, preferred_state: tuple[int, int]) -> np.ndarray:
         """Set and return a one-hot preference over observations."""
         coordinate = _coordinate(preferred_state, "preferred_state")
-        if coordinate not in self.grid:
+        if coordinate not in self._coordinate_index:
             raise ValueError(f"preferred_state {preferred_state!r} is not present in grid")
-        self.C = onehot(self.grid.index(coordinate), self.n_observations)
+        self.C = onehot(self._coordinate_index[coordinate], self.n_observations)
         return self.C
 
     def get_D(self, initial_state: tuple[int, int]) -> np.ndarray:
         """Set and return a one-hot prior over hidden states."""
         coordinate = _coordinate(initial_state, "initial_state")
-        if coordinate not in self.grid:
+        if coordinate not in self._coordinate_index:
             raise ValueError(f"initial_state {initial_state!r} is not present in grid")
-        self.D = onehot(self.grid.index(coordinate), self.n_states)
+        self.D = onehot(self._coordinate_index[coordinate], self.n_states)
         self.prior = self.D.copy()
         self.env_state = coordinate
         return self.D

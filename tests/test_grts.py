@@ -2,7 +2,15 @@
 
 import json
 
-from GRTs.agents import OfflineCorpusProvider, ResearchOrchestrator, ResearchWorkspace, process_csv
+import pytest
+
+from GRTs.agents import (
+    OfflineCorpusProvider,
+    ResearchOrchestrator,
+    ResearchWorkspace,
+    build_provider,
+    process_csv,
+)
 
 
 def test_offline_orchestrator_writes_report(tmp_path):
@@ -20,3 +28,10 @@ def test_csv_analysis_is_deterministic(tmp_path):
     result = json.loads(process_csv(source, "count rows"))
     assert result["rows"] == 1
     assert result["columns"] == ["a", "b"]
+
+
+def test_openai_provider_fails_clearly_without_key(monkeypatch):
+    """The OpenAI provider is network-free to validate: missing key raises up front."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
+        build_provider("openai")

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import tempfile
 from pathlib import Path
 
 import matplotlib
@@ -9,7 +11,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
-from matplotlib.animation import FuncAnimation, PillowWriter
+from matplotlib.animation import FFMpegWriter, FuncAnimation, PillowWriter
 
 from blockference.viz._common import extract_agent_positions, infer_grid_dimension
 
@@ -81,12 +83,24 @@ def animate_trajectory(
         animation = FuncAnimation(
             fig, update, frames=n_frames, init_func=init, blit=False, interval=1000 / fps
         )
-        if path.suffix.lower() == ".gif":
-            animation.save(path, writer=PillowWriter(fps=fps))
-        else:
-            from matplotlib.animation import FFMpegWriter
-
-            animation.save(path, writer=FFMpegWriter(fps=fps))
+        writer = (
+            PillowWriter(fps=fps)
+            if path.suffix.lower() == ".gif"
+            else FFMpegWriter(fps=fps)
+        )
+        # Write through a sibling temporary file that keeps the real extension
+        # so the writer still infers the format, then publish atomically.
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{path.name}.", suffix=path.suffix, dir=path.parent
+        )
+        os.close(descriptor)
+        temporary = Path(temporary_name)
+        try:
+            animation.save(temporary, writer=writer)
+            os.replace(temporary, path)
+        except BaseException:
+            temporary.unlink(missing_ok=True)
+            raise
     except (ImportError, RuntimeError) as exc:
         raise RuntimeError("MP4 output requires ffmpeg; use a .gif extension") from exc
     finally:

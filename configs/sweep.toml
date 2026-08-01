@@ -13,6 +13,7 @@ runs = 3
 n_agents = 4
 target = "random"
 initial_state = [0, 0]
+initial_states = [[0, 0], [0, 3], [3, 0], [3, 3]]
 
 [output]
 path = "results/gridworld_sweep.csv"

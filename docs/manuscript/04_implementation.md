@@ -34,13 +34,25 @@ complete `RunPaths` directory tree before persistence. Direct simulation CSVs
 are written with `index=False`, which makes the CSV a real row-wise artefact
 rather than a DataFrame debugging dump.
 
-The simulation boundary accepts a legacy `initial_state` coordinate and
-broadcasts it to all agents. A caller can instead provide
-`simulation.initial_states` with one coordinate per agent. Random targets and
-sampled actions use one generator owned by the run; collision correction is
-applied before the next prior is persisted.
+The simulation boundary accepts a legacy `initial_state` coordinate for
+single-agent runs, or `simulation.initial_states` with one distinct coordinate
+per agent. A multi-agent run without distinct starts fails fast with an
+explicit error rather than surfacing an obscure collision failure inside a
+backend. Random targets and sampled actions use one generator owned by the run;
+collision correction is applied before the next prior is persisted.
 
 ## Persistence contract
+
+Every JSON, CSV, NPZ, config, model, and render artefact is published
+atomically: it is written to a sibling temporary file in the same directory and
+renamed into place, so a reader or a crashed process only ever observes a
+complete file, never a partially written one. A leftover temporary file is
+treated as drift by validation and fails the report.
+
+A normalized typed trajectory schema (`TrajectoryRecord`) lets backend parity
+and persistence round-trips compare coordinates, integer indices, and float
+vectors as values rather than as stringified DataFrame cells, so radCAD and
+cadCAD runs are verified to agree exactly.
 
 One canonical run has these required files:
 

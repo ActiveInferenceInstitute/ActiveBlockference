@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import json
+
 import pandas as pd
 
 from blockference.config import ExperimentConfig
-from blockference.io import validate_run_outputs
+from blockference.io import (
+    build_run_paths,
+    parse_trajectory_records,
+    persist_config,
+    validate_run_outputs,
+)
 from blockference.pipeline import run_pipeline
 from blockference.simulations.grid_sim import run_experiment
 
@@ -50,9 +57,10 @@ def test_radcad_and_cadcad_emit_same_schema_and_seeded_states():
         "obs_idx",
     ):
         assert radcad[column].astype(str).tolist() == cadcad[column].astype(str).tolist()
-    repeated = run_experiment(radcad_config)
-    assert radcad["env_states"].astype(str).tolist() == repeated["env_states"].astype(str).tolist()
-
+    # Typed schema parity: the two backends agree on normalized typed values,
+    # not just stringified cells, and both round-trip deterministically.
+    assert parse_trajectory_records(radcad) == parse_trajectory_records(cadcad)
+    assert parse_trajectory_records(radcad) == parse_trajectory_records(run_experiment(radcad_config))
     first_run_config = ExperimentConfig.from_dict(
         {**radcad_config.to_dict(), "simulation": {**radcad_config.to_dict()["simulation"], "runs": 1}}
     )
@@ -110,3 +118,55 @@ def test_pipeline_refuses_non_empty_run_tree_without_explicit_reuse(tmp_path):
         pass
     else:
         raise AssertionError("completed run tree was silently reused")
+
+
+def test_interrupted_partial_tree_fails_closed(tmp_path):
+    """A run interrupted before finishing can never yield a passing verdict."""
+    paths = build_run_paths(tmp_path, "interrupted").ensure()
+    persist_config(ExperimentConfig.from_dict({"output": {"path": None}}), paths)
+    # Stale manifest claims completion but no data artefacts exist.
+    paths.manifest_json.write_text(
+        json.dumps({"version": 1, "complete": True, "files": []}), encoding="utf-8"
+    )
+    report = validate_run_outputs(paths)
+    assert not report.ok
+    assert any("present" in issue or "complete" in issue for issue in report.issues)
+
+
+def test_leftover_atomic_temp_file_fails_closed(tmp_path):
+    """A stale atomic-write temp file is treated as drift, never a valid artefact."""
+    result = run_pipeline(config(), output_root=tmp_path, run_name="temp")
+    result.paths.data_dir.joinpath(".trajectory.csv.deadbeef.tmp").write_bytes(b"partial")
+    assert not validate_run_outputs(result.paths).ok
+
+
+def test_validate_stages_are_focused_and_aggregate(tmp_path):
+    from blockference.io.validate import (
+        validate_artifact_presence,
+        validate_config_boundary,
+        validate_config_model_agreement,
+        validate_config_trajectory_agreement,
+        validate_manifest_boundary,
+        validate_model_boundary,
+        validate_per_step_boundary,
+        validate_policies_boundary,
+        validate_trajectory_boundary,
+        validate_tree_structure,
+    )
+
+    result = run_pipeline(config(), output_root=tmp_path, run_name="stages")
+    paths = result.paths
+    assert validate_tree_structure(paths).ok
+    assert validate_artifact_presence(paths).ok
+    config_report, cfg = validate_config_boundary(paths)
+    assert config_report.ok and cfg is not None
+    trajectory_report, trajectory, summary = validate_trajectory_boundary(paths, cfg)
+    assert trajectory_report.ok and trajectory is not None
+    model_report, model_payload = validate_model_boundary(paths, cfg)
+    assert model_report.ok and model_payload is not None
+    assert validate_manifest_boundary(paths).ok
+    assert validate_policies_boundary(paths).ok
+    assert validate_per_step_boundary(paths, cfg, trajectory).ok
+    assert validate_config_trajectory_agreement(cfg, trajectory, summary).ok
+    assert validate_config_model_agreement(cfg, model_payload).ok
+    assert validate_run_outputs(paths).ok

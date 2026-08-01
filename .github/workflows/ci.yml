@@ -38,6 +38,9 @@ jobs:
       - name: Run canonical release gate
         run: uv run python scripts/release_check.py
 
+      - name: Type-check the package against Python 3.10 stubs
+        run: uv run mypy --python-version 3.10 blockference
+
       - name: Upload coverage
         if: matrix.python-version == '3.11'
         uses: actions/upload-artifact@v4

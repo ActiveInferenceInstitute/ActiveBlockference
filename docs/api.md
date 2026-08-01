@@ -11,8 +11,14 @@
   pymdp adapter. Install `active-blockference[pymdp]` to use it.
 * `blockference.ExperimentConfig.from_dict(mapping)` rejects unknown keys and
   validates dimensions, coordinates, action labels, engine, and paths.
-  `simulation.initial_states` can provide one start coordinate per agent;
-  otherwise `simulation.initial_state` is broadcast.
+  `simulation.initial_state` remains the single-agent compatibility default;
+  for `n_agents > 1` provide `simulation.initial_states` with one distinct
+  start coordinate per agent (a multi-agent run without it fails fast).
+* `blockference.envs.DiscreteEnvironment` is the runtime-checkable environment
+  protocol; `GridWorld` conforms and adds lossless `serialize()` / `load()`.
+* `blockference.io.atomic_replace(path, writer)` publishes any file atomically;
+  `parse_trajectory_records(df)` normalizes a trajectory into typed, ordered
+  `TrajectoryRecord` values for backend/persistence parity.
 
 ## Execution
 

@@ -90,7 +90,12 @@ class OfflineCorpusProvider:
 class OpenAIProvider:
     """Explicit OpenAI provider requiring the optional SDK and API key."""
 
-    def __init__(self, model: str = "gpt-4o-mini", api_key: str | None = None) -> None:
+    def __init__(
+        self,
+        model: str = "gpt-4o-mini",
+        api_key: str | None = None,
+        timeout: float | None = None,
+    ) -> None:
         key = api_key or os.environ.get("OPENAI_API_KEY")
         if not key:
             raise RuntimeError("OpenAI provider requires OPENAI_API_KEY")
@@ -99,7 +104,8 @@ class OpenAIProvider:
         except ImportError as exc:
             raise RuntimeError("OpenAI provider requires the optional openai package") from exc
         self.model = model
-        self.client = OpenAI(api_key=key)
+        self.timeout = 60.0 if timeout is None else timeout
+        self.client = OpenAI(api_key=key, timeout=self.timeout)
 
     def complete(self, prompt: str) -> str:
         """Send one prompt to the configured OpenAI model."""
@@ -165,14 +171,18 @@ class ResearchOrchestrator:
 
 
 def build_provider(
-    name: str, *, corpus: str | Path | None = None, model: str = "gpt-4o-mini"
+    name: str,
+    *,
+    corpus: str | Path | None = None,
+    model: str = "gpt-4o-mini",
+    timeout: float | None = None,
 ) -> ResearchProvider:
     """Build an explicitly selected provider."""
 
     if name == "offline":
         return OfflineCorpusProvider(corpus)
     if name == "openai":
-        return OpenAIProvider(model=model)
+        return OpenAIProvider(model=model, timeout=timeout)
     raise ValueError("provider must be 'offline' or 'openai'")
 
 

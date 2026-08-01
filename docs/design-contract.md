@@ -66,11 +66,19 @@ The release path is intentionally layered:
 
 `ValidationReport.ok` and `PipelineResult.ok` remain the only release verdicts.
 Passing tests without a passing persisted artefact report is not a release.
+These verdicts are software- and artefact-integrity checks only; they never
+stamp a run with empirical or scientific adequacy.
 
 ## Outside the current scope
 
 Obstacles, stochastic transitions, learned `A`/`B`/`C`, factored state spaces,
-unbounded policy search, network-backed research, and empirical claims about
-scientific adequacy are deliberately outside this contract. They can be added
-only with explicit state semantics, validation rules, tests, and regenerated
-documentation and figures.
+unbounded policy search, and network-backed research are deliberately outside
+this contract. They can be added only with explicit state semantics, validation
+rules, tests, and regenerated documentation and figures.
+
+Empirical claims about scientific adequacy are also outside this contract. Any
+such claim requires independent datasets, documented provenance, and sensitivity
+analyses maintained separately from `PipelineResult.ok`. A passing software
+verdict neither implies nor disproves a scientific hypothesis; adequacy claims
+are the author's responsibility and must be supported by their own evidence
+trail, never inferred from a green pipeline report.

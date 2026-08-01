@@ -2,6 +2,7 @@
 
 from blockference.io.layout import RunPaths, build_run_paths
 from blockference.io.persist import (
+    atomic_replace,
     persist_config,
     persist_dataframe,
     persist_generative_model,
@@ -11,6 +12,7 @@ from blockference.io.persist import (
     persist_policies,
     persist_summary,
 )
+from blockference.io.schema import TrajectoryRecord, parse_trajectory_records
 from blockference.io.validate import (
     ValidationReport,
     validate_generative_model,
@@ -21,8 +23,11 @@ from blockference.io.validate import (
 
 __all__ = [
     "RunPaths",
+    "TrajectoryRecord",
     "ValidationReport",
+    "atomic_replace",
     "build_run_paths",
+    "parse_trajectory_records",
     "persist_config",
     "persist_dataframe",
     "persist_generative_model",

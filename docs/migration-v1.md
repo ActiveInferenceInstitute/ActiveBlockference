@@ -5,10 +5,13 @@ older permissive grid helpers.
 
 ## Configuration
 
-Continue using `simulation.initial_state` for the compatibility broadcast, or
-provide one unique coordinate per agent with `simulation.initial_states`.
-Unknown keys, duplicate explicit starts, invalid coordinates, and malformed
-paths now fail during configuration loading. `grid.max_policies` defaults to
+For single-agent runs, continue using `simulation.initial_state` as the
+compatibility default. For multi-agent runs (`n_agents > 1`) provide one unique
+coordinate per agent with `simulation.initial_states`; a multi-agent run
+without it fails fast with an explicit error, because the simultaneous-start
+environment requires distinct cells. Unknown keys, non-unique explicit starts,
+invalid coordinates, and malformed paths now fail during configuration loading.
+`grid.max_policies` defaults to
 100,000 and prevents accidental exponential policy allocation; raise it only
 when the run has an explicit resource budget.
 

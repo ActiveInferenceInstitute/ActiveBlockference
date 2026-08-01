@@ -3,10 +3,36 @@
 from __future__ import annotations
 
 import ast
+import os
+import tempfile
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
+
+
+def atomic_savefig(fig, path: str | Path, **kwargs: Any) -> Path:
+    """Render ``fig`` to ``path`` atomically via a sibling temporary file.
+
+    The temporary file keeps the real output suffix (e.g. ``.png``) so
+    matplotlib still infers the format, then ``os.replace`` publishes it in one
+    step. A crashed render can never leave a partially written final image.
+    """
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{target.name}.", suffix=target.suffix, dir=target.parent
+    )
+    os.close(descriptor)
+    temporary = Path(temporary_name)
+    try:
+        fig.savefig(temporary, **kwargs)
+        os.replace(temporary, target)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+    return target
 
 
 def coerce_cell(value: Any) -> Any:
@@ -114,6 +140,7 @@ def infer_grid_dimension(df: pd.DataFrame) -> int:
 
 
 __all__ = [
+    "atomic_savefig",
     "coerce_cell",
     "extract_action_history",
     "extract_agent_positions",

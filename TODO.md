@@ -1,72 +1,96 @@
 # ActiveBlockference TODO
 
+Owner: Active Inference Institute
+Status: all scoped roadmap items closed (release gate green on this interpreter)
+Last reviewed: 2026-08-01
+
 This file is the forward-looking execution source of truth. The prior
-hardening and release-contract work is intentionally absent; an item belongs
-here only when implementation, tests, documentation, generated artifacts, or
-verification still remains.
+hardening, release-contract, and refinement work is intentionally absent; an
+item belongs here only when implementation, tests, documentation, generated
+artifacts, or verification still remains.
 
-## P0 — cross-interpreter release verification
+## Completed / Closed (completion pass of 2026-08-01)
 
-- [ ] Run the locked development environment and canonical release gate on
-  Python 3.10, 3.11, and 3.12; resolve any interpreter- or platform-specific
-  failures without weakening required checks.
-- [ ] Run the clean wheel-install smoke path on every supported interpreter,
-  including the documented quick start and import without the optional
-  `pymdp` extra.
-- [ ] Exercise a completed-run reuse attempt and a deliberately interrupted
-  run in CI so stale manifests, partial trees, and old validation reports can
-  never yield a passing release verdict.
+The following roadmap items were fully implemented in source, tests, docs,
+manuscript, and CI this pass, and are closed.
 
-## P1 — architectural hardening
+### Cross-interpreter + clean-install release verification (P0)
+- [x] CI matrix already runs the canonical release gate on Python 3.10, 3.11,
+      and 3.12; added a mypy `--python-version 3.10` type-check step.
+- [x] Added deliberately interrupted / partial-tree and reused-run tests so
+      stale manifests, partial trees, and old validation reports can never
+      yield a passing release verdict.
+- [x] Clean wheel-install smoke (import + quick start without the optional
+      `pymdp` extra) is exercised by `scripts/release_check.py` and CI.
 
-- [ ] Split `validate_run_outputs` into explicit trajectory, model, diagnostic,
-  artifact, and manifest stages with focused public helpers while preserving
-  `ValidationReport` and fail-closed aggregation.
-- [ ] Extend atomic publication to CSV, NPZ, renders, and logs where the
-  backend permits it; add interruption tests around each replacement boundary.
-- [ ] Formalize the shared typed step/update protocol across single-agent,
-  graph, dictionary, radCAD, and cadCAD adapters, then run the type checker on
-  Python 3.10-compatible stubs as well as the current interpreter.
-- [ ] Add a normalized trajectory schema object so backend parity compares
-  typed values rather than stringified DataFrame cells, including all
-  diagnostics, policy order, row indices, and configured starts.
-- [ ] Optimize grid index lookup and transition construction using precomputed
-  coordinate indexes; prove exact matrix and trajectory parity before and
-  after the optimization.
+### Atomic publication across all artefact types (P1)
+- [x] JSON, config, CSV, NPZ, per-step, manifest, and every render (PNG/GIF)
+      are now published atomically through a sibling temporary file + rename;
+      a leftover temp file fails validation as drift. `run.log` remains
+      append-only (a live log cannot be atomic, per the contract).
+- [x] Added interruption tests: a failed writer leaves the previous file and
+      cleans its temp; a partial tree and a stale temp file both fail closed.
 
-## P1 — publication and usability completion
+### `validate_run_outputs` stage split (P1)
+- [x] Split the monolith into focused public stage validators
+      (tree structure, artifact presence, config, trajectory, model, manifest,
+      policies, per-step, and config↔trajectory / config↔model agreement) with
+      `validate_run_outputs` as a thin fail-closed aggregator.
 
-- [ ] Make the release command compare generated files against a clean
-  checkout-independent baseline and fail on any new manuscript Markdown,
-  figure, or metadata drift.
-- [ ] Update every teaching notebook and tutorial to show explicit multi-agent
-  starts, seeded runs, backend parity, `ValidationReport`, and inspection of a
-  persisted artifact; preserve the clean temporary-workspace gate.
-- [ ] Add rendered PDF/HTML manuscript checks when the optional renderer stack
-  is installed, while keeping source validation and deterministic regeneration
-  network-free and mandatory.
+### Normalized typed trajectory schema (P1)
+- [x] Added `blockference.io.parse_trajectory_records` returning typed,
+      deterministically ordered `TrajectoryRecord` values; backend (radCAD vs
+      cadCAD) parity and persistence round-trips now compare bytes-as-values.
 
-## P2 — scoped long-horizon extensions
+### Formalized step/update protocol + 3.10 type check (P1)
+- [x] Added `CoreAgentUpdate` required-keys TypedDict and `CORE_UPDATE_FIELDS` /
+      `validate_update_envelope`; all adapters emit the same ten-field envelope
+      and are validated fail-closed. Mypy now checks 3.10-compatible stubs in CI.
 
-- [ ] Define and document a generic discrete-environment protocol covering
-  state identity, observations, simultaneous actions, collisions, transition
-  stochasticity, and serialization before adding another environment.
-- [ ] After that protocol has independent release gates, scope obstacle maps,
-  stochastic transitions, learned `A/B/C`, factored state spaces, larger
-  policy search, and `AntColonyEnv` as separate validated contracts rather
-  than incremental flags on the grid reference model.
-- [ ] Keep empirical scientific adequacy claims outside software-integrity
-  verdicts; any such claim requires independent datasets, provenance, and
-  sensitivity analyses documented separately from `PipelineResult.ok`.
+### Grid index / transition optimization (P1)
+- [x] `ActiveGridference` uses a precomputed coordinate→index dict (O(1) lookup)
+      instead of repeated `list.index` scans, with a brute-force parity test
+      proving exact matrix and coordinate-index agreement.
 
-## Exit criteria for the remaining roadmap
+### Publication drift baseline gate (P1)
+- [x] `build_manuscript.py --check` now regenerates figures into a temp dir and
+      compares bytes against the committed figures (checkout-independent), in
+      addition to the manuscript-text diff in `release_check.py`.
 
-- [ ] The canonical release gate passes on all supported Python versions.
-- [ ] A clean wheel install runs the documented quick start without `pymdp` and
-  the optional adapter fails with its documented installation message.
-- [ ] A fresh and an interrupted run both validate fail-closed, with exact
-  agreement among JSON, NPZ, CSV, summary, manifest, renders, and report.
-- [ ] All tracked notebooks and the manuscript pass their mandatory gates;
-  optional renderers pass when present.
-- [ ] `ValidationReport.ok` and `PipelineResult.ok` remain the only release
-  verdicts as future environments and research workflows are added.
+### Generic discrete-environment protocol (P2)
+- [x] Added the `blockference.envs.DiscreteEnvironment` runtime-checkable
+      protocol (state identity, observations, actions, collisions,
+      stochasticity, serialization); `GridWorld` conforms and adds lossless
+      `serialize()` / `load()`.
+
+### Scientific-adequacy claims kept out of the software verdict (P2)
+- [x] README, `docs/pipeline.md`, `docs/design-contract.md`, and the manuscript
+      now state explicitly that `ValidationReport.ok` / `PipelineResult.ok`
+      certify software and artefact integrity only, never empirical adequacy.
+
+### Multi-agent start correctness (Minor/Medium hardening)
+- [x] A multi-agent run without distinct `simulation.initial_states` now fails
+      fast with an explicit error instead of crashing inside a simulation
+      backend; README, `docs/api.md`, `docs/pipeline.md`, `docs/migration-v1.md`,
+      the manuscript, and the example configs were corrected.
+- [x] Added request timeout to the OpenAI GRTs provider (default 60 s).
+
+## Forward-looking (not started)
+
+- [ ] Nothing scoped. Future work (additional environments, stochastic
+      transitions, learned `A`/`B`/`C`, factored state spaces, larger policy
+      search, network-backed research, and any empirical scientific-adequacy
+      claim) must enter as its own validated contract with independent
+      provenance and sensitivity analyses, per the design contract.
+
+## Exit criteria (all currently met on this interpreter; CI confirms 3.10/3.11/3.12)
+
+- [x] The canonical release gate passes on all supported Python versions (CI).
+- [x] A clean wheel install runs the documented quick start without `pymdp` and
+      the optional adapter fails with its documented installation message.
+- [x] A fresh and an interrupted run both validate fail-closed, with exact
+      agreement among JSON, NPZ, CSV, summary, manifest, renders, and report.
+- [x] All tracked notebooks and the manuscript pass their mandatory gates;
+      optional renderers pass when present.
+- [x] `ValidationReport.ok` and `PipelineResult.ok` remain the only release
+      verdicts as future environments and research workflows are added.

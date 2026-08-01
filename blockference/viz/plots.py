@@ -14,6 +14,7 @@ import pandas as pd
 
 from blockference.actions import DEFAULT_AFFORDANCES, validate_affordances
 from blockference.viz._common import (
+    atomic_savefig,
     extract_action_history,
     extract_agent_positions,
     extract_belief_history,
@@ -33,7 +34,6 @@ def _target(out_path: str | Path, suffix: str = ".png") -> Path:
     path = Path(out_path)
     if path.suffix.lower() != suffix:
         raise ValueError(f"output must use the {suffix} extension")
-    path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
 
@@ -71,7 +71,7 @@ def plot_trajectory(df: pd.DataFrame, out_path: str | Path, *, title: str = "Age
             ax.scatter([xs[-1]], [ys[-1]], c="red", s=80, marker="*", zorder=5)
         ax.legend(loc="best")
         fig.tight_layout()
-        fig.savefig(path, dpi=120)
+        atomic_savefig(fig, path, dpi=120)
     finally:
         plt.close(fig)
     return path
@@ -99,7 +99,7 @@ def plot_belief_heatmap(df: pd.DataFrame, out_path: str | Path, *, agent_id: obj
         ax.set_yticks(range(n))
         fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
         fig.tight_layout()
-        fig.savefig(path, dpi=120)
+        atomic_savefig(fig, path, dpi=120)
     finally:
         plt.close(fig)
     return path
@@ -126,7 +126,7 @@ def plot_action_distribution(df: pd.DataFrame, out_path: str | Path, *, affordan
         ax.set_title(title)
         ax.legend(loc="best")
         fig.tight_layout()
-        fig.savefig(path, dpi=120)
+        atomic_savefig(fig, path, dpi=120)
     finally:
         plt.close(fig)
     return path
@@ -151,7 +151,7 @@ def plot_efe(df: pd.DataFrame, out_path: str | Path, *, title: str = "Expected f
         ax.grid(True, alpha=0.3)
         ax.legend(loc="best")
         fig.tight_layout()
-        fig.savefig(path, dpi=120)
+        atomic_savefig(fig, path, dpi=120)
     finally:
         plt.close(fig)
     return path

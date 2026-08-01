@@ -63,3 +63,25 @@ def test_calculate_G_policies_shapes():
     policies = [np.array([[0]]), np.array([[1]])]
     G = u.calculate_G_policies(A, B, C, qs_current, policies)
     assert G.shape == (2,)
+
+
+def test_calculate_G_single_step_efe():
+    # Identity likelihood => ambiguity zero; a switch action moves away from C.
+    A = np.eye(2)
+    B = np.zeros((2, 2, 2))
+    B[:, :, 0] = np.eye(2)
+    B[:, :, 1] = np.array([[0.0, 1.0], [1.0, 0.0]])
+    C = np.array([1.0, 0.0])
+    qs = np.array([1.0, 0.0])
+    G = u.calculate_G(A, B, C, qs, ["stay", "switch"])
+    assert G.shape == (2,)
+    assert G[0] == pytest.approx(0.0, abs=1e-9)
+    assert G[1] > G[0]
+
+
+def test_sample_without_rng_uses_global_stream():
+    np.random.seed(7)
+    first = u.sample(np.array([0.5, 0.5]))
+    np.random.seed(7)
+    second = u.sample(np.array([0.5, 0.5]))
+    assert first == second

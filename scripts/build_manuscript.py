@@ -440,6 +440,31 @@ def _write_outputs(compiled: str) -> Path:
     return output
 
 
+def _check_figures_against_committed() -> list[str]:
+    """Return committed figure filenames that drift from a fresh, content-identical build.
+
+    Regenerates the figures into a temporary directory and compares every
+    committed SVG/PNG byte-for-byte against the fresh output. This is a
+    checkout-independent drift baseline: it does not depend on ``git diff``
+    state, so a stale or hand-edited committed figure is always caught.
+    """
+    import tempfile
+    from filecmp import cmp
+    from pathlib import Path
+
+    drift: list[str] = []
+    with tempfile.TemporaryDirectory(prefix="activeblockference-figcheck-") as directory:
+        build_figures(Path(directory))
+        produced = {path.name: path for path in Path(directory).iterdir() if path.is_file()}
+        for committed in sorted(FIGURE_DIR.iterdir()):
+            if not committed.is_file():
+                continue
+            fresh = produced.get(committed.name)
+            if fresh is None or not cmp(fresh, committed, shallow=False):
+                drift.append(committed.name)
+    return drift
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -483,6 +508,11 @@ def main(argv: list[str] | None = None) -> int:
             if (BUILD_DIR / "manuscript.md").read_text(encoding="utf-8") != compiled:
                 raise ValueError(
                     "composed manuscript is out of date; run scripts/build_manuscript.py"
+                )
+            figure_drift = _check_figures_against_committed()
+            if figure_drift:
+                raise ValueError(
+                    "committed figures drift from a fresh build: " + ", ".join(figure_drift)
                 )
             print(f"manuscript check passed ({len(labels)} numbered labels)")
         return 0

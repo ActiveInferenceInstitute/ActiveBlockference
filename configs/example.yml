@@ -16,9 +16,9 @@ simulation:
   runs: 1
   n_agents: 2
   target: random          # or a [y, x] coordinate, e.g. [2, 2]
-  initial_state: [0, 0]
-  # Optional explicit starts, one coordinate per agent:
-  # initial_states: [[0, 0], [2, 2]]
+  # Multi-agent runs (n_agents > 1) require one distinct start per agent.
+  initial_state: [0, 0]   # single-agent compatibility default only
+  initial_states: [[0, 0], [2, 2]]
 
 output:
   # When using --pipeline this is overridden to output/<name>/data/trajectory.csv.
