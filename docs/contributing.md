@@ -56,11 +56,9 @@ If you change a public surface, update:
 
 ### 6. Open the PR
 
-Fill in the PR template:
-
-* **What changed** — code summary.
-* **Why** — motivating issue or use case.
-* **How verified** — pytest output, screenshots if visual.
+Describe the change, motivation, and verification in the pull request
+conversation. Include pytest output and screenshots when visual behaviour
+changed.
 
 A reviewer will look at correctness, scope, and doc/test parity.
 

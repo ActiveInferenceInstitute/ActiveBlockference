@@ -69,7 +69,8 @@ config = ExperimentConfig.from_dict({
     "grid": {"dimension": 3, "planning_length": 2,
              "affordances": ["UP", "RIGHT", "STAY"]},
     "simulation": {"timesteps": 10, "runs": 1, "n_agents": 2,
-                    "target": [2, 2], "initial_state": [0, 0]},
+                    "target": [2, 2],
+                    "initial_states": [[0, 0], [1, 1]]},
 })
 result = run_pipeline(config)
 assert result.ok
@@ -87,5 +88,8 @@ world.step({0: 1, 1: 0})
 * `GRTs/` — optional provider-based local research workflow.
 * `tests/` — unit, integration, artefact, and notebook checks.
 
-See [`docs/api.md`](docs/api.md), [`docs/pipeline.md`](docs/pipeline.md), and
-[`docs/development.md`](docs/development.md) for the complete contracts.
+See [`docs/README.md`](docs/README.md) for the documentation index,
+[`docs/api.md`](docs/api.md), [`docs/pipeline.md`](docs/pipeline.md), and
+[`docs/development.md`](docs/development.md) for the complete contracts and
+workflow. Contributions are described in [`docs/contributing.md`](docs/contributing.md);
+the repository is released under the [MIT License](LICENSE).

@@ -3,7 +3,7 @@
 The source manuscript follows the ordered-file convention used by the
 repository template.  Labels are resolved locally so the checked-in source
 does not depend on a particular Pandoc filter for numbering.  The optional
-PDF/HTML renderers can consume ``docs/_build/manuscript.md`` after this script
+PDF/HTML renderers can consume ``docs/_build/manuscript/manuscript.md`` after this script
 has composed the source files.
 """
 

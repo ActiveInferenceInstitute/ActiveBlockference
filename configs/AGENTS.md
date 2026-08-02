@@ -5,7 +5,7 @@
 * **Schema source of truth** is
   `blockference.config.experiment.ExperimentConfig`. If you add a key
   here, also add it there (with a default + validation) and write a
-  test in `tests/test_config.py`.
+  focused test in the relevant `tests/test_*.py` module.
 * **No secrets** in config files. They are committed to git.
 * **Validate before commit**: every committed config must round-trip
   through `load_experiment_config` without error.
