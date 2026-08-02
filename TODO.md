@@ -13,27 +13,27 @@ Items are grouped by the size of the documentation change required:
 ## Minor
 
 - [x] Fix four broken repository-root links in `tests/envs/README.md` and
-      `tests/utils/README.md`. (commit: pending)
+      `tests/utils/README.md`. (e67253c)
 - [x] Replace the nonexistent `tests/test_config.py` reference in
-      `configs/AGENTS.md` with the current test-file convention. (commit: pending)
+      `configs/AGENTS.md` with the current test-file convention. (e67253c)
 - [x] Correct the generated-manuscript path in the `scripts/build_manuscript.py`
-      module documentation. (commit: pending)
+      module documentation. (e67253c)
 - [x] Link the root README to the documentation index and MIT license.
-      (commit: pending)
+      (e67253c)
 
 ## Medium
 
 - [x] Correct the root README Python example so its two-agent configuration
       supplies distinct `simulation.initial_states` and executes under the
-      current validation contract. (commit: pending)
+      current validation contract. (e67253c)
 - [x] Expand `docs/README.md` into a usable documentation index covering
       concepts, tutorials, development, configuration, notebooks, and the
-      manuscript source. (commit: pending)
+      manuscript source. (55055c4)
 - [x] Rewrite the three tutorials as short runnable stories with prerequisites,
       current API/CLI examples, assertions or validation steps, and next steps.
-      (commit: pending)
+      (55055c4)
 - [x] Remove the nonexistent PR-template claim from `docs/contributing.md` and
-      describe the actual pull-request information expected. (commit: pending)
+      describe the actual pull-request information expected. (e67253c)
 
 ## Major
 
