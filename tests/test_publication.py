@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 import scripts.build_manuscript as builder
+import scripts.check_docs_links as docs_links
 import scripts.validate_manuscript as validator
 from scripts.build_manuscript import _normalise_svg
 
@@ -50,3 +51,25 @@ def test_manuscript_validator_reports_negative_controls(monkeypatch, tmp_path):
     assert any("figure" in error for error in errors)
     assert any("token" in error for error in errors)
     assert any("LaTeX" in error for error in errors)
+
+
+def test_docs_link_checker_reports_broken_links_and_anchors(tmp_path):
+    (tmp_path / "a.md").write_text(
+        "# Heading\n\n"
+        "[ok](#heading)\n"
+        "[missing](nope.md)\n"
+        "[anchor](b.md#nope)\n"
+        "[escape](../../outside.md)\n"
+        "```\nfenced [fake](fake.md)\n```\n"
+        "[external](https://example.com/page)\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "b.md").write_text("# Title\n", encoding="utf-8")
+    failures = docs_links.validate(tmp_path)
+    messages = [message for issues in failures.values() for message in issues]
+    assert any("nope.md" in message for message in messages)
+    assert any("#nope" in message and "b.md" in message for message in messages)
+    assert any("outside" in message for message in messages)
+    assert not any("fake.md" in message for message in messages)
+    assert not any("example.com" in message for message in messages)
+    assert not any("same-file anchor" in message for message in messages)

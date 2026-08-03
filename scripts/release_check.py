@@ -73,6 +73,7 @@ def main() -> int:
     """Execute lint, tests, artefact, publication, and package gates."""
 
     _run(["uv", "run", "ruff", "check", "blockference", "tests", "GRTs", "scripts"])
+    _run(["uv", "run", "python", "scripts/check_docs_links.py"])
     _run(
         [
             "uv",
