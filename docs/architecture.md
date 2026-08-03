@@ -34,7 +34,7 @@ aggregate pipeline result false.
 The experiment seed spawns one independent NumPy child generator per run. It
 draws random targets and actions without mutating process-global Python or
 NumPy random state; adding later runs cannot change earlier trajectories.
-Multi-agent policies
-resolve simultaneous proposals from the common pre-step occupancy map; the
-prior persisted after a collision is the one-hot distribution at the realized
-coordinate, so diagnostics describe the world that actually occurred.
+Multi-agent policies resolve simultaneous proposals from the common pre-step
+occupancy map; the prior persisted after a collision is the one-hot
+distribution at the realized coordinate, so diagnostics describe the world
+that actually occurred.

@@ -63,11 +63,10 @@ G(\pi) = \sum_{\tau=t}^{t+H-1}
 $$ {#eq:expected-free-energy}
 
 The decomposition in [@eq:expected-free-energy] uses expected observation
-entropy for the first term and preference distance for the second; the second measures the
-distance from preferred observations. This is the implementation-level
-decomposition used by `calculate_G_policies_traced`; it is described as a
-computational decomposition rather than as a claim that every formulation of
-expected free energy has identical terms [@ParrFriston2019].
+entropy for the first term and preference distance for the second. This is the
+implementation-level decomposition used by `calculate_G_policies_traced`; it is
+described as a computational decomposition rather than as a claim that every
+formulation of expected free energy has identical terms [@ParrFriston2019].
 
 The policy posterior and first-action marginal are:
 

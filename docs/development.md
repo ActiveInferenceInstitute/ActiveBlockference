@@ -5,12 +5,17 @@ Use the committed lockfile for the exact environment:
 ```bash
 uv sync --locked --extra dev
 uv run ruff check blockference tests GRTs scripts
+uv run python scripts/check_docs_links.py
 uv run pytest
 uv run python scripts/execute_notebooks.py
 uv run python scripts/validate_manuscript.py
 uv run python scripts/build_manuscript.py
 uv run python scripts/build_manuscript.py --check
 ```
+
+Markdown links and anchors across all tracked documentation are validated by
+`scripts/check_docs_links.py`, which is also part of the canonical release
+gate.
 
 The development extra includes pytest, Ruff, notebook parsing/execution, and a
 Python kernel. The runtime package includes both radCAD and cadCAD so backend

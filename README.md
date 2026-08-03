@@ -5,6 +5,9 @@ discrete-state radCAD and cadCAD grid simulations. It provides strict YAML/TOML
 configuration, canonical `(y, x)` dynamics, persisted diagnostics, rendered
 artefacts, and fail-closed validation.
 
+[![CI](https://github.com/ActiveInferenceInstitute/ActiveBlockference/actions/workflows/ci.yml/badge.svg)](https://github.com/ActiveInferenceInstitute/ActiveBlockference/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 ## Quick start
 
 ```bash
@@ -92,4 +95,5 @@ See [`docs/README.md`](docs/README.md) for the documentation index,
 [`docs/api.md`](docs/api.md), [`docs/pipeline.md`](docs/pipeline.md), and
 [`docs/development.md`](docs/development.md) for the complete contracts and
 workflow. Contributions are described in [`docs/contributing.md`](docs/contributing.md);
-the repository is released under the [MIT License](LICENSE).
+security issues are reported privately per [`SECURITY.md`](SECURITY.md); the
+repository is released under the [MIT License](LICENSE).

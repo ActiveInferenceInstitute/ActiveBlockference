@@ -6,5 +6,6 @@ radCAD/cadCAD runs, persisted artefacts, rendering, reproducible publication
 assets, notebooks, and the credential-free research workflow. Run it with
 `uv run pytest` after `uv sync --locked --extra dev`.
 The release-equivalent command is `uv run python scripts/release_check.py`;
-it adds mypy, the 90% coverage gate, clean notebook execution, CLI JSON smoke,
-manuscript drift checks, and a clean wheel install.
+it adds mypy, the 90% coverage gate, Markdown link/anchor checks, clean
+notebook execution, CLI JSON smoke, manuscript drift checks, and a clean wheel
+install.
