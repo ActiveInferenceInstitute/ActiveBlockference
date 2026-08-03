@@ -62,6 +62,21 @@ was warranted.
 - Replaced the TODO roadmap with severity sections, completed entries, and
   explicit deferred items.
 
+## Follow-up pass (deferred items closed)
+
+- Added `scripts/check_docs_links.py`, a stdlib-only, network-free validator
+  for internal Markdown links and heading anchors (fence-aware, external URLs
+  skipped, repository-root containment enforced), wired it into
+  `scripts/release_check.py` so CI runs it, and added a negative-controls test
+  in `tests/test_publication.py`. (0c16ab8)
+- Added `SECURITY.md` pointing at GitHub's private Security Advisories
+  mechanism (no invented contacts) and documenting factual security-relevant
+  project behaviour; linked it from the root README. (96a02e3)
+- Added README CI/license badges, recorded the validator in
+  `docs/development.md` and `tests/README.md`, and corrected two prose issues
+  (paragraph wrap in `docs/architecture.md`; a redundant clause in
+  `docs/manuscript/02_formal_model.md`). (96a02e3)
+
 ## Validation performed
 
 - Executed the README API example after correction.
@@ -71,4 +86,6 @@ was warranted.
 - Ran the repo-wide relative Markdown link/anchor audit: no remaining internal
   link or anchor failures after fixes.
 - Ran `uv run ruff check blockference tests scripts GRTs`: passed.
+- Ran `scripts/check_docs_links.py` on the full repository: passed.
+- Ran manuscript source validation, build, and build `--check`: passed.
 - The complete release gate is run after the final documentation commits.

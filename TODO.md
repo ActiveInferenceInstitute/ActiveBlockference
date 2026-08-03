@@ -34,6 +34,11 @@ Items are grouped by the size of the documentation change required:
       (55055c4)
 - [x] Remove the nonexistent PR-template claim from `docs/contributing.md` and
       describe the actual pull-request information expected. (e67253c)
+- [x] Add a stdlib-only Markdown link/anchor validator
+      (`scripts/check_docs_links.py`), a negative-controls test, and a release
+      gate step so documentation drift fails the canonical gate. (0c16ab8)
+- [x] Add `SECURITY.md` with a private-advisory disclosure path and factual
+      security-relevant project behaviour. (96a02e3)
 
 ## Major
 
@@ -43,14 +48,7 @@ an executable publication validator.
 
 ## Open / deferred
 
-- [ ] Add automated Markdown link and anchor validation to CI. Deferred because
-      the repository currently has no Markdown tooling dependency or CI command;
-      the pass used a repo-wide audit script without introducing a heavyweight
-      documentation toolchain.
-- [ ] Add a dedicated `SECURITY.md` policy. Deferred because no security-reporting
-      channel or policy owner is defined in the repository metadata; adding one
-      would require an organization-level decision rather than inventing contact
-      details.
+Nothing open — all items scoped during the docs-deep review are complete.
 
 ## Verification notes
 
