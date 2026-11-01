@@ -208,9 +208,37 @@ def _save_figure(fig: object, path: Path) -> None:
     try:
         fig.savefig(path, format="svg", bbox_inches="tight")
         _normalise_svg(path)
-        fig.savefig(path.with_suffix(".png"), format="png", dpi=180, bbox_inches="tight")
+        png_path = path.with_suffix(".png")
+        fig.savefig(png_path, format="png", dpi=180, bbox_inches="tight")
+        _normalise_png(png_path)
     finally:
         plt.close(fig)
+
+
+def _normalise_png(path: Path) -> None:
+    """Drop toolchain-version metadata chunks from a generated PNG.
+
+    matplotlib records its own version in a ``tEXt`` chunk, which would make
+    the committed bytes depend on the writer version rather than on the figure.
+    Ancillary text and timestamp chunks are removed; image chunks are copied
+    verbatim with their original CRCs.
+    """
+
+    import struct
+
+    data = path.read_bytes()
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise ValueError(f"{path} is not a PNG file")
+    dropped = {b"tEXt", b"zTXt", b"iTXt", b"tIME"}
+    kept = [data[:8]]
+    offset = 8
+    while offset < len(data):
+        length = struct.unpack(">I", data[offset : offset + 4])[0]
+        chunk = data[offset : offset + 12 + length]
+        if chunk[4:8] not in dropped:
+            kept.append(chunk)
+        offset += 12 + length
+    path.write_bytes(b"".join(kept))
 
 
 def _normalise_svg(path: Path) -> None:
@@ -387,9 +415,7 @@ def build_figures(output_dir: Path = FIGURE_DIR) -> list[Path]:
         axes[1].legend()
         fig.tight_layout()
         path = output_dir / "fig3_seeded_run.svg"
-        fig.savefig(path, format="svg", bbox_inches="tight")
-        _normalise_svg(path)
-        fig.savefig(path.with_suffix(".png"), format="png", dpi=180, bbox_inches="tight")
+        _save_figure(fig, path)
         paths.append(path)
     finally:
         plt.close(fig)
@@ -440,13 +466,44 @@ def _write_outputs(compiled: str) -> Path:
     return output
 
 
+def png_structure_failures(path: Path) -> list[str]:
+    """Return structural problems with a committed PNG figure, if any.
+
+    Rasterized bytes are produced by the host toolchain, so a PNG is checked by
+    structure rather than by byte equality: signature, a leading ``IHDR`` chunk,
+    a plausible canvas, 8-bit samples, and RGB/RGBA colour. The SVG companion
+    keeps the byte-identity check.
+    """
+
+    import struct
+
+    data = path.read_bytes()
+    if data[:8] != b"\x89PNG\r\n\x1a\n" or data[12:16] != b"IHDR":
+        return [f"{path.name} is not a PNG with a leading IHDR chunk"]
+    width, height, bit_depth, color_type = struct.unpack(">IIBB", data[16:26])
+    failures: list[str] = []
+    if not (1 <= width <= 10000 and 1 <= height <= 10000):
+        failures.append(f"{path.name} has an implausible canvas {width}x{height}")
+    if bit_depth != 8:
+        failures.append(f"{path.name} has bit depth {bit_depth}, expected 8")
+    if color_type not in (2, 6):
+        failures.append(f"{path.name} has colour type {color_type}, expected RGB or RGBA")
+    return failures
+
+
 def _check_figures_against_committed() -> list[str]:
-    """Return committed figure filenames that drift from a fresh, content-identical build.
+    """Return committed figure problems against a fresh, content-identical build.
 
     Regenerates the figures into a temporary directory and compares every
-    committed SVG/PNG byte-for-byte against the fresh output. This is a
+    committed SVG byte-for-byte against the fresh output. This is a
     checkout-independent drift baseline: it does not depend on ``git diff``
     state, so a stale or hand-edited committed figure is always caught.
+
+    SVG output is vector data and reproducible once ``_normalise_svg`` has
+    removed build dates and dynamic identifiers. PNG output is rasterized by
+    the host toolchain and legitimately differs across hosts, so the committed
+    raster is checked structurally (:func:`png_structure_failures`) and the
+    release gate excludes figure PNG bytes from its generated-drift diff.
     """
     import tempfile
     from filecmp import cmp
@@ -460,8 +517,13 @@ def _check_figures_against_committed() -> list[str]:
             if not committed.is_file():
                 continue
             fresh = produced.get(committed.name)
-            if fresh is None or not cmp(fresh, committed, shallow=False):
-                drift.append(committed.name)
+            if fresh is None:
+                drift.append(f"{committed.name} (missing from a fresh build)")
+            elif committed.suffix == ".svg":
+                if not cmp(fresh, committed, shallow=False):
+                    drift.append(f"{committed.name} (SVG bytes differ from a fresh build)")
+            else:
+                drift.extend(png_structure_failures(committed))
     return drift
 
 

@@ -73,3 +73,33 @@ def test_docs_link_checker_reports_broken_links_and_anchors(tmp_path):
     assert not any("fake.md" in message for message in messages)
     assert not any("example.com" in message for message in messages)
     assert not any("same-file anchor" in message for message in messages)
+
+
+def test_generated_svgs_are_byte_stable_across_builds(tmp_path):
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    builder.build_figures(first)
+    builder.build_figures(second)
+
+    svgs = sorted(first.glob("*.svg"))
+    assert svgs
+    for svg in svgs:
+        assert svg.read_bytes() == (second / svg.name).read_bytes()
+
+
+def test_generated_pngs_carry_no_toolchain_metadata(tmp_path):
+    builder.build_figures(tmp_path)
+
+    pngs = sorted(tmp_path.glob("*.png"))
+    assert pngs
+    for png in pngs:
+        assert b"Matplotlib version" not in png.read_bytes()
+
+
+def test_committed_figures_are_structurally_valid():
+    svgs = sorted(builder.FIGURE_DIR.glob("*.svg"))
+    assert svgs
+    for svg in svgs:
+        png = svg.with_suffix(".png")
+        assert png.is_file(), f"missing raster companion for {svg.name}"
+        assert builder.png_structure_failures(png) == []

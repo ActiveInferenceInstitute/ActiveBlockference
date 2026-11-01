@@ -30,3 +30,13 @@ the labels in `SYNTAX.md`, and citations use keys from `references.bib`.
 The composed Markdown and optional PDF live under `docs/_build/`, which is
 reproducible and excluded from version control. Change the ordered source,
 then rerun the builder and validation commands.
+
+## Figure bytes
+
+`figures/` keeps both an SVG and a PNG for every figure. The SVGs are
+byte-compared against a fresh build (`--check`); the PNGs are rasterized by the
+host toolchain, so their bytes differ across hosts. Generated PNGs are
+normalized to drop toolchain-version metadata chunks, and the committed rasters
+are checked structurally instead of byte-for-byte. The release gate excludes
+figure PNG bytes from its generated-drift diff for the same reason. Every other
+generated artifact stays byte-compared.

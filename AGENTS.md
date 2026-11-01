@@ -8,14 +8,30 @@ expected-free-energy evaluation, action sampling, and prior propagation.
 
 ```bash
 uv sync --locked --extra dev
-uv run ruff check blockference tests
+uv run ruff check blockference tests scripts GRTs
 uv run pytest
+uv run python scripts/release_check.py
 ```
 
 Use absolute `blockference.*` imports, NumPy-style docstrings, and 100-column
 Ruff formatting. Runtime dependencies belong in `pyproject.toml` and the
 generated `uv.lock`. Do not commit generated result files, caches, virtual
 environments, or notebook checkpoints.
+
+## Generative-model specification
+
+The grid-world model is declared in `specs/gridworld_3x3.gnn.md` (Generalized
+Notation Notation) and generated from the implementation by
+`blockference.gnn.render_spec`; `uv run python scripts/export_gnn_spec.py
+--check` fails when the committed document drifts. The upstream parser is
+pinned in `specs/gnn-pin.json` (GNN v5.0.3, commit `8f293d9ba`), and
+`scripts/validate_gnn_spec.py` parses the document with that revision, builds
+the runtime model from the declared parameters, and requires the declared
+matrices to match. That check needs an external runtime (`GNN_ROOT` or
+`GNN_RUNTIME_PYTHON`); the required CI job provisions one from the pin. Do not
+hand-edit `specs/gridworld_3x3.gnn.md`: change the model or fixture in
+`blockference/` and regenerate with `scripts/export_gnn_spec.py`. See
+`docs/gnn.md`.
 
 ## Contracts
 

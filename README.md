@@ -86,10 +86,24 @@ world.step({0: 1, 1: 0})
 
 * `blockference/` — installable library and CLI.
 * `configs/` — strict YAML/TOML examples.
+* `specs/` — the GNN declaration of the grid-world model and its pinned parser
+  record.
 * `docs/` — architecture, theory, API, and pipeline contracts.
 * `notebooks/` — executable current-API teaching notebooks.
 * `GRTs/` — optional provider-based local research workflow.
 * `tests/` — unit, integration, artefact, and notebook checks.
+
+## Generative-model specification
+
+The grid-world generative model is declared in
+[`specs/gridworld_3x3.gnn.md`](specs/gridworld_3x3.gnn.md) using
+[Generalized Notation Notation](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation)
+(GNN). The document is generated from the implementation and validated against
+the upstream parser pinned in [`specs/gnn-pin.json`](specs/gnn-pin.json)
+(GNN v5.0.3, commit `8f293d9ba`): the validator reads the declared parameters
+back, builds the runtime model from them, and requires the declared matrices to
+match exactly. See [`docs/gnn.md`](docs/gnn.md) for the commands and the
+conformance contract.
 
 See [`docs/README.md`](docs/README.md) for the documentation index,
 [`docs/api.md`](docs/api.md), [`docs/pipeline.md`](docs/pipeline.md), and
