@@ -30,3 +30,16 @@ the labels in `SYNTAX.md`, and citations use keys from `references.bib`.
 The composed Markdown and optional PDF live under `docs/_build/`, which is
 reproducible and excluded from version control. Change the ordered source,
 then rerun the builder and validation commands.
+
+## Figure bytes
+
+`figures/` keeps both an SVG and a PNG for every figure. Both formats are
+written by the host toolchain: matplotlib changes glyph identifiers, text
+layout, coordinate formatting, and rasterizer output between releases, and
+`uv.lock` resolves different matplotlib versions for different Python versions.
+Byte equality therefore holds inside one toolchain only, and
+`tests/test_publication.py` asserts it there. The committed figures are checked
+structurally by `--check` (well-formed SVG, positive viewBox, version-free
+Dublin Core title, text drawn as paths, plus the PNG canvas checks) and their
+bytes are excluded from the release gate's generated-drift diff. Every other
+generated artifact stays byte-compared.

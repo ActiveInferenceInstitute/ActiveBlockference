@@ -24,6 +24,7 @@ Choose the shortest path for your goal:
 | Run a first experiment | [`docs/tutorials/01_single_agent.md`](../docs/tutorials/01_single_agent.md) |
 | Configure a reproducible pipeline | [`docs/pipeline.md`](../docs/pipeline.md) and [`configs/README.md`](../configs/README.md) |
 | Understand the model and coordinates | [`docs/theory.md`](../docs/theory.md) and [`docs/architecture.md`](../docs/architecture.md) |
+| Read the generative-model specification | [`docs/gnn.md`](../docs/gnn.md) and [`specs/gridworld_3x3.gnn.md`](../specs/gridworld_3x3.gnn.md) |
 | Explore executable examples | [`notebooks/README.md`](../notebooks/README.md) |
 | Read the publication source | [`docs/manuscript/README.md`](../docs/manuscript/README.md) |
 | Contribute or report a bug | [`docs/contributing.md`](../docs/contributing.md) |
@@ -90,8 +91,11 @@ Run the same gate locally with:
 uv run python scripts/release_check.py
 ```
 
-The gate is intentionally fail-closed: a required check is not converted into
-a skip when an optional backend or generated artefact is unavailable. See
+A separate `gnn conformance` job installs the GNN revision pinned in
+`specs/gnn-pin.json` into its own Python 3.12 runtime and validates
+`specs/gridworld_3x3.gnn.md` against the declared runtime model. The gate is
+intentionally fail-closed: a required check is not converted into a skip when
+an optional backend or generated artefact is unavailable. See
 [`docs/development.md`](../docs/development.md) for the development workflow
 and [`docs/design-contract.md`](../docs/design-contract.md) for the project
 scope and invariants.
@@ -101,6 +105,7 @@ scope and invariants.
 ```text
 blockference/  installable library, CLI, environments, persistence, and viz
 configs/       strict examples and smoke configuration
+specs/         GNN model declaration and its pinned upstream parser record
 docs/          concepts, API, tutorials, development, and manuscript source
 notebooks/     executable teaching examples
 GRTs/          optional provider-based local research workflow

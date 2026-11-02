@@ -13,6 +13,8 @@ Start here if you are new to the repository:
 * [`theory.md`](theory.md) — the discrete Active Inference loop and matrix
   conventions.
 * [`architecture.md`](architecture.md) — module boundaries and data flow.
+* [`gnn.md`](gnn.md) — the GNN declaration of the grid-world model, the pinned
+  parser validation, and its commands.
 * [`design-contract.md`](design-contract.md) — scope, constraints, and release
   gates.
 * [`glossary.md`](glossary.md) — recurring terms and symbols.
