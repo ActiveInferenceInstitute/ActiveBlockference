@@ -105,6 +105,10 @@ back, builds the runtime model from them, and requires the declared matrices to
 match exactly. See [`docs/gnn.md`](docs/gnn.md) for the commands and the
 conformance contract.
 
+GNN maintains a [downstream adoption
+guide](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/main/docs/gnn/integration/downstream_adoption.md)
+for repositories that consume the notation.
+
 See [`docs/README.md`](docs/README.md) for the documentation index,
 [`docs/api.md`](docs/api.md), [`docs/pipeline.md`](docs/pipeline.md), and
 [`docs/development.md`](docs/development.md) for the complete contracts and
