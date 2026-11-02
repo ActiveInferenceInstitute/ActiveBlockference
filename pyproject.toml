@@ -33,9 +33,9 @@ classifiers = [
 dependencies = [
     "cadCAD>=0.4.28",
     "radcad>=0.12",
-    # radcad 0.14.0 requires numpy>=1.25,<1.26.4; numpy 2.x is unresolvable
+    # radcad 0.14.0 requires numpy>=1.25,<2.2.7; numpy 2.x is unresolvable
     # while radcad is a required runtime dependency (verified 2026-11-01).
-    "numpy>=1.25,<1.26.4",
+    "numpy>=1.25,<2.2.7",
     "pandas>=2.0",
     "matplotlib>=3.7",
     "seaborn>=0.12",
