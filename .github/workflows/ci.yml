@@ -21,7 +21,7 @@ jobs:
         python-version: ["3.10", "3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
         # v10.3.3; setup-uv publishes no floating v10 major tag, so @v10 is unresolvable
@@ -44,7 +44,7 @@ jobs:
 
       - name: Upload coverage
         if: matrix.python-version == '3.11'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage
           path: coverage.xml
@@ -60,7 +60,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
         # v10.3.3; setup-uv publishes no floating v10 major tag, so @v10 is unresolvable
