@@ -51,16 +51,29 @@ def _headings(path: Path) -> set[str]:
 
 
 def _markdown_files(root: Path) -> list[Path]:
-    """Return tracked Markdown files, falling back to a directory scan."""
+    """Return tracked Markdown files, falling back to a directory scan.
 
-    result = subprocess.run(
-        ["git", "-C", str(root), "ls-files", "*.md"],
+    ``git ls-files`` is only trusted when ``root`` is the repository top level:
+    a temporary or nested directory inside an unrelated repository would
+    otherwise yield that repository's files instead of the files under
+    ``root``.
+    """
+
+    toplevel = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
         capture_output=True,
         text=True,
         check=False,
     )
-    if result.returncode == 0:
-        return sorted(Path(name) for name in result.stdout.splitlines() if name)
+    if toplevel.returncode == 0 and Path(toplevel.stdout.strip()).resolve() == root.resolve():
+        result = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "--", "*.md"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0:
+            return sorted(Path(name) for name in result.stdout.splitlines() if name)
     return sorted(
         path
         for path in root.rglob("*.md")

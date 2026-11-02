@@ -242,12 +242,28 @@ def _normalise_png(path: Path) -> None:
 
 
 def _normalise_svg(path: Path) -> None:
-    """Make a generated SVG stable across processes and build dates."""
+    """Remove process, build-date, and writer-version metadata from a generated SVG.
+
+    The result is byte-stable for one matplotlib version, which the test suite
+    asserts, but it is not byte-stable across matplotlib versions: the writer
+    also changes glyph identifiers, text layout, and coordinate formatting
+    between releases. Committed SVGs are therefore verified structurally
+    (:func:`svg_structure_failures`) instead of byte-for-byte.
+    """
 
     text = path.read_text(encoding="utf-8")
     text = re.sub(
         r"<dc:date>[^<]+</dc:date>",
         "<dc:date>1970-01-01T00:00:00</dc:date>",
+        text,
+    )
+    # matplotlib writes its own version into the Dublin Core title, which would
+    # make the committed bytes depend on the writer version rather than on the
+    # figure (the lock resolves different versions for different Python
+    # versions, so CI would drift on every toolchain update).
+    text = re.sub(
+        r"<dc:title>Matplotlib v[^<]+</dc:title>",
+        "<dc:title>matplotlib, https://matplotlib.org/</dc:title>",
         text,
     )
     dynamic_id = re.compile(r"(?:p|m)[0-9a-f]{10}|C\d+_\d+_[0-9a-f]{10}")
@@ -471,8 +487,8 @@ def png_structure_failures(path: Path) -> list[str]:
 
     Rasterized bytes are produced by the host toolchain, so a PNG is checked by
     structure rather than by byte equality: signature, a leading ``IHDR`` chunk,
-    a plausible canvas, 8-bit samples, and RGB/RGBA colour. The SVG companion
-    keeps the byte-identity check.
+    a plausible canvas, 8-bit samples, and RGB/RGBA colour. The SVG companion is
+    checked structurally for the same reason; see :func:`svg_structure_failures`.
     """
 
     import struct
@@ -491,39 +507,83 @@ def png_structure_failures(path: Path) -> list[str]:
     return failures
 
 
+def svg_structure_failures(path: Path) -> list[str]:
+    """Return structural problems with a committed SVG figure, if any.
+
+    Vector bytes are written by the host's matplotlib version, and the lock
+    resolves different matplotlib versions for different Python versions, so an
+    SVG is checked by structure rather than by byte equality: a well-formed
+    document, a positive ``viewBox``, a Dublin Core title that records no
+    toolchain version, and text drawn as glyph outlines so the figure does not
+    depend on host fonts.
+    """
+
+    import xml.etree.ElementTree as ET
+
+    svg_namespace = "{http://www.w3.org/2000/svg}"
+    dc_title = "{http://purl.org/dc/elements/1.1/}title"
+    text = path.read_text(encoding="utf-8")
+    if not text.startswith("<?xml") or "<svg" not in text:
+        return [f"{path.name} is not an SVG document"]
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError as exc:
+        return [f"{path.name} is not well-formed XML: {exc}"]
+
+    failures: list[str] = []
+    try:
+        _, _, width, height = (float(value) for value in (root.get("viewBox") or "").split())
+    except ValueError:
+        failures.append(f"{path.name} has no usable viewBox {root.get('viewBox')!r}")
+    else:
+        if width <= 0 or height <= 0:
+            failures.append(f"{path.name} has a non-positive viewBox {width}x{height}")
+
+    title = next((element.text or "" for element in root.iter(dc_title)), None)
+    if title is None or not title.strip():
+        failures.append(f"{path.name} has no non-empty Dublin Core title")
+    elif re.search(r"\d+\.\d+", title):
+        failures.append(f"{path.name} records a toolchain version in its title: {title!r}")
+
+    if next(iter(root.iter(f"{svg_namespace}text")), None) is not None:
+        failures.append(f"{path.name} uses <text> elements; figures must draw text as paths")
+    if next(iter(root.iter(f"{svg_namespace}use")), None) is None:
+        failures.append(f"{path.name} draws no glyph outlines")
+    return failures
+
+
 def _check_figures_against_committed() -> list[str]:
     """Return committed figure problems against a fresh, content-identical build.
 
-    Regenerates the figures into a temporary directory and compares every
-    committed SVG byte-for-byte against the fresh output. This is a
-    checkout-independent drift baseline: it does not depend on ``git diff``
-    state, so a stale or hand-edited committed figure is always caught.
-
-    SVG output is vector data and reproducible once ``_normalise_svg`` has
-    removed build dates and dynamic identifiers. PNG output is rasterized by
-    the host toolchain and legitimately differs across hosts, so the committed
-    raster is checked structurally (:func:`png_structure_failures`) and the
-    release gate excludes figure PNG bytes from its generated-drift diff.
+    Regenerates the figures into a temporary directory. Every committed figure
+    must still be produced by that build and every fresh figure must be
+    committed; each committed artefact is then checked structurally, because
+    both SVG and PNG bytes depend on the host toolchain. matplotlib changes
+    glyph identifiers, text layout, coordinate formatting, and rasterizer
+    output between releases, and the lock resolves different matplotlib
+    versions for different Python versions, so byte equality only holds inside
+    one toolchain and is asserted there by ``tests/test_publication.py``. See
+    ``docs/manuscript/README.md``.
     """
     import tempfile
-    from filecmp import cmp
     from pathlib import Path
 
     drift: list[str] = []
     with tempfile.TemporaryDirectory(prefix="activeblockference-figcheck-") as directory:
         build_figures(Path(directory))
-        produced = {path.name: path for path in Path(directory).iterdir() if path.is_file()}
-        for committed in sorted(FIGURE_DIR.iterdir()):
-            if not committed.is_file():
-                continue
-            fresh = produced.get(committed.name)
-            if fresh is None:
-                drift.append(f"{committed.name} (missing from a fresh build)")
-            elif committed.suffix == ".svg":
-                if not cmp(fresh, committed, shallow=False):
-                    drift.append(f"{committed.name} (SVG bytes differ from a fresh build)")
-            else:
-                drift.extend(png_structure_failures(committed))
+        produced = {path.name for path in Path(directory).iterdir() if path.is_file()}
+        committed = {
+            path.name: path for path in sorted(FIGURE_DIR.iterdir()) if path.is_file()
+        }
+        for name in sorted(produced - committed.keys()):
+            drift.append(f"{name} (generated but not committed)")
+        for name, path in committed.items():
+            if name not in produced:
+                drift.append(f"{name} (missing from a fresh build)")
+            elif path.suffix == ".svg":
+                drift.extend(svg_structure_failures(path))
+            elif path.suffix == ".png":
+                drift.extend(png_structure_failures(path))
     return drift
 
 

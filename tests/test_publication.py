@@ -1,5 +1,6 @@
 """Tests for reproducible publication-asset handling."""
 
+import re
 from pathlib import Path
 
 import pytest
@@ -96,10 +97,46 @@ def test_generated_pngs_carry_no_toolchain_metadata(tmp_path):
         assert b"Matplotlib version" not in png.read_bytes()
 
 
+def test_generated_svgs_carry_no_toolchain_metadata(tmp_path):
+    builder.build_figures(tmp_path)
+
+    svgs = sorted(tmp_path.glob("*.svg"))
+    assert svgs
+    for svg in svgs:
+        text = svg.read_text(encoding="utf-8")
+        assert "Matplotlib v" not in text
+        assert "<dc:date>1970-01-01T00:00:00</dc:date>" in text
+
+
 def test_committed_figures_are_structurally_valid():
     svgs = sorted(builder.FIGURE_DIR.glob("*.svg"))
     assert svgs
     for svg in svgs:
         png = svg.with_suffix(".png")
         assert png.is_file(), f"missing raster companion for {svg.name}"
+        assert builder.svg_structure_failures(svg) == []
         assert builder.png_structure_failures(png) == []
+
+
+def test_svg_structure_failures_report_damaged_figures(tmp_path):
+    source = sorted(builder.FIGURE_DIR.glob("*.svg"))[0]
+    original = source.read_text(encoding="utf-8")
+    assert builder.svg_structure_failures(source) == []
+
+    def failures(name: str, text: str) -> list[str]:
+        path = tmp_path / name
+        path.write_text(text, encoding="utf-8")
+        return builder.svg_structure_failures(path)
+
+    assert "not an SVG document" in failures("blank.svg", "")[0]
+    assert "well-formed XML" in failures("truncated.svg", original[: len(original) // 2])[0]
+    versioned = re.sub(r"<dc:title>[^<]*</dc:title>", "<dc:title>Matplotlib v9.9.9</dc:title>", original)
+    assert "toolchain version" in failures("versioned.svg", versioned)[0]
+    untitled = re.sub(r"<dc:title>[^<]*</dc:title>", "", original)
+    assert "Dublin Core title" in failures("untitled.svg", untitled)[0]
+    text_element = original.replace("</defs>", '</defs><text x="1" y="1">label</text>')
+    assert "draw text as paths" in failures("text.svg", text_element)[0]
+    empty_box = re.sub(r'viewBox="[^"]*"', 'viewBox="0 0 0 0"', original)
+    assert "non-positive viewBox" in failures("empty.svg", empty_box)[0]
+    no_box = re.sub(r'viewBox="[^"]*"', "", original)
+    assert "no usable viewBox" in failures("nobox.svg", no_box)[0]

@@ -44,9 +44,13 @@ The manuscript source is under `docs/manuscript/`. Its ordered Markdown files,
 `scripts/build_manuscript.py` composes a numbered Markdown manuscript and can
 be passed to Pandoc for PDF or HTML rendering; `docs/_build/` is disposable.
 
-Figure SVG output is vector data and is byte-compared against a fresh build.
-Figure PNG output is rasterized by the host toolchain, so its bytes legitimately
-differ between the maintainer host and CI: the committed rasters are checked
-structurally (PNG signature, canvas, 8-bit RGB/RGBA) and their bytes are
-excluded from the release gate's generated-drift diff. Regenerate both formats
-with `uv run python scripts/build_manuscript.py`.
+Figure SVG and PNG output is written by the host toolchain, so its bytes
+legitimately differ between the maintainer host and CI: matplotlib changes
+glyph identifiers, text layout, coordinate formatting, and rasterizer output
+between releases, and `uv.lock` resolves different matplotlib versions for
+different Python versions. Committed figures are checked structurally (SVG:
+well-formed document, positive viewBox, version-free Dublin Core title, text
+drawn as paths; PNG: signature, canvas, 8-bit RGB/RGBA), their bytes are
+excluded from the release gate's generated-drift diff, and byte equality is
+asserted within one toolchain by `tests/test_publication.py`. Regenerate both
+formats with `uv run python scripts/build_manuscript.py`.

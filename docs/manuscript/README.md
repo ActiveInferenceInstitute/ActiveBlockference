@@ -33,10 +33,13 @@ then rerun the builder and validation commands.
 
 ## Figure bytes
 
-`figures/` keeps both an SVG and a PNG for every figure. The SVGs are
-byte-compared against a fresh build (`--check`); the PNGs are rasterized by the
-host toolchain, so their bytes differ across hosts. Generated PNGs are
-normalized to drop toolchain-version metadata chunks, and the committed rasters
-are checked structurally instead of byte-for-byte. The release gate excludes
-figure PNG bytes from its generated-drift diff for the same reason. Every other
+`figures/` keeps both an SVG and a PNG for every figure. Both formats are
+written by the host toolchain: matplotlib changes glyph identifiers, text
+layout, coordinate formatting, and rasterizer output between releases, and
+`uv.lock` resolves different matplotlib versions for different Python versions.
+Byte equality therefore holds inside one toolchain only, and
+`tests/test_publication.py` asserts it there. The committed figures are checked
+structurally by `--check` (well-formed SVG, positive viewBox, version-free
+Dublin Core title, text drawn as paths, plus the PNG canvas checks) and their
+bytes are excluded from the release gate's generated-drift diff. Every other
 generated artifact stays byte-compared.
