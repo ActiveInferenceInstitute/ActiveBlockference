@@ -77,9 +77,15 @@ jobs:
 
       - name: Provision the pinned GNN parser runtime
         run: |
+          set -euo pipefail
+          PIN=specs/gnn-pin.json
+          PY=$(uv python find --no-project 3.12)
+          REPO=$("$PY" -c "import json;print(json.load(open('$PIN'))['repository'])")
+          COMMIT=$("$PY" -c "import json;print(json.load(open('$PIN'))['commit'])")
           uv venv --python 3.12 "$RUNNER_TEMP/gnn-runtime"
+          # The install follows specs/gnn-pin.json; a pin bump re-points it.
           uv pip install --python "$RUNNER_TEMP/gnn-runtime/bin/python" \
-            "generalized-notation-notation @ git+https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation@8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1"
+            "generalized-notation-notation @ git+${REPO}@${COMMIT}"
 
       - name: Validate the GNN specification against the pinned parser
         run: >-
