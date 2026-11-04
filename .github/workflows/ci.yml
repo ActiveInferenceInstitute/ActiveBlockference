@@ -56,7 +56,7 @@ jobs:
     # because the GNN distribution requires numpy>=2 while this package
     # resolves numpy 1.x; the validator verifies the installed parser file
     # digests against the pin record before parsing.
-    name: gnn conformance (pinned v5.0.3)
+    name: gnn conformance (pinned)
     runs-on: ubuntu-latest
 
     steps:
@@ -91,3 +91,12 @@ jobs:
         run: >-
           uv run python scripts/validate_gnn_spec.py
           --gnn-runtime "$RUNNER_TEMP/gnn-runtime/bin/python" --json
+
+      - name: Report the resolved GNN version
+        run: |
+          PIN=specs/gnn-pin.json
+          VERSION=$("$RUNNER_TEMP/gnn-runtime/bin/python" -c 'import gnn; print(gnn.__version__)')
+          TAG=$(python3 -c "import json;print(json.load(open('$PIN'))['tag'])")
+          test -n "$VERSION"
+          test "$VERSION" = "${TAG#v}"
+          echo "gnn-version=${VERSION}" >> "$GITHUB_STEP_SUMMARY"
