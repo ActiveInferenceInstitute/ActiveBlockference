@@ -25,7 +25,7 @@ locations and creates the directories on demand.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 __all__ = ["RunPaths", "build_run_paths"]
@@ -157,7 +157,7 @@ def build_run_paths(
     if not all(char.isprintable() for char in name):
         raise ValueError("run_name must contain printable characters only")
     if timestamped:
-        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
         name = f"{name}-{ts}"
     root_path = Path(root)
     if any(part == ".." for part in root_path.parts):
