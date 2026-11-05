@@ -109,4 +109,5 @@ disable_error_code = ["import-untyped"]
 check_untyped_defs = true
 
 [tool.uv]
+required-version = "==0.13.7"
 constraint-dependencies = ["pillow>=13.0.0", "tornado>=6.6"]
