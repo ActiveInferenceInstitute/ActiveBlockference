@@ -27,6 +27,7 @@ jobs:
         # v10.3.3; setup-uv publishes no floating v10 major tag, so @v10 is unresolvable
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: "uv.lock"
 
@@ -66,6 +67,7 @@ jobs:
         # v10.3.3; setup-uv publishes no floating v10 major tag, so @v10 is unresolvable
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2
         with:
+          version: "0.13.7"
           enable-cache: true
           cache-dependency-glob: "uv.lock"
 
