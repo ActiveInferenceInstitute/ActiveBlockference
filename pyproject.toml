@@ -107,3 +107,6 @@ python_version = "3.12"
 ignore_missing_imports = true
 disable_error_code = ["import-untyped"]
 check_untyped_defs = true
+
+[tool.uv]
+constraint-dependencies = ["pillow>=13.0.0", "tornado>=6.6"]
