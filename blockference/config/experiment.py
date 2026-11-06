@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import tomllib
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -10,12 +11,6 @@ from typing import Any
 import yaml
 
 from blockference.actions import DEFAULT_AFFORDANCES, validate_affordances
-
-try:
-    import tomllib
-except ImportError:  # pragma: no cover - Python 3.10 fallback
-    import tomli as tomllib  # type: ignore[no-redef]
-
 
 SUPPORTED_ENGINES: tuple[str, ...] = ("radcad", "cadcad")
 
