@@ -1,9 +1,10 @@
 # ActiveBlockference TODO
 
 Owner: Active Inference Institute
-Last reviewed: 2026-08-02
+Last reviewed: 2026-11-11
 
-This file records documentation findings from the 2026-08-02 DOCS-DEEP pass.
+This file records documentation findings from the 2026-08-02 DOCS-DEEP pass and
+the 2026-11-11 completeness pass.
 Items are grouped by the size of the documentation change required:
 
 * **Minor** — typo, broken link, stale path, or formatting correction.
@@ -39,6 +40,13 @@ Items are grouped by the size of the documentation change required:
       gate step so documentation drift fails the canonical gate. (0c16ab8)
 - [x] Add `SECURITY.md` with a private-advisory disclosure path and factual
       security-relevant project behaviour. (96a02e3)
+- [ ] Reconcile the Python-version claim. `docs/manuscript/00_abstract.md`
+      describes a "Python 3.10+" implementation and
+      `requirements.txt`/`pyproject.toml` keep a
+      `python_version < '3.11'` `tomli` fallback, but `pyproject.toml` declares
+      `requires-python = ">=3.11"`. The manuscript is publication source, so it
+      was recorded rather than edited here; decide whether to raise the
+      manuscript claim to 3.11+ or lower the package floor to 3.10.
 
 ## Major
 
@@ -48,7 +56,8 @@ an executable publication validator.
 
 ## Open / deferred
 
-Nothing open — all items scoped during the docs-deep review are complete.
+- The Python-version claim under **Medium** is open pending an owner decision on
+  which side to change. All 2026-08-02 docs-deep items remain complete.
 
 ## Verification notes
 

@@ -8,6 +8,16 @@ artefacts, and fail-closed validation.
 [![CI](https://github.com/ActiveInferenceInstitute/ActiveBlockference/actions/workflows/ci.yml/badge.svg)](https://github.com/ActiveInferenceInstitute/ActiveBlockference/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+## Contents
+
+- [Quick start](#quick-start)
+- [Reliability and contracts](#reliability-and-contracts)
+- [Python API](#python-api)
+- [Repository map](#repository-map)
+- [Generative-model specification](#generative-model-specification)
+- [Documentation](docs/README.md)
+- [InstituteOS sidecar](#instituteos-sidecar)
+
 ## Quick start
 
 ```bash
