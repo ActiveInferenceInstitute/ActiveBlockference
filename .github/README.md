@@ -32,7 +32,7 @@ Choose the shortest path for your goal:
 
 ## Quick start
 
-Requires Python 3.10 or newer and [`uv`](https://docs.astral.sh/uv/).
+Requires Python 3.11 or newer and [`uv`](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync --locked --extra dev
@@ -74,7 +74,7 @@ do not require either extra.
 ## Verification and CI
 
 The GitHub Actions workflow runs on pushes and pull requests targeting
-`main`, using the committed `uv.lock` on Python 3.10, 3.11, and 3.12. Each
+`main`, using the committed `uv.lock` on Python 3.11 and 3.12. Each
 matrix job runs the canonical release gate, which covers:
 
 * Ruff linting and repository-wide Markdown link/anchor validation;

@@ -1,6 +1,6 @@
 # ActiveBlockference contributor guide
 
-ActiveBlockference is a Python 3.10+ package for discrete Active Inference
+ActiveBlockference is a Python 3.11+ package for discrete Active Inference
 models in radCAD and cadCAD. The canonical loop is observation, inference,
 expected-free-energy evaluation, action sampling, and prior propagation.
 
