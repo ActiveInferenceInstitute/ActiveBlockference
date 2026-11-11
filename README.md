@@ -115,3 +115,11 @@ See [`docs/README.md`](docs/README.md) for the documentation index,
 workflow. Contributions are described in [`docs/contributing.md`](docs/contributing.md);
 security issues are reported privately per [`SECURITY.md`](SECURITY.md); the
 repository is released under the [MIT License](LICENSE).
+
+## InstituteOS sidecar
+
+This repository carries a committed [`.aii/`](.aii/README.md) sidecar with curated
+InstituteOS metadata (`aii-sidecar/v1`): category, maturity, ecosystem relations,
+key artifacts, provenance, and portable tasks. It is read by
+[InstituteOS](https://github.com/ActiveInferenceInstitute/InstituteOS) tooling and
+does not affect the project's build or runtime.

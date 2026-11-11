@@ -9,6 +9,8 @@ updates:
         patterns:
           - "*"
 
+    cooldown:
+      default-days: 7
   - package-ecosystem: "uv"
     directory: "/"
     schedule:
@@ -17,3 +19,5 @@ updates:
       pip-dependencies:
         patterns:
           - "*"
+    cooldown:
+      default-days: 7

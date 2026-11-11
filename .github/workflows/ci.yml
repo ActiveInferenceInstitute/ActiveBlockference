@@ -11,8 +11,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   test:
+    timeout-minutes: 120
     name: test (py${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
@@ -52,6 +56,7 @@ jobs:
           if-no-files-found: ignore
 
   gnn-conformance:
+    timeout-minutes: 120
     # Validates the committed GNN specification with the parser pinned in
     # specs/gnn-pin.json. The pinned revision is installed into a separate runtime
     # because the GNN distribution requires numpy>=2 while this package

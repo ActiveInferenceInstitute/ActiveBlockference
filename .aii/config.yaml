@@ -1,13 +1,15 @@
-# AII sidecar — InstituteOS metadata. Schema: instituteos.platform.aii_sidecar
+# AII sidecar — InstituteOS metadata. Schema: aii_platform.aii_sidecar
 meta:
-  updated: '2026-06-30'
+  sidecar_version: 1.2.1
+  updated: '2026-11-10'
 repo:
   name: ActiveBlockference
   slug: activeblockference
   full_name: ActiveInferenceInstitute/ActiveBlockference
-  description: '> **Active Inference agents in cadCAD** — discrete-state generative
-    models for > grid-world, multi-agent, and graph-structured environments, expressed
-    as > [cadCAD](https://github.com/cadCAD-org/cadCAD) /…'
+  description: ActiveBlockference is a CPU-oriented Active Inference library for deterministic,
+    discrete-state radCAD and cadCAD grid simulations. It provides strict YAML/TOML
+    configuration, canonical (y, x) dynamics, persisted diagnostics, rendered artefacts,
+    and fail-closed validation.
 institute:
   category: research-software
   maturity: released
@@ -19,6 +21,11 @@ ecosystem:
     note: Federated via the InstituteOS .aii manifest.
   - repo: ActiveInferenceInstitute/Active_Inference_Ontology
     note: Uses Active Inference Ontology terms.
+  - repo: ActiveInferenceInstitute/pymdp
+    relation: depends-on
+    note: Consumes the pymdp active-inference library.
+  - repo: ActiveInferenceInstitute/Generalized_Notation_Notation
+    note: Uses Generalized Notation Notation (GNN) for model specifications.
   links:
     github: https://github.com/ActiveInferenceInstitute/ActiveBlockference
     website: https://www.activeinference.org
@@ -32,25 +39,41 @@ artifacts:
 - path: LICENSE
   kind: doc
   description: License.
+- path: AGENTS.md
+  kind: doc
+  description: Agent guidance.
+- path: tests
+  kind: test
+  description: Test suite.
+- path: docs
+  kind: doc
+  description: Documentation tree.
 provenance:
   license: MIT
   citation:
     text: Active Inference Institute — ActiveBlockference.
 instituteos:
   tags:
-  - active
   - active-inference
   - cadcad
-  - inference
   - simulation
-  - jupyter notebook
+  - jupyter
+  - python
 capabilities:
 - python-package
 - tested
 - documentation
 - notebooks
 - dataset
+- ci
 tasks:
   test:
     cmd: python -m pytest
     description: Run the test suite.
+docs:
+- README.md
+- AGENTS.md
+- docs/INTEGRATION.md
+- docs/README.md
+- docs/AGENTS.md
+schema: aii-sidecar/v1
