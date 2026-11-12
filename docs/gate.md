@@ -34,7 +34,7 @@ measurements.
 | `test-full` | `uv run pytest --cov=blockference --cov-report=term --cov-report=xml --cov-fail-under=90` | yes |
 | `docs` | `scripts/check_docs_links.py`, `scripts/gate_metrics.py --check` | yes |
 | `manuscript` | `scripts/manuscript_variables.py --check`, `scripts/validate_manuscript.py`, `scripts/build_manuscript.py`, `scripts/build_manuscript.py --check`; the `gnn_*` variables come from `gnn.importers` in the pinned runtime | yes |
-| `gnn` | `scripts/export_gnn_spec.py --check`, the shared `python -m gnn.importers check --repo .` pin and pointer check, and real pinned `scripts/validate_gnn_spec.py` validation; missing runtime fails | yes |
+| `gnn` | `scripts/export_gnn_spec.py --check`, the shared `python -m gnn.importers check --repo .` pin and pointer check, and real pinned `scripts/validate_gnn_spec.py --verify-tag-remote` validation (parser digests before parsing, the pin's tag resolved upstream to the pinned commit; needs network); missing runtime fails | yes |
 | `smoke` | pipeline, validation, and standalone `run` JSON smoke checks in a temporary directory | yes |
 | `package` | `uv build`, locked `uv export` constraints for clean-wheel dependencies, and isolated import outside the source tree | yes |
 | `render` | `scripts/build_manuscript.py --render pdf` (Pandoc + XeLaTeX) | no |

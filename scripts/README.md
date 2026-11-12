@@ -13,7 +13,7 @@ Repository gates and generators, all run from the repository root:
 | `execute_notebooks.py` | Parses and executes every tracked notebook from the repository root. |
 | `validate_notebooks.py` | Notebook hygiene checks before execution. |
 | `export_gnn_spec.py` | Writes or verifies `specs/gridworld_3x3.gnn.md` from the implementation. |
-| `validate_gnn_spec.py` | Validates the committed specification with the pinned parser, using a separate interpreter selected by `--gnn-runtime` or the documented environment variables. |
+| `validate_gnn_spec.py` | Validates the committed specification with the pinned parser, using a separate interpreter selected by `--gnn-runtime` or the documented environment variables. Verifies the parser digests before parsing, binds the pin's tag to its commit (`--gnn-root` checkout or `--verify-tag-remote`; mismatch fails as `tag-commit-mismatch`), and compares the installed runtime's recorded commit with the pin. |
 | `gnn_parser_probe.py` | Imports the upstream `gnn` parser; runs as a subprocess under the pin. |
 | `gnn_importer_report.py` | Imports the upstream `gnn.importers` reader and prints this repository's normalized pin and `gnn-importer-variables/v1` map for the two scripts above. |
 
