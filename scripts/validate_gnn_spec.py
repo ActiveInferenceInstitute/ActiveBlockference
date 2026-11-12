@@ -147,6 +147,30 @@ def run_probe(
         environment["PYTHONPATH"] = str(source / "src") + (
             os.pathsep + existing if existing else ""
         )
+    checker = subprocess.run(
+        [
+            python,
+            "-m",
+            "gnn.importers",
+            "check",
+            "--repo",
+            ".",
+            "--require-pointer",
+            "--workflow",
+            ".github/workflows/ci.yml",
+            "--job",
+            "gnn-conformance",
+        ],
+        cwd=ROOT,
+        stdin=subprocess.DEVNULL,
+        check=False,
+        env=environment,
+    )
+    if checker.returncode != 0:
+        raise Unavailable(
+            f"shared GNN importer check failed with {python} (exit {checker.returncode}); "
+            "the pinned runtime must provide gnn.importers and pass its check"
+        )
     completed = subprocess.run(
         [python, str(PROBE), "--spec", str(spec), "--output", str(output)],
         capture_output=True,

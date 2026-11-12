@@ -20,4 +20,9 @@ with the pinned `MarkdownGNNParser`, and compares the declared parameters and th
 `B`, `C`, `D`, and `E` matrices against the runtime model built by
 `blockference.gnn`; it also requires the pinned semantic validator, the
 B-orientation check, and the consistency checker to report no errors or
-warnings. It does not scan the rest of the repository for `*.gnn.md`.
+warnings. Before that model-specific probe, it runs
+`python -m gnn.importers check --repo . --require-pointer --workflow .github/workflows/ci.yml --job gnn-conformance`
+from the same pinned environment. That reader discovers the repository's
+`*.gnn.md` specifications. The current pin lacks `gnn.importers`, so the arm
+fails closed and the migration remains blocked; see
+[`docs/gnn.md`](../docs/gnn.md#gnnfep-migration-blocked-by-the-current-pin).

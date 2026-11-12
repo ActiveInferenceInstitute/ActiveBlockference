@@ -56,6 +56,29 @@ An unavailable runtime fails the arm and `all`; no opt-in requirement flag or
 skip mode is needed. See [`gate.md`](gate.md) for the canonical gate commands
 and exact CI map.
 
+### GNN–FEP migration blocked by the current pin
+
+The [GNN–FEP contract](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/main/docs/workflows/gnn-fep.md)
+requires the shared reader to run from the pinned parser environment. Before
+the model-specific probe, the `gnn` arm now invokes that environment's Python:
+
+```bash
+python -m gnn.importers check --repo . --require-pointer \
+    --workflow .github/workflows/ci.yml --job gnn-conformance
+```
+
+The current pinned commit does not contain `src/gnn/importers.py`. Consequently
+this check fails; it must not import a newer live checkout to appear green.
+The pointer already names the pin, revision, workflow and job.
+
+Migration is incomplete: removing `blockference.gnn.load_pin`, replacing the
+validator's duplicate pin checks, and using `gnn.importers.importer_variables`
+in `scripts/manuscript_variables.py` require a pinned revision that supplies
+those APIs. The pin and its schema remain unchanged pending that decision.
+The manuscript producer's rename is due at the next manuscript render, as the
+contract specifies; this migration does not render a manuscript.
+
+
 ## What the validation checks
 
 1. The pin: the resolved commit equals `specs/gnn-pin.json` and every recorded
