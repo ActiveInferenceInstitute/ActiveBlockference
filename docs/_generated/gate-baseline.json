@@ -1,0 +1,77 @@
+{
+  "schema": "activeblockference-gate-baseline/v1",
+  "measured": "2026-11-12",
+  "host": "macOS-27.0.1-arm64-arm-64bit",
+  "python": "3.12.16",
+  "conditions": "One manual run per command before the composable gate landed, on the same host. Other estate jobs drove the load average to about 100 and all caches were warm, so these are historical evidence, not a controlled benchmark.",
+  "arms": {
+    "lint": {
+      "seconds": 0.34,
+      "comparable": true,
+      "commands": [
+        {"command": "uv run ruff check blockference tests GRTs scripts", "seconds": 0.34}
+      ]
+    },
+    "types": {
+      "seconds": 10.35,
+      "comparable": false,
+      "note": "The baseline mypy run targeted Python 3.12; the arm now targets the requires-python floor (3.11).",
+      "commands": [
+        {"command": "uv run mypy blockference", "seconds": 10.35}
+      ]
+    },
+    "test-full": {
+      "seconds": 88.77,
+      "comparable": false,
+      "note": "The baseline was `uv run pytest` without `--cov` or `--cov-fail-under=90`; the arm runs coverage. Recorded result: 84 passed, 1 skipped.",
+      "commands": [
+        {"command": "uv run pytest", "seconds": 88.77}
+      ]
+    },
+    "docs": {
+      "seconds": 0.22,
+      "comparable": false,
+      "note": "The baseline ran only the link/anchor checker; the arm also verifies the generated metrics document.",
+      "commands": [
+        {"command": "uv run python scripts/check_docs_links.py", "seconds": 0.22}
+      ]
+    },
+    "manuscript": {
+      "seconds": 18.81,
+      "comparable": false,
+      "note": "The baseline ran validation, build, and the build check; the arm also verifies the generated variables file.",
+      "commands": [
+        {"command": "uv run python scripts/validate_manuscript.py", "seconds": 3.85},
+        {"command": "uv run python scripts/build_manuscript.py", "seconds": 7.24},
+        {"command": "uv run python scripts/build_manuscript.py --check", "seconds": 7.72}
+      ]
+    },
+    "gnn": {
+      "seconds": 14.8,
+      "comparable": true,
+      "commands": [
+        {"command": "uv run python scripts/export_gnn_spec.py --check", "seconds": 3.08},
+        {"command": "uv run python scripts/validate_gnn_spec.py --json", "seconds": 11.72}
+      ]
+    },
+    "smoke": {
+      "seconds": 15.42,
+      "comparable": true,
+      "commands": [
+        {"command": "uv run blockference pipeline --config configs/smoke.yml --output-root <temporary>/output --run-name gate_smoke", "seconds": 7.57},
+        {"command": "uv run blockference validation --run-dir <temporary>/output/gate_smoke", "seconds": 3.66},
+        {"command": "uv run blockference run --config configs/smoke.yml --output <temporary>/run.csv", "seconds": 4.19}
+      ]
+    },
+    "package": {
+      "seconds": 17.67,
+      "comparable": true,
+      "commands": [
+        {"command": "uv build", "seconds": 4.98},
+        {"command": "uv venv --python <project>/.venv/bin/python <temporary>/venv", "seconds": 0.04},
+        {"command": "uv pip install --python <temporary>/venv/bin/python dist/*.whl", "seconds": 1.01},
+        {"command": "<temporary>/venv/bin/python -c \"from blockference import GridWorld; ...\"", "seconds": 11.64}
+      ]
+    }
+  }
+}

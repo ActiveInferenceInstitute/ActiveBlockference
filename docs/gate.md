@@ -12,8 +12,10 @@ uv run python scripts/release_check.py --list       # arms and their commands
 ```
 
 Measured wall times and test counts live in the generated
-[`_generated/gate-metrics.md`](_generated/gate-metrics.md). Do not hand-edit
-those numbers: refresh them with the commands the generated page records.
+[`_generated/gate-metrics.md`](_generated/gate-metrics.md), which shows the
+recorded before/after arm times and labels baseline workloads that are not
+equivalent to their arms. Do not hand-edit those numbers: refresh them with the
+commands the generated page records.
 
 ## Arms
 
