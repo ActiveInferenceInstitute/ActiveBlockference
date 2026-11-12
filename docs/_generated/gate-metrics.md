@@ -4,7 +4,7 @@
 
 Measured wall times from recorded canonical gate observations on `macOS-27.0.1-arm64-arm-64bit` with Python 3.12.16 at `2026-11-12T13:56:34Z`.
 
-First successful measurements retained for each arm. Package initially failed twice because offline pandas wheel metadata was unavailable; only package and the not-yet-run render arm were then run after SHA-256-verified acquisition of the exact pandas wheel in uv.lock. Those failures remain in this receipt’s runs. UV_FIND_LINKS pointed to that verified local wheelhouse for the successful package run. Baseline and after test selections differ by the new regression cases. No speedup is claimed.
+First successful measurements retained for each arm. Package initially failed twice because offline pandas wheel metadata was unavailable; only package and the not-yet-run render arm were then run after SHA-256-verified acquisition of the exact pandas wheel in uv.lock. Those failures remain in this receipt’s runs. UV_FIND_LINKS pointed to that verified local wheelhouse for the successful package run. Baseline and after test selections differ by the new regression cases. No speedup is claimed. Audit refresh retains the earlier observations and two failed full-suite runs in runs; the notebook validator initially recursed into gitignored, untracked GNN migration build output. That output was moved aside without tracked changes for the successful 103-test run, then restored. Current lint, types, docs, GNN, render and full-suite observations are refreshed; other arm observations remain historical. The fresh render artifact was identified by the gate producer from source commit 2193be7b0be3fc429f4a8d159d4b96b249b12060.
 
 Refresh with:
 
@@ -20,16 +20,16 @@ uv run python scripts/gate_metrics.py --record-timings /tmp/gate-after.json
 
 | Arm | Before (s) | Before status | After (s) | After status | After command |
 | --- | --- | --- | --- | --- | --- |
-| `lint` | 0.11 | passed | 0.08 | passed | `uv run ruff check blockference tests GRTs scripts` |
-| `types` | 0.61 | passed | 0.3 | passed | `uv run mypy blockference` |
+| `lint` | 0.11 | passed | 0.03 | passed | `uv run ruff check blockference tests GRTs scripts` |
+| `types` | 0.61 | passed | 1.06 | passed | `uv run mypy blockference` |
 | `test` | 33.27 | passed | 4.82 | passed | `uv run pytest -m not slow` |
-| `test-full` | 55.38 | passed | 31.17 | passed | `uv run pytest --cov=blockference --cov-report=term --cov-report=xml --cov-fail-under=90` |
-| `docs` | 7.45 | passed | 3.56 | passed | `uv run python scripts/check_docs_links.py` |
+| `test-full` | 55.38 | passed | 44.22 | passed | `uv run pytest --cov=blockference --cov-report=term --cov-report=xml --cov-fail-under=90` |
+| `docs` | 7.45 | passed | 5.28 | passed | `uv run python scripts/check_docs_links.py` |
 | `manuscript` | 6.04 | passed | 3.24 | passed | `uv run python scripts/manuscript_variables.py --check` |
-| `gnn` | 2.78 | passed | 1.51 | passed | `uv run python scripts/export_gnn_spec.py --check` |
+| `gnn` | 2.78 | passed | 2.0 | passed | `uv run python scripts/export_gnn_spec.py --check` |
 | `smoke` | 3.48 | passed | 2.55 | passed | `uv run blockference pipeline --config configs/smoke.yml --output-root /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-gate-vx7lf7ds/output --run-name gate_smoke` |
 | `package` | 0.08 | failed | 14.86 | passed | `uv build` |
-| `render` | 4.04 | passed | 6.18 | passed | `uv run python scripts/build_manuscript.py --render pdf` |
+| `render` | 4.04 | passed | 4.46 | passed | `uv run python scripts/build_manuscript.py --render pdf` |
 
 Baseline workloads that are not equivalent to their arms:
 
@@ -43,13 +43,13 @@ The baseline and current receipts are historical evidence. Timings include host 
 
 | Selection | Collected tests |
 | --- | --- |
-| full suite | 92 |
-| fast (`-m "not slow"`) | 79 |
+| full suite | 103 |
+| fast (`-m "not slow"`) | 90 |
 | slow (`-m slow`) | 13 |
 
-Recorded run: 92 passed, 0 skipped.
+Recorded run: 103 passed, 0 skipped.
 
-`test-full` recorded 90.94% line coverage of `blockference` (floor 90%).
+`test-full` recorded 91.02% line coverage of `blockference` (floor 90%).
 
 ## Receipts
 

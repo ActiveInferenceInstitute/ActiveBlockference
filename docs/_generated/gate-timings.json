@@ -5,7 +5,7 @@
         "uv run python scripts/check_docs_links.py",
         "uv run python scripts/gate_metrics.py --check"
       ],
-      "seconds": 3.56,
+      "seconds": 5.28,
       "status": "passed"
     },
     "gnn": {
@@ -13,14 +13,14 @@
         "uv run python scripts/export_gnn_spec.py --check",
         "uv run python scripts/validate_gnn_spec.py --gnn-runtime /private/tmp/gnn-rt-503/bin/python --json"
       ],
-      "seconds": 1.51,
+      "seconds": 2.0,
       "status": "passed"
     },
     "lint": {
       "commands": [
         "uv run ruff check blockference tests GRTs scripts"
       ],
-      "seconds": 0.08,
+      "seconds": 0.03,
       "status": "passed"
     },
     "manuscript": {
@@ -45,10 +45,16 @@
       "status": "passed"
     },
     "render": {
+      "artifact": {
+        "bytes": 262701,
+        "path": "docs/_build/manuscript/activeblockference.pdf",
+        "sha256": "77ee9b6ef9c83cc8b26ce5bd9130baa851ce5168b5d4207f3e2b3e16ce884f88",
+        "source_commit": "2193be7b0be3fc429f4a8d159d4b96b249b12060"
+      },
       "commands": [
         "uv run python scripts/build_manuscript.py --render pdf"
       ],
-      "seconds": 6.18,
+      "seconds": 4.46,
       "status": "passed"
     },
     "smoke": {
@@ -71,19 +77,19 @@
       "commands": [
         "uv run pytest --cov=blockference --cov-report=term --cov-report=xml --cov-fail-under=90"
       ],
-      "seconds": 31.17,
+      "seconds": 44.22,
       "status": "passed"
     },
     "types": {
       "commands": [
         "uv run mypy blockference"
       ],
-      "seconds": 0.3,
+      "seconds": 1.06,
       "status": "passed"
     }
   },
-  "completed": "2026-11-12T14:02:13Z",
-  "conditions": "First successful measurements retained for each arm. Package initially failed twice because offline pandas wheel metadata was unavailable; only package and the not-yet-run render arm were then run after SHA-256-verified acquisition of the exact pandas wheel in uv.lock. Those failures remain in this receipt\u2019s runs. UV_FIND_LINKS pointed to that verified local wheelhouse for the successful package run. Baseline and after test selections differ by the new regression cases. No speedup is claimed.",
+  "completed": "2026-11-12T15:01:53Z",
+  "conditions": "First successful measurements retained for each arm. Package initially failed twice because offline pandas wheel metadata was unavailable; only package and the not-yet-run render arm were then run after SHA-256-verified acquisition of the exact pandas wheel in uv.lock. Those failures remain in this receipt\u2019s runs. UV_FIND_LINKS pointed to that verified local wheelhouse for the successful package run. Baseline and after test selections differ by the new regression cases. No speedup is claimed. Audit refresh retains the earlier observations and two failed full-suite runs in runs; the notebook validator initially recursed into gitignored, untracked GNN migration build output. That output was moved aside without tracked changes for the successful 103-test run, then restored. Current lint, types, docs, GNN, render and full-suite observations are refreshed; other arm observations remain historical. The fresh render artifact was identified by the gate producer from source commit 2193be7b0be3fc429f4a8d159d4b96b249b12060.",
   "generated": "2026-11-12T13:56:34Z",
   "host": "macOS-27.0.1-arm64-arm-64bit",
   "python": "3.12.16",
@@ -209,12 +215,115 @@
       "host": "macOS-27.0.1-arm64-arm-64bit",
       "python": "3.12.16",
       "schema": "activeblockference-gate/v1"
+    },
+    {
+      "arms": {
+        "lint": {
+          "commands": [
+            "uv run ruff check blockference tests GRTs scripts"
+          ],
+          "seconds": 0.03,
+          "status": "passed"
+        },
+        "test-full": {
+          "commands": [
+            "uv run pytest --cov=blockference --cov-report=term --cov-report=xml --cov-fail-under=90"
+          ],
+          "error": "Command '['uv', 'run', 'pytest', '--cov=blockference', '--cov-report=term', '--cov-report=xml', '--cov-fail-under=90']' returned non-zero exit status 1.",
+          "seconds": 17.61,
+          "status": "failed"
+        },
+        "types": {
+          "commands": [
+            "uv run mypy blockference"
+          ],
+          "seconds": 1.06,
+          "status": "passed"
+        }
+      },
+      "generated": "2026-11-12T14:59:48Z",
+      "host": "macOS-27.0.1-arm64-arm-64bit",
+      "python": "3.12.16",
+      "schema": "activeblockference-gate/v1"
+    },
+    {
+      "arms": {
+        "test-full": {
+          "commands": [
+            "uv run pytest --cov=blockference --cov-report=term --cov-report=xml --cov-fail-under=90"
+          ],
+          "error": "Command '['uv', 'run', 'pytest', '--cov=blockference', '--cov-report=term', '--cov-report=xml', '--cov-fail-under=90']' returned non-zero exit status 1.",
+          "seconds": 24.86,
+          "status": "failed"
+        }
+      },
+      "generated": "2026-11-12T15:00:39Z",
+      "host": "macOS-27.0.1-arm64-arm-64bit",
+      "python": "3.12.16",
+      "schema": "activeblockference-gate/v1"
+    },
+    {
+      "arms": {
+        "docs": {
+          "commands": [
+            "uv run python scripts/check_docs_links.py",
+            "uv run python scripts/gate_metrics.py --check"
+          ],
+          "seconds": 5.28,
+          "status": "passed"
+        },
+        "gnn": {
+          "commands": [
+            "uv run python scripts/export_gnn_spec.py --check",
+            "uv run python scripts/validate_gnn_spec.py --gnn-runtime /private/tmp/gnn-rt-503/bin/python --json"
+          ],
+          "seconds": 2.0,
+          "status": "passed"
+        },
+        "render": {
+          "artifact": {
+            "bytes": 262701,
+            "path": "docs/_build/manuscript/activeblockference.pdf",
+            "sha256": "77ee9b6ef9c83cc8b26ce5bd9130baa851ce5168b5d4207f3e2b3e16ce884f88",
+            "source_commit": "2193be7b0be3fc429f4a8d159d4b96b249b12060"
+          },
+          "commands": [
+            "uv run python scripts/build_manuscript.py --render pdf"
+          ],
+          "seconds": 4.46,
+          "status": "passed"
+        }
+      },
+      "generated": "2026-11-12T15:01:36Z",
+      "host": "macOS-27.0.1-arm64-arm-64bit",
+      "python": "3.12.16",
+      "schema": "activeblockference-gate/v1"
+    },
+    {
+      "arms": {
+        "test-full": {
+          "commands": [
+            "uv run pytest --cov=blockference --cov-report=term --cov-report=xml --cov-fail-under=90"
+          ],
+          "seconds": 44.22,
+          "status": "passed"
+        }
+      },
+      "generated": "2026-11-12T15:01:53Z",
+      "host": "macOS-27.0.1-arm64-arm-64bit",
+      "python": "3.12.16",
+      "schema": "activeblockference-gate/v1",
+      "tests": {
+        "coverage_percent": 91.02,
+        "passed": 103,
+        "skipped": 0
+      }
     }
   ],
   "schema": "activeblockference-gate/v1",
   "tests": {
-    "coverage_percent": 90.94,
-    "passed": 92,
+    "coverage_percent": 91.02,
+    "passed": 103,
     "skipped": 0
   }
 }

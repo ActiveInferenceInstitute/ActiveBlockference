@@ -22,6 +22,7 @@ parser validates the document; see ``docs/gnn.md`` for the commands.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -152,9 +153,19 @@ def spec_arrays(parameters: GridWorldSpecParameters | None = None) -> dict[str, 
 
 
 def load_pin(path: Path | None = None) -> dict[str, Any]:
-    """Return the recorded upstream GNN pin."""
+    """Return the upstream pin, rejecting records outside the local pin contract."""
 
-    return json.loads((path or GNN_PIN_PATH).read_text(encoding="utf-8"))
+    pin = json.loads((path or GNN_PIN_PATH).read_text(encoding="utf-8"))
+    if not isinstance(pin, dict):
+        raise ValueError("invalid GNN pin: expected a JSON object")
+    if pin.get("schema") != "gnn-importer-pin/v1":
+        raise ValueError("invalid GNN pin schema: expected gnn-importer-pin/v1")
+    if pin.get("tag") != "v5.0.3":
+        raise ValueError("invalid GNN pin tag: expected v5.0.3")
+    commit = pin.get("commit")
+    if not isinstance(commit, str) or re.fullmatch(r"[0-9a-fA-F]{40}", commit) is None:
+        raise ValueError("invalid GNN pin commit: expected a full 40-hex revision")
+    return pin
 
 
 def _format_value(value: float) -> str:

@@ -28,6 +28,7 @@ and then ``uv run python scripts/gate_metrics.py --record-timings /tmp/gate-afte
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -37,6 +38,11 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+
+if __package__:
+    from scripts.build_manuscript import RENDER_TARGETS
+else:
+    from build_manuscript import RENDER_TARGETS
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = "activeblockference-gate/v1"
@@ -276,6 +282,24 @@ def _selected(arms: list[str]) -> list[str]:
     return [arm for arm in ARM_ORDER if arm in expanded]
 
 
+def _render_artifact() -> dict[str, object]:
+    """Identify the PDF bytes produced by the successful render command."""
+
+    pdf = RENDER_TARGETS["pdf"]
+    with pdf.open("rb") as handle:
+        digest = hashlib.file_digest(handle, "sha256").hexdigest()
+    commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, check=True, text=True,
+        capture_output=True, stdin=subprocess.DEVNULL,
+    ).stdout.strip()
+    return {
+        "path": pdf.relative_to(ROOT).as_posix(),
+        "bytes": pdf.stat().st_size,
+        "sha256": digest,
+        "source_commit": commit,
+    }
+
+
 def _write_receipt(path: Path, receipt: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -365,6 +389,7 @@ def main(argv: list[str] | None = None) -> int:
                             )
                     if arm == "test-full":
                         tests["coverage_percent"] = _coverage_percent()
+                artifact = _render_artifact() if arm == "render" else None
             except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError, ValueError) as exc:
                 failed = True
                 arms_receipt[arm] = {
@@ -381,6 +406,8 @@ def main(argv: list[str] | None = None) -> int:
                 "status": "passed",
                 "commands": [" ".join(command) for command in commands],
             }
+            if artifact is not None:
+                arms_receipt[arm]["artifact"] = artifact
             print(f"{arm} passed in {elapsed:.2f}s", flush=True)
 
     receipt["arms"] = arms_receipt

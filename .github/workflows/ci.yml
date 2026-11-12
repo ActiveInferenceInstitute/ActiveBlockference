@@ -83,10 +83,8 @@ jobs:
         id: runtime
         run: |
           set -euo pipefail
-          PIN=specs/gnn-pin.json
-          PY=$(uv python find --no-project 3.12)
-          REPO=$("$PY" -c "import json;print(json.load(open('$PIN'))['repository'])")
-          COMMIT=$("$PY" -c "import json;print(json.load(open('$PIN'))['commit'])")
+          REPO=$(uv run --no-sync python -c "from blockference.gnn import load_pin; print(load_pin()['repository'])")
+          COMMIT=$(uv run --no-sync python -c "from blockference.gnn import load_pin; print(load_pin()['commit'])")
           uv venv --python 3.12 "$RUNNER_TEMP/gnn-runtime"
           # The install follows specs/gnn-pin.json; a pin bump re-points it.
           uv pip install --python "$RUNNER_TEMP/gnn-runtime/bin/python" \

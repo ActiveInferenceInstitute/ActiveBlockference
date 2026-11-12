@@ -92,7 +92,11 @@ the workflow installs the locked environment directly.
 `release_check.py --timings PATH` writes the actual commands, statuses, and
 elapsed times for the selected run, including a failed arm. Use a fresh receipt
 path for each run; selecting `render` separately records the explicit local PDF
-build without adding it to CI.
+build without adding it to CI. A passing render arm also records `artifact`:
+the repository-relative PDF path, exact byte count, SHA-256, and source commit
+(`git rev-parse HEAD`). Commit source changes before recording a release render
+so that commit identifies the rendered source. The PDF remains ignored; the
+receipt identifies the local bytes without publishing the binary.
 
 Import receipts before regenerating the checked metrics page:
 
