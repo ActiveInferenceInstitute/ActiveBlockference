@@ -10,4 +10,7 @@
   directory fails the release gate.
 - `export_gnn_spec.py --check` is a drift gate: change the model or fixture in
   `blockference/`, then regenerate.
+- The pin file is the canonical record (`specs/gnn-pin.json`, schema
+  `gnn-importer-pin/v1`); bump it by re-recording the upstream commit and parser
+  digests, never by editing the generated document.
 - Parent rules: [../AGENTS.md](../AGENTS.md).

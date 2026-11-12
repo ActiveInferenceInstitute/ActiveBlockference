@@ -22,9 +22,8 @@ artefacts, and fail-closed validation.
 
 ```bash
 uv sync --locked --extra dev
-uv run pytest
-uv run ruff check blockference tests
-uv run python scripts/release_check.py
+uv run python scripts/release_check.py            # fast arms (default)
+uv run python scripts/release_check.py --arm all  # release gate
 uv run blockference pipeline --config configs/smoke.yml --output-root output
 ```
 
@@ -119,7 +118,9 @@ GNN maintains a [downstream adoption
 guide](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/main/docs/gnn/integration/downstream_adoption.md)
 for repositories that consume the notation.
 
-See [`docs/README.md`](docs/README.md) for the documentation index,
+See [`docs/README.md`](docs/README.md) for the documentation hub and
+[`docs/documentation-index.md`](docs/documentation-index.md) for the flat index
+of long-lived documents, plus
 [`docs/api.md`](docs/api.md), [`docs/pipeline.md`](docs/pipeline.md), and
 [`docs/development.md`](docs/development.md) for the complete contracts and
 workflow. Contributions are described in [`docs/contributing.md`](docs/contributing.md);

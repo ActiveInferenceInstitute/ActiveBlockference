@@ -76,6 +76,7 @@ def test_docs_link_checker_reports_broken_links_and_anchors(tmp_path):
     assert not any("same-file anchor" in message for message in messages)
 
 
+@pytest.mark.slow
 def test_generated_svgs_are_byte_stable_across_builds(tmp_path):
     first = tmp_path / "first"
     second = tmp_path / "second"
@@ -88,6 +89,7 @@ def test_generated_svgs_are_byte_stable_across_builds(tmp_path):
         assert svg.read_bytes() == (second / svg.name).read_bytes()
 
 
+@pytest.mark.slow
 def test_generated_pngs_carry_no_toolchain_metadata(tmp_path):
     builder.build_figures(tmp_path)
 
@@ -97,6 +99,7 @@ def test_generated_pngs_carry_no_toolchain_metadata(tmp_path):
         assert b"Matplotlib version" not in png.read_bytes()
 
 
+@pytest.mark.slow
 def test_generated_svgs_carry_no_toolchain_metadata(tmp_path):
     builder.build_figures(tmp_path)
 

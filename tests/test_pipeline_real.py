@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 import pandas as pd
+import pytest
 
 from blockference.config import ExperimentConfig
 from blockference.io import (
@@ -15,6 +16,8 @@ from blockference.io import (
 )
 from blockference.pipeline import run_pipeline
 from blockference.simulations.grid_sim import run_experiment
+
+pytestmark = pytest.mark.slow
 
 
 def config(engine: str = "radcad") -> ExperimentConfig:

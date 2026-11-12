@@ -5,8 +5,18 @@ uses `uv sync --locked --extra dev` for development. The release procedure is:
 
 ```bash
 uv sync --locked --extra dev
-uv run python scripts/release_check.py
+uv run python {{gate_entry_point}} --arm all
 ```
+
+The gate has separately runnable arms (`--list` shows them); `--arm all` is the
+release selection and the fast default is used while editing.
+
+The generative-model declaration is checked against the pinned upstream parser:
+`{{gnn_pin_path}}` records schema `{{gnn_pin_schema}}`, tag `{{gnn_tag}}`, and
+commit `{{gnn_commit}}`. The conformance job key is `{{gnn_job_key}}` with
+display name `{{gnn_job_name}}`; the pointer
+[`../../.github/GNN.md`](../../.github/GNN.md) records exactly what that job
+parses.
 
 The canonical command emits a run tree whose completed `manifest.json` and
 independently written `validation_report.json` agree. `PipelineResult.ok` and
@@ -30,7 +40,7 @@ manuscript validation step.
 
 ## Software citation
 
-The code artifact is released as ActiveBlockference 1.0.0 under the MIT
+The code artifact is released as ActiveBlockference {{package_version}} under the MIT
 license. The repository itself is citable using [@ActiveBlockference2026].
 The release makes a deliberate compatibility boundary: callers should use the
 typed `blockference` CLI, `GridWorld`, `plot_efe`, `PipelineResult.ok`, and the

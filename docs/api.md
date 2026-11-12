@@ -40,7 +40,9 @@ print(result.ok, result.paths.run_dir)
 max_policies, target, initial_state, initial_states, affordances, seed, runs,
 engine)` is the typed primitive wrapper. Engine names are `radcad` and `cadcad`.
 
-Run the complete local release gate with `uv run python scripts/release_check.py`.
+Run the complete local release gate with
+`uv run python scripts/release_check.py --arm all`; the no-argument default is
+the fast selection. See [`gate.md`](gate.md).
 
 ## CLI
 

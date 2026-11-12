@@ -13,6 +13,7 @@ def test_cli_rejects_positional_run_arguments():
     assert error.value.code == 2
 
 
+@pytest.mark.slow
 def test_cli_pipeline_returns_success(tmp_path, capsys):
     code = main(["pipeline", "--config", "configs/smoke.yml", "--output-root", str(tmp_path)])
     assert code == 0
@@ -20,6 +21,7 @@ def test_cli_pipeline_returns_success(tmp_path, capsys):
     assert json.loads(output)["ok"] is True
 
 
+@pytest.mark.slow
 def test_cli_run_and_validation_emit_json(tmp_path, capsys):
     output = tmp_path / "run.csv"
     assert main(["run", "--config", "configs/smoke.yml", "--output", str(output)]) == 0

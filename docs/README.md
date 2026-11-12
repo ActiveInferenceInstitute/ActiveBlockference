@@ -4,9 +4,15 @@ Start here if you are new to the repository:
 
 1. [`../README.md`](../README.md) — installation, quick start, public API, and
    repository map.
-2. [`tutorials/`](tutorials/) — short runnable examples.
-3. [`api.md`](api.md) — public Python and CLI contracts.
-4. [`pipeline.md`](pipeline.md) — configuration, output tree, and validation.
+2. [`documentation-index.md`](documentation-index.md) — flat index of every
+   long-lived document.
+3. [`tutorials/`](tutorials/) — short runnable examples.
+4. [`api.md`](api.md) — public Python and CLI contracts.
+5. [`pipeline.md`](pipeline.md) — configuration, output tree, and validation.
+
+Generated facts live under [`_generated/`](_generated/README.md). Measured gate
+numbers are in [`_generated/gate-metrics.md`](_generated/gate-metrics.md); do
+not copy those numbers into prose.
 
 ## Concepts and design
 
@@ -24,6 +30,8 @@ Start here if you are new to the repository:
 
 * [`development.md`](development.md) — locked development and verification
   commands.
+* [`gate.md`](gate.md) — gate arms, CI job map, and where the measured
+  numbers live.
 * [`contributing.md`](contributing.md) — contribution flow and issue reporting.
 * [`../configs/README.md`](../configs/README.md) — configuration examples and
   schema notes.

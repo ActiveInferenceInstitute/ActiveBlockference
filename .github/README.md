@@ -74,24 +74,31 @@ do not require either extra.
 ## Verification and CI
 
 The GitHub Actions workflow runs on pushes and pull requests targeting
-`main`, using the committed `uv.lock` on Python 3.11 and 3.12. Each
-matrix job runs the canonical release gate, which covers:
+`main`, using the committed `uv.lock` on Python 3.11 and 3.12. CI calls the
+arms of the canonical gate in [`scripts/release_check.py`](../scripts/release_check.py):
 
-* Ruff linting and repository-wide Markdown link/anchor validation;
-* the full test suite with a 90% `blockference` coverage floor;
-* mypy type checking;
-* notebook hygiene and execution;
-* real pipeline, validation, and standalone `run` smoke checks;
-* manuscript source validation, build, and generated-output drift detection;
-* source distribution/wheel construction and clean-environment import smoke.
+* the `test` matrix job runs `--arm test-full` (full suite, 90% coverage floor);
+* the `gate` job runs `--arm lint --arm types --arm docs --arm manuscript
+  --arm smoke --arm package` once on Python 3.12;
+* the `gnn-conformance` job runs `--arm gnn` with a runtime provisioned from
+  `specs/gnn-pin.json`.
 
-Run the same gate locally with:
+The arms cover Ruff linting, repository-wide Markdown link/anchor validation,
+mypy, the test suite, notebook hygiene and execution, real pipeline and CLI
+smoke checks, manuscript validation/build/render drift, and a wheel import
+smoke. [`docs/gate.md`](../docs/gate.md) lists them and
+[`docs/_generated/gate-metrics.md`](../docs/_generated/gate-metrics.md) holds
+the measured numbers.
+
+Run the release gate locally with:
 
 ```bash
-uv run python scripts/release_check.py
+uv run python scripts/release_check.py --arm all
 ```
 
-A separate `gnn conformance` job installs the GNN revision pinned in
+The fast default (`uv run python scripts/release_check.py`) runs lint, types,
+the fast test selection, and docs. A separate `gnn conformance (pinned)` job
+(job key `gnn-conformance`) installs the GNN revision pinned in
 `specs/gnn-pin.json` into its own Python 3.12 runtime and validates
 `specs/gridworld_3x3.gnn.md` against the declared runtime model. The gate is
 intentionally fail-closed: a required check is not converted into a skip when

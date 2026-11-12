@@ -4,21 +4,25 @@ Use the committed lockfile for the exact environment:
 
 ```bash
 uv sync --locked --extra dev
-uv run ruff check blockference tests GRTs scripts
-uv run python scripts/check_docs_links.py
-uv run pytest
-uv run python scripts/execute_notebooks.py
-uv run python scripts/validate_manuscript.py
-uv run python scripts/build_manuscript.py
-uv run python scripts/build_manuscript.py --check
-uv run python scripts/export_gnn_spec.py --check
+uv run python scripts/release_check.py            # fast arms (default)
+uv run python scripts/release_check.py --arm all  # release gate
 ```
 
-`uv run python scripts/release_check.py` runs the whole sequence above plus
-mypy, the pipeline smoke runs, and the wheel import check. The pinned GNN
-parser conformance check (`scripts/validate_gnn_spec.py`) is part of that gate
-only when `GNN_ROOT` or `GNN_RUNTIME_PYTHON` is set, because it needs an
-external runtime; CI runs it as its own required job. See [`gnn.md`](gnn.md).
+[`gate.md`](gate.md) lists every arm and CI job; `--list` prints the exact
+commands. The fast default runs lint, types, the fast test selection, and docs.
+The release gate adds the full suite with the 90% coverage floor, manuscript
+validation/build/drift checks, the GNN drift and conformance checks, pipeline
+smoke runs, and the wheel import check.
+
+mypy targets the `requires-python` floor (`python_version = "3.11"` in
+`pyproject.toml`), so one run covers the minimum supported stubs. Notebook
+execution, real-pipeline integration, CLI smoke, and figure-byte checks carry
+the `slow` marker and are excluded from `--arm test`.
+
+The pinned GNN parser conformance check (`scripts/validate_gnn_spec.py`) is
+part of the `gnn` arm only when `GNN_ROOT` or `GNN_RUNTIME_PYTHON` is set,
+because it needs an external runtime; CI runs the same arm as its own required
+job. See [`gnn.md`](gnn.md).
 
 Markdown links and anchors across all tracked documentation are validated by
 `scripts/check_docs_links.py`, which is also part of the canonical release

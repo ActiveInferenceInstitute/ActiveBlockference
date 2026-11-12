@@ -21,7 +21,7 @@ Include:
 Reports are triaged by the maintainers, and fixes ship through the
 repository's normal release process: `uv.lock`-locked dependencies,
 fail-closed validation, and the canonical release gate
-(`uv run python scripts/release_check.py`).
+(`uv run python scripts/release_check.py --arm all`).
 
 ## Security-relevant behaviour of this project
 
