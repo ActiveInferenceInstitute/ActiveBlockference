@@ -84,6 +84,68 @@ def test_local_tag_pointing_elsewhere_is_a_named_failure(checkout) -> None:
     assert head in failures[0] and OTHER in failures[0]
 
 
+def _stale_checkout(tmp_path: Path) -> tuple[Path, Path, str, str]:
+    """Return a checkout whose local tag is stale against a local upstream.
+
+    The upstream tag is moved to a new commit after the checkout cloned it, so
+    the checkout keeps a tag that names the pinned commit while upstream names
+    another one. Everything is local, so no test here uses the network.
+    """
+
+    work = tmp_path / "work"
+    work.mkdir()
+    _git(work, "init", "-q")
+    (work / "f").write_text("A", encoding="utf-8")
+    _git(work, "add", "f")
+    _git(work, "commit", "-q", "-m", "A")
+    pinned = _git(work, "rev-parse", "HEAD")
+    _git(work, "tag", "v9.9.9")
+    upstream = tmp_path / "upstream.git"
+    subprocess.run(["git", "clone", "-q", "--bare", str(work), str(upstream)], check=True)
+    checkout = tmp_path / "checkout"
+    subprocess.run(["git", "clone", "-q", str(upstream), str(checkout)], check=True)
+    (work / "f").write_text("B", encoding="utf-8")
+    _git(work, "commit", "-q", "-am", "B")
+    moved = _git(work, "rev-parse", "HEAD")
+    _git(work, "tag", "-f", "-a", "-m", "moved", "v9.9.9", moved)
+    _git(work, "push", "-q", "--force", str(upstream), "refs/tags/v9.9.9")
+    return checkout, upstream, pinned, moved
+
+
+def test_remote_is_consulted_when_the_local_tag_resolves(tmp_path: Path) -> None:
+    checkout, upstream, pinned, moved = _stale_checkout(tmp_path)
+    pin = _pin(repository=str(upstream), commit=pinned)
+    local = vgs.tag_binding(checkout, pin)
+
+    assert local["status"] == "verified"
+    assert local["resolved"] == pinned
+
+    binding = vgs.tag_binding(checkout, pin, remote=True)
+
+    assert binding["detail"] == "git ls-remote"
+    assert binding["resolved"] == moved
+    assert [f.split(":")[0] for f in vgs.tag_failures(binding, pin)] == [vgs.TAG_COMMIT_MISMATCH]
+
+
+def test_remote_that_cannot_answer_never_accepts_the_local_tag(
+    monkeypatch: pytest.MonkeyPatch, checkout
+) -> None:
+    repo, head = checkout
+    _git(repo, "tag", "v9.9.9")
+    real_run = subprocess.run
+
+    def run(command, **kwargs):
+        if command[:2] == ["git", "ls-remote"]:
+            return subprocess.CompletedProcess(command, 128, "", "unreachable")
+        return real_run(command, **kwargs)
+
+    monkeypatch.setattr(vgs.subprocess, "run", run)
+    binding = vgs.tag_binding(repo, _pin(commit=head), remote=True)
+
+    assert binding["status"] == "unresolvable-offline"
+    assert "ls-remote failed" in binding["detail"]
+
+
 def test_offline_without_a_store_is_explicitly_unresolved(
     monkeypatch: pytest.MonkeyPatch, checkout
 ) -> None:

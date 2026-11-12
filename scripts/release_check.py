@@ -192,6 +192,17 @@ def _plan(
         ]
     if arm == "gnn":
         commands = [["uv", "run", "python", "scripts/export_gnn_spec.py", "--check"]]
+        # The validator verifies the pinned parser file digests before it parses
+        # anything, so it runs before the shared reader's specification check:
+        # ``gnn.importers check`` parses the document with the installed parser
+        # and must not reach it before the digests are verified. It also resolves
+        # the pin's tag upstream, so a tag moved off the pinned commit fails.
+        validator = [
+            "uv", "run", "python", "scripts/validate_gnn_spec.py", "--verify-tag-remote", "--json",
+        ]
+        if gnn_runtime:
+            validator[-2:-2] = ["--gnn-runtime", gnn_runtime]
+        commands.append(validator)
         if gnn_runtime:
             commands.append(
                 [
@@ -201,14 +212,6 @@ def _plan(
                     "--job", "gnn-conformance",
                 ]
             )
-        # The pin's tag is resolved upstream (needs network), so a tag that was
-        # moved off the pinned commit fails the release gate.
-        validator = [
-            "uv", "run", "python", "scripts/validate_gnn_spec.py", "--verify-tag-remote", "--json",
-        ]
-        if gnn_runtime:
-            validator[-2:-2] = ["--gnn-runtime", gnn_runtime]
-        commands.append(validator)
         return commands
     if arm == "smoke":
         output_root = workdir / "output"

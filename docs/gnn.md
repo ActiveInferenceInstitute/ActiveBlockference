@@ -102,7 +102,10 @@ and exact CI map.
    The pin's `tag` must resolve to the pinned `commit` (`tag-commit-mismatch`):
    locally in a `GNN_ROOT` checkout, or upstream with `--verify-tag-remote`
    (`git ls-remote`, the peeled commit of an annotated tag; the release gate's
-   `gnn` arm passes the flag, so it needs network access). The commit the
+   `gnn` arm passes the flag, so it needs network access). The upstream answer is
+   authoritative: when the flag is given, upstream is always queried, so a tag
+   that moved after a checkout fetched it fails even though the local tag still
+   names the pinned commit. The commit the
    installer recorded for the runtime (`direct_url.json` `vcs_info.commit_id`)
    must equal the pin's commit. Without a checkout or the flag, and for an
    install with no recorded VCS commit, the receipt reports `tag_binding` /

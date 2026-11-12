@@ -34,7 +34,7 @@ measurements.
 | `test-full` | `uv run pytest --cov=blockference --cov-report=term --cov-report=xml --cov-fail-under=90` | yes |
 | `docs` | `scripts/check_docs_links.py`, `scripts/gate_metrics.py --check` | yes |
 | `manuscript` | `scripts/manuscript_variables.py --check`, `scripts/validate_manuscript.py`, `scripts/build_manuscript.py`, `scripts/build_manuscript.py --check`; the `gnn_*` variables come from `gnn.importers` in the pinned runtime | yes |
-| `gnn` | `scripts/export_gnn_spec.py --check`, the shared `python -m gnn.importers check --repo .` pin and pointer check, and real pinned `scripts/validate_gnn_spec.py --verify-tag-remote` validation (parser digests before parsing, the pin's tag resolved upstream to the pinned commit; needs network); missing runtime fails | yes |
+| `gnn` | `scripts/export_gnn_spec.py --check`, then pinned `scripts/validate_gnn_spec.py --verify-tag-remote` conformance (parser digests verified before anything parses, the pin's tag resolved upstream to the pinned commit; needs network), then the shared `python -m gnn.importers check --repo .` pin and pointer check; missing runtime fails | yes |
 | `smoke` | pipeline, validation, and standalone `run` JSON smoke checks in a temporary directory | yes |
 | `package` | `uv build`, locked `uv export` constraints for clean-wheel dependencies, and isolated import outside the source tree | yes |
 | `render` | `scripts/build_manuscript.py --render pdf` (Pandoc + XeLaTeX) | no |
@@ -60,9 +60,13 @@ The conformance job's key is `gnn-conformance` and its display name is
 
 The pin, the pointer and the specification are read by the estate's shared
 reader, `gnn.importers`, so this repository carries no copy of the pin shape. The
-`gnn` arm runs `python -m gnn.importers check --repo . --require-pointer
+`gnn` arm runs the offline drift check, then real pinned-parser conformance, then
+`python -m gnn.importers check --repo . --require-pointer
 --workflow .github/workflows/ci.yml --job gnn-conformance` from the pinned
-runtime, then the offline drift check, then real pinned-parser conformance.
+runtime. Conformance precedes that reader check because `gnn.importers check`
+parses the document with the installed parser, while the validator verifies the
+pin's parser digests before it parses anything: no arm command reaches the
+parser before its digests are verified.
 
 Select an installed pinned runtime with `--gnn-runtime` or
 `GNN_RUNTIME_PYTHON`, or supply a pinned source checkout via `GNN_ROOT` as

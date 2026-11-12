@@ -16,13 +16,23 @@ import scripts.release_check as gate
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_gnn_arm_runs_the_shared_pin_reader_before_conformance():
+def test_gnn_arm_runs_the_shared_pin_reader_after_digest_verification():
     runtime = "/opt/gnn-runtime/bin/python"
     plan = gate._plan("gnn", workdir=Path("<temporary>"), gnn_runtime=runtime)
 
     assert plan is not None
     assert plan[0] == ["uv", "run", "python", "scripts/export_gnn_spec.py", "--check"]
     assert plan[1] == [
+        "uv",
+        "run",
+        "python",
+        "scripts/validate_gnn_spec.py",
+        "--gnn-runtime",
+        runtime,
+        "--verify-tag-remote",
+        "--json",
+    ]
+    assert plan[2] == [
         runtime,
         "-m",
         "gnn.importers",
@@ -35,16 +45,29 @@ def test_gnn_arm_runs_the_shared_pin_reader_before_conformance():
         "--job",
         "gnn-conformance",
     ]
-    assert plan[2] == [
-        "uv",
-        "run",
-        "python",
-        "scripts/validate_gnn_spec.py",
-        "--gnn-runtime",
-        runtime,
-        "--verify-tag-remote",
-        "--json",
-    ]
+
+
+def test_gnn_arm_verifies_the_pinned_parser_digests_before_it_parses():
+    """``gnn.importers check`` parses the document; the digests must be verified first.
+
+    ``check`` calls ``gnn.importers._validate_spec``, which imports the installed
+    parser and parses every ``*.gnn.md``. The validator is the command that
+    verifies the pin's parser digests before it parses anything, so it has to
+    come first or a tampered parser is executed before its digests are checked.
+    """
+
+    plan = gate._plan("gnn", workdir=Path("<temporary>"), gnn_runtime="/opt/gnn/bin/python")
+
+    assert plan is not None
+    verify = next(
+        index
+        for index, command in enumerate(plan)
+        if any("validate_gnn_spec.py" in part for part in command)
+    )
+    parses = next(
+        index for index, command in enumerate(plan) if "gnn.importers" in command
+    )
+    assert verify < parses
 
 
 def test_gnn_arm_omits_the_reader_without_a_runtime():
@@ -137,5 +160,8 @@ def test_gnn_arm_always_asks_the_validator_to_resolve_the_tag_upstream():
         plan = gate._plan("gnn", workdir=Path("<temporary>"), gnn_runtime=runtime)
 
         assert plan is not None
-        assert "--verify-tag-remote" in plan[-1]
-        assert plan[-1][-1] == "--json"
+        validator = next(
+            command for command in plan if any("validate_gnn_spec.py" in part for part in command)
+        )
+        assert "--verify-tag-remote" in validator
+        assert validator[-1] == "--json"
