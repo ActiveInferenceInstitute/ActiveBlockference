@@ -72,7 +72,7 @@ research = [
 [package.metadata]
 requires-dist = [
     { name = "cadcad", specifier = ">=0.4.28" },
-    { name = "inferactively-pymdp", marker = "extra == 'pymdp'", specifier = ">=1.0.1" },
+    { name = "inferactively-pymdp", marker = "extra == 'pymdp'", specifier = ">=1.0.5" },
     { name = "ipykernel", marker = "extra == 'dev'" },
     { name = "matplotlib", specifier = ">=3.7" },
     { name = "mkdocs", marker = "extra == 'docs'" },
@@ -1006,7 +1006,7 @@ wheels = [
 
 [[package]]
 name = "inferactively-pymdp"
-version = "1.0.4"
+version = "1.0.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "equinox" },
@@ -1022,9 +1022,9 @@ dependencies = [
     { name = "opt-einsum" },
     { name = "seaborn" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/61/49/ad9848844aa56aecaf3074170150ab18d91ab15df5b93ea6318191d6e188/inferactively_pymdp-1.0.4.tar.gz", hash = "sha256:92368bbfab7346e46aa2cb4a5b213dd90dee6a8699a3d4d1bda0b970aee123ca", size = 712820, upload-time = "2026-08-23T13:05:25.653Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a4/47/e165cacac83517d523e93e486290bc4b11e7a6544f251466846a8617a3b0/inferactively_pymdp-1.0.5.tar.gz", hash = "sha256:c58461217fe16d9bf4c4df8e49411d36fff8ae067f4b42225f5c69c4832963a7", size = 718158, upload-time = "2026-11-07T15:10:10.374Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/64/00/d8d9670da465956dcd0d446ee988e57544428a48f98877e31537ca1cafdb/inferactively_pymdp-1.0.4-py3-none-any.whl", hash = "sha256:5bb8c67f4a8d076031b1ead666a9333c61b989fa57baccd73cc483d81b41fb33", size = 640653, upload-time = "2026-08-23T13:05:24.259Z" },
+    { url = "https://files.pythonhosted.org/packages/91/8f/d106043c9b409dc6f0b5614811173f72f404d18d25b6b1a115eba3e288d6/inferactively_pymdp-1.0.5-py3-none-any.whl", hash = "sha256:5e423a331894c7d4dbda1d935d7b592556dfea229d99890aec02d5216e9f1d84", size = 642033, upload-time = "2026-11-07T15:10:08.618Z" },
 ]
 
 [[package]]
