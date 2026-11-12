@@ -74,4 +74,6 @@ stable artifact. It is written after persistence and rendering complete; the
 validator checks it independently. `validation_report.json` and `run.log` are
 mutable metadata and are deliberately excluded from the manifest digest.
 
-The complete local release gate is `uv run python scripts/release_check.py`.
+The complete local release gate is
+`uv run python scripts/release_check.py --arm all`; the no-argument default is
+the fast selection. See [`gate.md`](gate.md).

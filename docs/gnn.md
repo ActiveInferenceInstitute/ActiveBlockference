@@ -12,9 +12,10 @@ Python code and are checked against it.
   fixture: identity likelihood `A`, deterministic boundary-clamped transition
   `B[next_state, previous_state, action]`, one-hot preference `C`, one-hot
   prior `D`, and the uniform policy prior `E` over the five affordances.
-* `specs/gnn-pin.json` — the pin record: upstream repository, tag `v5.0.3`,
-  commit `8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1`, and SHA-256 digests of the
-  parser files that validate the document.
+* `specs/gnn-pin.json` — the pin record (schema `gnn-importer-pin/v1`):
+  upstream repository, tag `v5.0.3`, commit
+  `8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1`, recorded date, and SHA-256
+  digests of the parser files that validate the document.
 
 The document is generated from the implementation by
 `blockference.gnn.render_spec`; the declared matrices come from
@@ -46,9 +47,11 @@ works. Exit codes are `0` pass, `1` conformance failure, and `2` pinned runtime
 or checkout unavailable — an unavailable run is reported as not run, never as a
 pass.
 
-CI runs the same validation in the `gnn conformance` job, provisioning a
-separate Python 3.12 runtime from the pinned revision because the GNN
-distribution requires `numpy>=2` while this package resolves `numpy` 1.x.
+CI runs the same validation in the `gnn-conformance` job (display name
+`gnn conformance (pinned)`), provisioning a separate Python 3.12 runtime from
+the pinned revision because the GNN distribution requires `numpy>=2` while this
+package resolves `numpy` 1.x. Locally, `scripts/release_check.py --arm gnn`
+runs it when `GNN_ROOT` or `GNN_RUNTIME_PYTHON` is set.
 
 ## What the validation checks
 

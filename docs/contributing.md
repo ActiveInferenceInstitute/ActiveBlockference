@@ -8,7 +8,8 @@ contributions from researchers, engineers, and AI agents alike.
 
 1. Open or comment on an issue describing what you want to do.
 2. Fork → branch → code → test → PR.
-3. Run `uv run python scripts/release_check.py` before pushing.
+3. Run `uv run python scripts/release_check.py --arm all` before pushing; the
+   no-argument default is the fast selection.
 4. Keep PRs scoped: one logical change per PR.
 
 ## Detailed flow
@@ -19,9 +20,8 @@ contributions from researchers, engineers, and AI agents alike.
 git clone https://github.com/<you>/ActiveBlockference.git
 cd ActiveBlockference
 uv venv --python 3.11
-uv pip install -e ".[dev,docs]"
 uv sync --locked --extra dev
-uv run pytest --cov=blockference --cov-fail-under=90
+uv run python scripts/release_check.py --arm test
 ```
 
 ### 2. Branch

@@ -40,13 +40,12 @@ Items are grouped by the size of the documentation change required:
       gate step so documentation drift fails the canonical gate. (0c16ab8)
 - [x] Add `SECURITY.md` with a private-advisory disclosure path and factual
       security-relevant project behaviour. (96a02e3)
-- [ ] Reconcile the Python-version claim. `docs/manuscript/00_abstract.md`
-      describes a "Python 3.10+" implementation and
-      `requirements.txt`/`pyproject.toml` keep a
-      `python_version < '3.11'` `tomli` fallback, but `pyproject.toml` declares
-      `requires-python = ">=3.11"`. The manuscript is publication source, so it
-      was recorded rather than edited here; decide whether to raise the
-      manuscript claim to 3.11+ or lower the package floor to 3.10.
+- [x] Reconcile the Python-version claim. `docs/manuscript/00_abstract.md` now
+      injects `{{python_requires}}` from the generated manuscript variables,
+      which derive it from `pyproject.toml`'s `requires-python = ">=3.11"`, so
+      the manuscript and package floor can no longer disagree. The
+      `python_version < '3.11'` `tomli` fallback in `requirements.txt` remains a
+      data-file pin, not a second supported floor.
 
 ## Major
 
@@ -65,4 +64,4 @@ The pass verified the documented single-agent and multi-agent Python examples,
 the `docs/api.md` pipeline example, the tutorial snippets, `uv run ruff check
 blockference tests scripts GRTs`, manuscript validation/build drift checks, and
 the repository-wide relative Markdown links and anchors. Full release verification
-remains the canonical `uv run python scripts/release_check.py` command.
+remains the canonical `uv run python scripts/release_check.py --arm all` command.

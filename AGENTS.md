@@ -8,13 +8,13 @@ expected-free-energy evaluation, action sampling, and prior propagation.
 
 ```bash
 uv sync --locked --extra dev
-uv run ruff check blockference tests scripts GRTs
-uv run pytest
-uv run python scripts/release_check.py
+uv run python scripts/release_check.py            # fast arms (default)
+uv run python scripts/release_check.py --arm all  # release gate
 ```
 
-Use absolute `blockference.*` imports, NumPy-style docstrings, and 100-column
-Ruff formatting. Runtime dependencies belong in `pyproject.toml` and the
+Arms are listed in [`docs/gate.md`](docs/gate.md). Use absolute
+`blockference.*` imports, NumPy-style docstrings, and 100-column Ruff
+formatting. Runtime dependencies belong in `pyproject.toml` and the
 generated `uv.lock`. Do not commit generated result files, caches, virtual
 environments, or notebook checkpoints.
 
@@ -28,7 +28,8 @@ pinned in `specs/gnn-pin.json` (GNN v5.0.3, commit `8f293d9ba`), and
 `scripts/validate_gnn_spec.py` parses the document with that revision, builds
 the runtime model from the declared parameters, and requires the declared
 matrices to match. That check needs an external runtime (`GNN_ROOT` or
-`GNN_RUNTIME_PYTHON`); the required CI job provisions one from the pin. Do not
+`GNN_RUNTIME_PYTHON`); the required `gnn-conformance` CI job provisions one from
+the pin and runs `scripts/release_check.py --arm gnn`. Do not
 hand-edit `specs/gridworld_3x3.gnn.md`: change the model or fixture in
 `blockference/` and regenerate with `scripts/export_gnn_spec.py`. See
 `docs/gnn.md`.
