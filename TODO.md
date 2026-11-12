@@ -46,6 +46,13 @@ Items are grouped by the size of the documentation change required:
       the manuscript and package floor can no longer disagree. The
       `python_version < '3.11'` `tomli` fallback in `requirements.txt` remains a
       data-file pin, not a second supported floor.
+- [x] Reconcile the optional `pymdp` extra with its lock. The extra named
+      `inferactively-pymdp>=1.0.1` while `uv.lock` resolved 1.0.4; the extra now
+      requires `>=1.0.5`, the regenerated lock resolves 1.0.5, and the lock's
+      `[package.metadata] requires-dist` carries the new specifier. The adapter
+      only subclasses `pymdp.agent.Agent`, which 1.0.5 keeps, so the documented
+      adapter surface is unchanged, and no page states a pymdp version.
+      (7f8469d, #28)
 - [x] Align the documentation hub and flat index with long-lived guides,
       generated receipts, and the manuscript figure registry; keep measured
       values in generated metrics rather than human-maintained prose.
@@ -65,6 +72,7 @@ Items are grouped by the size of the documentation change required:
       runtime, and the `gnn_*` manuscript variables come from
       `gnn.importers.importer_variables` through
       `scripts/gnn_importer_report.py`. No copy of the reader is vendored.
+      (b621126, #27)
 
 ## Major
 
@@ -74,8 +82,19 @@ an executable publication validator.
 
 ## Open / deferred
 
-No unresolved item remains from the listed documentation findings. The Python
-floor reconciliation under **Medium** is complete, not deferred.
+No unresolved documentation finding remains. The Python-floor and pymdp-floor
+reconciliations under **Medium** are complete, not deferred.
+
+One repository defect found in the 2026-11-12 review is open:
+
+- [ ] Remove the stray tracked run dump `ignored.csv` at the repository root.
+      It was committed by 574a5c1 ("updates", 2026-05-10), is a cadCAD record
+      export whose cells hold `ActiveGridference` object reprs, and no file,
+      test, or page in the tree references it. `.gitignore` covers `result.csv`,
+      `results/`, and `output/` but not this name, which is how it was committed.
+      Deleting the file, or adding the matching ignore rule, is a one-file
+      change; git history keeps the content either way. Owner: the maintainer
+      who opens the hygiene PR. Nothing outside this repository blocks it.
 
 ## Verification notes
 
@@ -89,3 +108,13 @@ The estate documentation edits were reviewed by reasoning only; integrated
 verification belongs to the canonical release selection in
 [`docs/gate.md`](docs/gate.md), with a configured pinned GNN runtime. The
 generated metrics and receipts record actual runs, including failures.
+
+On 2026-11-12 the `docs` arm (`scripts/check_docs_links.py` and
+`scripts/gate_metrics.py --check`) and the `gnn` arm both passed at `7f8469d`.
+The `gnn` arm ran `python -m gnn.importers check --repo . --require-pointer
+--workflow .github/workflows/ci.yml --job gnn-conformance` from a locally
+installed pinned runtime and reported `pin: specs/gnn-pin.json -> v5.1.0 @
+75c834bd85 (schema gnn-importer-pin/v1)`, `pointer: .github/GNN.md -> ok`, and
+`verdict: ok`, followed by real pinned-parser conformance at `gnn_version`
+5.1.0. The other arms were not re-run in this pass; their recorded observations
+in `docs/_generated/` are unchanged.
