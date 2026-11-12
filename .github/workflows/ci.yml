@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11"]
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -52,36 +52,6 @@ jobs:
           path: coverage.xml
           if-no-files-found: ignore
 
-  gate:
-    timeout-minutes: 60
-    # Lint, types, docs, manuscript, smoke, and package work runs once; the
-    # test matrix above repeats only the suite across supported Python versions.
-    name: gate (lint, types, docs, manuscript, smoke, package)
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Install uv
-        # v10.3.3; setup-uv publishes no floating v10 major tag, so @v10 is unresolvable
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2
-        with:
-          version: "0.13.7"
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
-
-      - name: Set up Python 3.12
-        run: uv python install 3.12
-
-      - name: Install locked package and development dependencies
-        run: uv sync --locked --extra dev --python 3.12
-
-      - name: Run the release arms
-        run: >-
-          uv run python scripts/release_check.py
-          --arm lint --arm types --arm docs --arm manuscript
-          --arm smoke --arm package
-
   gnn-conformance:
     timeout-minutes: 120
     # Validates the committed GNN specification with the parser pinned in
@@ -106,8 +76,8 @@ jobs:
       - name: Set up Python 3.12
         run: uv python install 3.12
 
-      - name: Install locked package without development extras
-        run: uv sync --locked --python 3.12
+      - name: Install locked package and development dependencies
+        run: uv sync --locked --extra dev --python 3.12
 
       - name: Provision the pinned GNN parser runtime
         id: runtime
@@ -123,8 +93,7 @@ jobs:
             "generalized-notation-notation @ git+${REPO}@${COMMIT}"
           echo "python=$RUNNER_TEMP/gnn-runtime/bin/python" >> "$GITHUB_OUTPUT"
 
-      - name: GNN conformance arm
-        run: >-
-          uv run python scripts/release_check.py
-          --arm gnn --gnn-runtime "${{ steps.runtime.outputs.python }}"
-          --require-gnn
+      - name: Release arms (including Python 3.12 full tests and GNN conformance)
+        env:
+          GNN_RUNTIME_PYTHON: ${{ steps.runtime.outputs.python }}
+        run: uv run python scripts/release_check.py --arm all

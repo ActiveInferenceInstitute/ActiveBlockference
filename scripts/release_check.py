@@ -21,8 +21,8 @@ Arms:
 * ``all`` -- every release arm (``test`` and ``render`` are excluded).
 
 ``fast`` is the default; ``all`` is the release gate. Refresh the measured
-numbers with ``--arm all --arm test --timings docs/_generated/gate-timings.json``
-and then ``uv run python scripts/gate_metrics.py``.
+numbers with ``--arm all --arm test --arm render --timings /tmp/gate-after.json``
+and then ``uv run python scripts/gate_metrics.py --record-timings /tmp/gate-after.json``.
 """
 
 from __future__ import annotations
@@ -76,7 +76,7 @@ ARM_HELP = {
 def _run(
     command: list[str], *, cwd: Path = ROOT, capture: bool = False
 ) -> subprocess.CompletedProcess[str]:
-    """Run one gate command with a consistent environment."""
+    """Run one gate command without re-synchronizing the prepared locked environment."""
 
     print("$", " ".join(command), flush=True)
     return subprocess.run(
@@ -85,7 +85,8 @@ def _run(
         check=True,
         text=True,
         capture_output=capture,
-        env={**os.environ, "PYTHONUNBUFFERED": "1"},
+        env={**os.environ, "PYTHONUNBUFFERED": "1", "UV_NO_SYNC": "1"},
+        stdin=subprocess.DEVNULL,
     )
 
 
@@ -103,7 +104,8 @@ def _changed_paths() -> set[str]:
     """
 
     result = subprocess.run(
-        ["git", "diff", "--name-only"], cwd=ROOT, check=True, text=True, capture_output=True
+        ["git", "diff", "--name-only"], cwd=ROOT, check=True, text=True,
+        capture_output=True, stdin=subprocess.DEVNULL,
     )
     return {
         line
@@ -129,7 +131,7 @@ def _assert_json(command: list[str]) -> None:
 
 
 def _plan(
-    arm: str, *, workdir: Path, gnn_runtime: str | None, gnn_available: bool
+    arm: str, *, workdir: Path, gnn_runtime: str | None
 ) -> list[list[str]] | None:
     """Return the commands for one arm, or ``None`` for a Python-driven arm."""
 
@@ -165,11 +167,10 @@ def _plan(
         ]
     if arm == "gnn":
         commands = [["uv", "run", "python", "scripts/export_gnn_spec.py", "--check"]]
-        if gnn_available:
-            validator = ["uv", "run", "python", "scripts/validate_gnn_spec.py", "--json"]
-            if gnn_runtime:
-                validator[-1:-1] = ["--gnn-runtime", gnn_runtime]
-            commands.append(validator)
+        validator = ["uv", "run", "python", "scripts/validate_gnn_spec.py", "--json"]
+        if gnn_runtime:
+            validator[-1:-1] = ["--gnn-runtime", gnn_runtime]
+        commands.append(validator)
         return commands
     if arm == "smoke":
         output_root = workdir / "output"
@@ -214,21 +215,35 @@ def _package_smoke() -> list[list[str]]:
     if not wheels:
         raise FileNotFoundError("uv build produced no wheel")
     with tempfile.TemporaryDirectory(prefix="activeblockference-package-") as directory:
+        constraints = Path(directory) / "constraints.txt"
+        commands.append(
+            [
+                "uv", "export", "--locked", "--no-dev", "--no-emit-project", "--no-hashes",
+                "--output-file", str(constraints),
+            ]
+        )
+        _run(commands[-1], capture=True)
         venv = Path(directory) / "venv"
         commands.append(["uv", "venv", "--python", sys.executable, str(venv)])
         _run(commands[-1])
         python = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-        commands.append(["uv", "pip", "install", "--python", str(python), str(wheels[-1])])
+        commands.append(
+            [
+                "uv", "pip", "install", "--python", str(python),
+                "--constraint", str(constraints), str(wheels[-1]),
+            ]
+        )
         _run(commands[-1])
         commands.append(
             [
                 str(python),
+                "-I",
                 "-c",
                 "from blockference import GridWorld; "
                 "assert GridWorld(2, {'agent': (0, 0)}).current_state == {'agent': (0, 0)}",
             ]
         )
-        _run(commands[-1])
+        _run(commands[-1], cwd=Path(directory))
     return commands
 
 
@@ -283,16 +298,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--timings", type=Path, help="write a JSON runtime receipt")
     parser.add_argument("--json", action="store_true", help="print a JSON summary")
     parser.add_argument("--gnn-runtime", help="interpreter with the pinned GNN distribution")
-    parser.add_argument(
-        "--require-gnn",
-        action="store_true",
-        help="fail when no pinned GNN runtime or checkout is available",
-    )
     args = parser.parse_args(argv)
 
     selected = _selected(args.arm or [])
     gnn_runtime = args.gnn_runtime or os.environ.get("GNN_RUNTIME_PYTHON")
-    gnn_available = bool(gnn_runtime or os.environ.get("GNN_ROOT"))
     if args.list:
         for arm in (*ALIASES, *ARM_ORDER):
             print(f"{arm:10s} {ARM_HELP[arm]}")
@@ -302,20 +311,10 @@ def main(argv: list[str] | None = None) -> int:
                 arm,
                 workdir=Path("<temporary>"),
                 gnn_runtime=gnn_runtime,
-                gnn_available=gnn_available,
             )
             for command in plan or [["(python-driven arm)"]]:
                 print("           $", " ".join(command))
         return 0
-
-    if "gnn" in selected and not gnn_available:
-        if args.require_gnn:
-            parser.error("--require-gnn needs --gnn-runtime, GNN_RUNTIME_PYTHON, or GNN_ROOT")
-        print(
-            "gnn validation not run: set GNN_RUNTIME_PYTHON or GNN_ROOT to run the pinned "
-            "parser conformance check (see docs/gnn.md)",
-            flush=True,
-        )
 
     receipt: dict[str, object] = {
         "schema": SCHEMA,
@@ -341,7 +340,6 @@ def main(argv: list[str] | None = None) -> int:
                             arm,
                             workdir=workdir,
                             gnn_runtime=gnn_runtime,
-                            gnn_available=gnn_available,
                         )
                         or []
                     )

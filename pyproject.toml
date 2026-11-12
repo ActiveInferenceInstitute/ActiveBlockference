@@ -32,8 +32,8 @@ classifiers = [
 dependencies = [
     "cadCAD>=0.4.28",
     "radcad>=0.12",
-    # radcad 0.14.0 requires numpy>=1.25,<2.2.7; numpy 2.x is unresolvable
-    # while radcad is a required runtime dependency (verified 2026-11-01).
+    # Preserve the simulation backend's compatible range; uv.lock selects the
+    # concrete version used by the project environment.
     "numpy>=1.25,<2.2.7",
     "pandas>=2.0",
     "matplotlib>=3.7",
