@@ -1,14 +1,14 @@
 {
   "schema": "gnn-importer-pin/v1",
   "repository": "https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation",
-  "tag": "v5.0.3",
-  "commit": "8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1",
+  "tag": "v5.1.0",
+  "commit": "75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf",
   "recorded": "2026-11-12",
   "parser_files": {
-    "src/gnn/__init__.py": "4303d2cec14db42ad1a3f9ca557aaf48f42efc6b1566bcf099d2bf878c2b26ff",
-    "src/gnn/parsers/__init__.py": "257f10d65b54ed2cc421fe25257d6ae506dc3dbde8685b7a5672aba06f0c4991",
-    "src/gnn/parsers/common.py": "c27da82a05058ec2f96b4c675374a848e64535122bf3a63155a47b8b23e3076e",
-    "src/gnn/parsers/markdown_parser.py": "24a30ea7e67d597e891fe16e521e13be5f2013af90eeb282cfe257940b281e82",
+    "src/gnn/__init__.py": "908848847f2fb938f65b3ea0b17252ab6d2129ad2f0b427bca8761a81083d10d",
+    "src/gnn/parsers/__init__.py": "a08df88ecf239a094254f7dc4ef0ea57aff697075f777a3993702ca8d45803ea",
+    "src/gnn/parsers/common.py": "ade640beffbf18e6f99dc7b9e3ac5993e5a183652da096ceeb0014b77f3f5527",
+    "src/gnn/parsers/markdown_parser.py": "150f2994dc7e95bea30e7b226d86220eb319fcff64489503df20a307cf7b097c",
     "src/gnn/parsers/markdown_parser_parameter.py": "2e94e88c79b8998387f2a1c53fe88dcc45adc498c47c30f7ec3bd577a8072061"
   }
 }

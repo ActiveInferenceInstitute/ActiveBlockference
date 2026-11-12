@@ -3,13 +3,18 @@
 Manuscript prose uses ``{{token}}`` placeholders; the declared values come from
 this generated file rather than from hand-copied literals. The values are read
 from ``pyproject.toml`` (Python floor and package version), the executable
-manuscript configuration, the canonical GNN pin, and the CI workflow.
+manuscript configuration, the CI workflow, and the upstream ``gnn.importers``
+reader for the ``gnn_*`` keys. The reader needs the pinned GNN runtime
+(``GNN_RUNTIME_PYTHON``) because its distribution resolves NumPy 2.x while this
+package resolves NumPy 1.x.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
+import subprocess
 import sys
 import tomllib
 from pathlib import Path
@@ -18,8 +23,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 VARIABLES_PATH = ROOT / "docs" / "_generated" / "manuscript-variables.json"
-PIN_PATH = ROOT / "specs" / "gnn-pin.json"
 WORKFLOW_PATH = ROOT / ".github" / "workflows" / "ci.yml"
+REPORT = ROOT / "scripts" / "gnn_importer_report.py"
 SCHEMA = "manuscript-variables/v1"
 MANUSCRIPT_CONFIG_PATH = ROOT / "docs" / "manuscript" / "config.yaml"
 
@@ -44,12 +49,50 @@ def _gnn_job() -> tuple[str, str]:
     raise ValueError("no GNN conformance job in .github/workflows/ci.yml")
 
 
+def _gnn_interpreter() -> str:
+    """Return the interpreter that has the pinned GNN distribution installed."""
+
+    runtime = os.environ.get("GNN_RUNTIME_PYTHON")
+    if runtime and Path(runtime).is_file():
+        return runtime
+    return sys.executable
+
+
+def _gnn_variables(job_key: str, job_name: str) -> dict[str, str]:
+    """Return the ``gnn_*`` keys from ``gnn.importers.importer_variables``."""
+
+    completed = subprocess.run(
+        [
+            _gnn_interpreter(),
+            str(REPORT),
+            "--repo", str(ROOT),
+            "--job", job_key,
+            "--job-name", job_name,
+        ],
+        cwd=ROOT,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout).strip().splitlines()
+        raise ValueError(
+            "the shared gnn.importers reader could not produce the gnn_* variables: "
+            + (" | ".join(detail[-3:]) if detail else "no output")
+            + "; set GNN_RUNTIME_PYTHON to the pinned GNN runtime"
+        )
+    variables = dict(json.loads(completed.stdout)["variables"])
+    variables.pop("schema", None)  # gnn-importer-variables/v1 names the map, not this file
+    return variables
+
+
 def build() -> dict[str, object]:
     """Return the declared manuscript variables and their sources."""
 
     project = _project()
-    pin = json.loads(PIN_PATH.read_text(encoding="utf-8"))
     job_key, job_name = _gnn_job()
+    gnn = _gnn_variables(job_key, job_name)
     metadata = yaml.safe_load(MANUSCRIPT_CONFIG_PATH.read_text(encoding="utf-8"))
     config_path = metadata["experiment"]["config_path"]
     config = yaml.safe_load((ROOT / config_path).read_text(encoding="utf-8"))
@@ -80,23 +123,17 @@ def build() -> dict[str, object]:
         "python_requires": _python_requires(str(project["requires-python"])),
         "package_version": str(project["version"]),
         "gate_entry_point": "scripts/release_check.py",
-        "gnn_pin_path": "specs/gnn-pin.json",
-        "gnn_pin_schema": str(pin["schema"]),
-        "gnn_repository": str(pin["repository"]),
-        "gnn_tag": str(pin["tag"]),
-        "gnn_commit": str(pin["commit"]),
-        "gnn_job_key": job_key,
-        "gnn_job_name": job_name,
+        **gnn,
         **experiment_values,
         "sources": {
             "python_requires": "pyproject.toml [project].requires-python",
             "package_version": "pyproject.toml [project].version",
             "gate_entry_point": "scripts/release_check.py",
-            "gnn_pin_path": "specs/gnn-pin.json",
-            "gnn_pin_schema": "specs/gnn-pin.json schema",
-            "gnn_repository": "specs/gnn-pin.json repository",
-            "gnn_tag": "specs/gnn-pin.json tag",
-            "gnn_commit": "specs/gnn-pin.json commit",
+            "gnn_pin_path": "gnn.importers.importer_variables pin_path",
+            "gnn_pin_schema": "gnn.importers.importer_variables pin_schema",
+            "gnn_repository": "gnn.importers.importer_variables repository",
+            "gnn_tag": "gnn.importers.importer_variables tag",
+            "gnn_commit": "gnn.importers.importer_variables commit",
             "gnn_job_key": ".github/workflows/ci.yml GNN job key",
             "gnn_job_name": ".github/workflows/ci.yml GNN job name",
             **experiment_sources,

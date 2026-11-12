@@ -55,6 +55,16 @@ Items are grouped by the size of the documentation change required:
 - [x] Document receipt imports, including the failed offline package baseline
       cache miss, without claiming a speedup; distinguish the declared NumPy
       range from the actual lockfile resolution.
+- [x] Cut over to the shared GNN pin reader. The pin moved from `v5.0.3` at
+      `8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1` — a revision that predates
+      `src/gnn/importers.py` — to `v5.1.0` at
+      `75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf`, and the interim local reader
+      (`blockference.gnn.load_pin` plus its pin-shape tests) is deleted. The
+      `gnn` arm now runs `python -m gnn.importers check --repo . --require-pointer
+      --workflow .github/workflows/ci.yml --job gnn-conformance` from the pinned
+      runtime, and the `gnn_*` manuscript variables come from
+      `gnn.importers.importer_variables` through
+      `scripts/gnn_importer_report.py`. No copy of the reader is vendored.
 
 ## Major
 

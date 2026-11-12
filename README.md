@@ -113,10 +113,11 @@ The grid-world generative model is declared in
 [Generalized Notation Notation](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation)
 (GNN). The document is generated from the implementation and validated against
 the upstream parser pinned in [`specs/gnn-pin.json`](specs/gnn-pin.json)
-(schema `gnn-importer-pin/v1`, GNN v5.0.3, commit
-`8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1`): the validator reads the declared parameters
-back, builds the runtime model from them, and requires the declared matrices to
-match exactly. See [`docs/gnn.md`](docs/gnn.md) for the commands and the
+(schema `gnn-importer-pin/v1`, GNN v5.1.0, commit
+`75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf`): the estate's shared reader
+`gnn.importers` validates that pin and the [`.github/GNN.md`](.github/GNN.md)
+pointer, and the validator reads the declared parameters back, builds the runtime
+model from them, and requires the declared matrices to match exactly. See [`docs/gnn.md`](docs/gnn.md) for the commands and the
 conformance contract.
 
 GNN maintains a [downstream adoption

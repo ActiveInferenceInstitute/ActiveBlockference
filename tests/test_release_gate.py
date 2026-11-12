@@ -16,6 +16,58 @@ import scripts.release_check as gate
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_gnn_arm_runs_the_shared_pin_reader_before_conformance():
+    runtime = "/opt/gnn-runtime/bin/python"
+    plan = gate._plan("gnn", workdir=Path("<temporary>"), gnn_runtime=runtime)
+
+    assert plan is not None
+    assert plan[0] == ["uv", "run", "python", "scripts/export_gnn_spec.py", "--check"]
+    assert plan[1] == [
+        runtime,
+        "-m",
+        "gnn.importers",
+        "check",
+        "--repo",
+        ".",
+        "--require-pointer",
+        "--workflow",
+        ".github/workflows/ci.yml",
+        "--job",
+        "gnn-conformance",
+    ]
+    assert plan[2] == [
+        "uv",
+        "run",
+        "python",
+        "scripts/validate_gnn_spec.py",
+        "--gnn-runtime",
+        runtime,
+        "--json",
+    ]
+
+
+def test_gnn_arm_omits_the_reader_without_a_runtime():
+    plan = gate._plan("gnn", workdir=Path("<temporary>"), gnn_runtime=None)
+
+    assert plan is not None
+    assert not any("gnn.importers" in " ".join(command) for command in plan)
+
+
+def test_checkout_runtime_comes_from_the_gnn_checkout(tmp_path, monkeypatch):
+    relative = Path("Scripts" if os.name == "nt" else "bin") / (
+        "python.exe" if os.name == "nt" else "python"
+    )
+    python = tmp_path / ".venv" / relative
+    python.parent.mkdir(parents=True)
+    python.write_text("", encoding="utf-8")
+
+    monkeypatch.setenv("GNN_ROOT", str(tmp_path))
+    assert gate._checkout_runtime() == str(python)
+
+    monkeypatch.delenv("GNN_ROOT")
+    assert gate._checkout_runtime() is None
+
+
 def test_gnn_arm_without_runtime_cannot_write_a_passing_receipt(tmp_path):
     environment = dict(os.environ, UV_OFFLINE="1", UV_NO_SYNC="1")
     for name in ("GNN_ROOT", "GNN_RUNTIME_PYTHON", "GNN_PYTHON"):

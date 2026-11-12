@@ -10,7 +10,8 @@ release gate in two jobs:
 
 The second job retains the display name `gnn conformance (pinned)` and installs
 the revision in [`../../specs/gnn-pin.json`](../../specs/gnn-pin.json) into a
-separate runtime. The full suite runs on both Python versions; all other release
+separate runtime; its `gnn` arm then calls the shared
+`python -m gnn.importers check --repo .` from that runtime. The full suite runs on both Python versions; all other release
 arms run with conformance on Python 3.12. Missing pinned-runtime validation
 fails the gate. There is no separate `gate` job, and PDF rendering remains an
 explicit local arm.
