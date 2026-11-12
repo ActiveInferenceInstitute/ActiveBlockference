@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -13,6 +14,18 @@ from blockference.config import load_experiment_config
 
 ROOT = Path(__file__).resolve().parents[1]
 MANUSCRIPT = ROOT / "docs" / "manuscript"
+VARIABLES_PATH = ROOT / "docs" / "_generated" / "manuscript-variables.json"
+
+
+def _declared_variables() -> set[str]:
+    """Return the variable keys declared by the generated variables file."""
+
+    payload = json.loads(VARIABLES_PATH.read_text(encoding="utf-8"))
+    return {
+        key
+        for key, value in payload.items()
+        if key not in {"schema", "sources"} and not isinstance(value, dict)
+    }
 
 
 def _bibliography_keys() -> set[str]:
@@ -41,8 +54,16 @@ def validate() -> list[str]:
     for figure in re.findall(r"\]\((figures/[^)]+)\)", all_text):
         if not (MANUSCRIPT / figure).is_file():
             errors.append(f"missing referenced figure: {figure}")
-    if re.search(r"\{\{[A-Za-z_][A-Za-z0-9_]*\}\}", all_text):
-        errors.append("unresolved manuscript variable token")
+    tokens = set(re.findall(r"\{\{([A-Za-z_][A-Za-z0-9_]*)\}\}", all_text))
+    try:
+        undeclared = sorted(tokens - _declared_variables())
+    except (OSError, ValueError) as exc:
+        errors.append(f"manuscript variables unavailable: {exc}")
+    else:
+        if undeclared:
+            errors.append(
+                "undeclared manuscript variable tokens: " + ", ".join(undeclared)
+            )
     if "\\eqref" in all_text or "\\ref{" in all_text:
         errors.append("raw LaTeX cross-reference found; use labelled Pandoc references")
     metadata_path = MANUSCRIPT / "config.yaml"

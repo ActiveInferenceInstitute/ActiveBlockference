@@ -1,19 +1,82 @@
-"""Run the canonical local release gate for ActiveBlockference."""
+"""Run the canonical ActiveBlockference gate, one arm at a time.
+
+The release gate is one entry point with separately runnable arms so a
+contributor can run the arm they need without paying for the whole gate. Every
+arm is the exact command CI runs; CI invokes these arms instead of keeping a
+second copy of any command.
+
+Arms:
+
+* ``lint`` -- Ruff over the package, tests, ``GRTs``, and scripts.
+* ``types`` -- mypy over the package at the ``requires-python`` floor.
+* ``test`` -- fast pytest selection (``-m "not slow"``), no coverage floor.
+* ``test-full`` -- the whole suite with the 90% coverage floor.
+* ``docs`` -- Markdown links/anchors and the generated gate metrics.
+* ``manuscript`` -- variables freshness, source validation, build, and drift.
+* ``gnn`` -- specification drift and pinned-parser conformance.
+* ``smoke`` -- pipeline, validation, and standalone ``run`` JSON smoke checks.
+* ``package`` -- wheel build and clean virtualenv import.
+* ``render`` -- render the manuscript to PDF (needs Pandoc and XeLaTeX).
+* ``fast`` -- ``lint``, ``types``, ``test``, ``docs``.
+* ``all`` -- every release arm (``test`` and ``render`` are excluded).
+
+``fast`` is the default; ``all`` is the release gate. Refresh the measured
+numbers with ``--arm all --arm test --timings docs/_generated/gate-timings.json``
+and then ``uv run python scripts/gate_metrics.py``.
+"""
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
+import platform
+import re
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+SCHEMA = "activeblockference-gate/v1"
+
+ARM_ORDER = (
+    "lint",
+    "types",
+    "test",
+    "test-full",
+    "docs",
+    "manuscript",
+    "gnn",
+    "smoke",
+    "package",
+    "render",
+)
+FAST_ARMS = ("lint", "types", "test", "docs")
+RELEASE_ARMS = ("lint", "types", "test-full", "docs", "manuscript", "gnn", "smoke", "package")
+ALIASES = {"fast": FAST_ARMS, "all": RELEASE_ARMS}
+
+ARM_HELP = {
+    "fast": "lint, types, fast tests, docs (default)",
+    "all": "every release arm",
+    "lint": "Ruff over blockference, tests, GRTs, scripts",
+    "types": "mypy over blockference",
+    "test": 'fast pytest selection (-m "not slow")',
+    "test-full": "full pytest suite with the 90% coverage floor",
+    "docs": "Markdown links/anchors and generated gate metrics",
+    "manuscript": "manuscript variables, validation, build, and drift check",
+    "gnn": "GNN specification drift and pinned-parser conformance",
+    "smoke": "pipeline, validation, and run JSON smoke checks",
+    "package": "wheel build and clean virtualenv import",
+    "render": "manuscript PDF render (Pandoc + XeLaTeX)",
+}
 
 
-def _run(command: list[str], *, cwd: Path = ROOT, capture: bool = False) -> subprocess.CompletedProcess[str]:
-    """Run one release-gate command with a consistent environment."""
+def _run(
+    command: list[str], *, cwd: Path = ROOT, capture: bool = False
+) -> subprocess.CompletedProcess[str]:
+    """Run one gate command with a consistent environment."""
 
     print("$", " ".join(command), flush=True)
     return subprocess.run(
@@ -50,7 +113,9 @@ def _changed_paths() -> set[str]:
     }
 
 
-def _assert_json(command: list[str]) -> dict[str, object]:
+def _assert_json(command: list[str]) -> None:
+    """Run one command whose last output line must be a passing JSON verdict."""
+
     result = _run(command, capture=True)
     lines = [line for line in result.stdout.splitlines() if line.strip()]
     if not lines:
@@ -61,54 +126,54 @@ def _assert_json(command: list[str]) -> dict[str, object]:
         raise ValueError(f"command did not end in JSON: {lines[-1]!r}") from exc
     if not isinstance(payload, dict) or payload.get("ok") is not True:
         raise ValueError(f"command returned a non-passing JSON verdict: {payload!r}")
-    return payload
 
 
-def _package_smoke() -> None:
-    """Build a wheel and import it from a clean temporary virtualenv."""
+def _plan(
+    arm: str, *, workdir: Path, gnn_runtime: str | None, gnn_available: bool
+) -> list[list[str]] | None:
+    """Return the commands for one arm, or ``None`` for a Python-driven arm."""
 
-    _run(["uv", "build"])
-    wheels = sorted((ROOT / "dist").glob("*.whl"))
-    if not wheels:
-        raise FileNotFoundError("uv build produced no wheel")
-    with tempfile.TemporaryDirectory(prefix="activeblockference-package-") as directory:
-        venv = Path(directory) / "venv"
-        _run(["uv", "venv", "--python", sys.executable, str(venv)])
-        python = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-        _run(["uv", "pip", "install", "--python", str(python), str(wheels[-1])])
-        _run(
+    if arm == "lint":
+        return [["uv", "run", "ruff", "check", "blockference", "tests", "GRTs", "scripts"]]
+    if arm == "types":
+        return [["uv", "run", "mypy", "blockference"]]
+    if arm == "test":
+        return [["uv", "run", "pytest", "-m", "not slow"]]
+    if arm == "test-full":
+        return [
             [
-                str(python),
-                "-c",
-                "from blockference import GridWorld; "
-                "assert GridWorld(2, {'agent': (0, 0)}).current_state == {'agent': (0, 0)}",
+                "uv",
+                "run",
+                "pytest",
+                "--cov=blockference",
+                "--cov-report=term",
+                "--cov-report=xml",
+                "--cov-fail-under=90",
             ]
-        )
-
-
-def main() -> int:
-    """Execute lint, tests, artefact, publication, and package gates."""
-
-    _run(["uv", "run", "ruff", "check", "blockference", "tests", "GRTs", "scripts"])
-    _run(["uv", "run", "python", "scripts/check_docs_links.py"])
-    _run(
-        [
-            "uv",
-            "run",
-            "pytest",
-            "--cov=blockference",
-            "--cov-report=term",
-            "--cov-report=xml",
-            "--cov-fail-under=90",
         ]
-    )
-    _run(["uv", "run", "mypy", "blockference"])
-    _run(["uv", "run", "python", "scripts/validate_notebooks.py"])
-    _run(["uv", "run", "python", "scripts/execute_notebooks.py"])
-    before_generated = _changed_paths()
-    with tempfile.TemporaryDirectory(prefix="activeblockference-release-") as directory:
-        output_root = Path(directory) / "output"
-        _assert_json(
+    if arm == "docs":
+        return [
+            ["uv", "run", "python", "scripts/check_docs_links.py"],
+            ["uv", "run", "python", "scripts/gate_metrics.py", "--check"],
+        ]
+    if arm == "manuscript":
+        return [
+            ["uv", "run", "python", "scripts/manuscript_variables.py", "--check"],
+            ["uv", "run", "python", "scripts/validate_manuscript.py"],
+            ["uv", "run", "python", "scripts/build_manuscript.py"],
+            ["uv", "run", "python", "scripts/build_manuscript.py", "--check"],
+        ]
+    if arm == "gnn":
+        commands = [["uv", "run", "python", "scripts/export_gnn_spec.py", "--check"]]
+        if gnn_available:
+            validator = ["uv", "run", "python", "scripts/validate_gnn_spec.py", "--json"]
+            if gnn_runtime:
+                validator[-1:-1] = ["--gnn-runtime", gnn_runtime]
+            commands.append(validator)
+        return commands
+    if arm == "smoke":
+        output_root = workdir / "output"
+        return [
             [
                 "uv",
                 "run",
@@ -119,20 +184,9 @@ def main() -> int:
                 "--output-root",
                 str(output_root),
                 "--run-name",
-                "release_smoke",
-            ]
-        )
-        _assert_json(
-            [
-                "uv",
-                "run",
-                "blockference",
-                "validation",
-                "--run-dir",
-                str(output_root / "release_smoke"),
-            ]
-        )
-        _assert_json(
+                "gate_smoke",
+            ],
+            ["uv", "run", "blockference", "validation", "--run-dir", str(output_root / "gate_smoke")],
             [
                 "uv",
                 "run",
@@ -141,28 +195,207 @@ def main() -> int:
                 "--config",
                 "configs/smoke.yml",
                 "--output",
-                str(Path(directory) / "run.csv"),
+                str(workdir / "run.csv"),
+            ],
+        ]
+    if arm == "render":
+        return [["uv", "run", "python", "scripts/build_manuscript.py", "--render", "pdf"]]
+    if arm == "package":
+        return None
+    raise ValueError(f"unknown arm {arm}")
+
+
+def _package_smoke() -> list[list[str]]:
+    """Build a wheel and import it from a clean temporary virtualenv."""
+
+    commands: list[list[str]] = [["uv", "build"]]
+    _run(commands[-1])
+    wheels = sorted((ROOT / "dist").glob("*.whl"))
+    if not wheels:
+        raise FileNotFoundError("uv build produced no wheel")
+    with tempfile.TemporaryDirectory(prefix="activeblockference-package-") as directory:
+        venv = Path(directory) / "venv"
+        commands.append(["uv", "venv", "--python", sys.executable, str(venv)])
+        _run(commands[-1])
+        python = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        commands.append(["uv", "pip", "install", "--python", str(python), str(wheels[-1])])
+        _run(commands[-1])
+        commands.append(
+            [
+                str(python),
+                "-c",
+                "from blockference import GridWorld; "
+                "assert GridWorld(2, {'agent': (0, 0)}).current_state == {'agent': (0, 0)}",
             ]
         )
-    _run(["uv", "run", "python", "scripts/validate_manuscript.py"])
-    _run(["uv", "run", "python", "scripts/build_manuscript.py"])
-    _run(["uv", "run", "python", "scripts/build_manuscript.py", "--check"])
-    _run(["uv", "run", "python", "scripts/export_gnn_spec.py", "--check"])
-    gnn_source = os.environ.get("GNN_RUNTIME_PYTHON") or os.environ.get("GNN_ROOT")
-    if gnn_source:
-        _run(["uv", "run", "python", "scripts/validate_gnn_spec.py"])
-    else:
+        _run(commands[-1])
+    return commands
+
+
+def _last_number(pattern: str, text: str) -> int | None:
+    """Return the last integer matched by ``pattern`` in ``text``."""
+
+    matches = re.findall(pattern, text)
+    return int(matches[-1]) if matches else None
+
+
+def _coverage_percent() -> float | None:
+    """Return the line coverage recorded by the last ``test-full`` run."""
+
+    path = ROOT / "coverage.xml"
+    if not path.is_file():
+        return None
+    match = re.search(r'line-rate="([0-9.]+)"', path.read_text(encoding="utf-8"))
+    return round(float(match.group(1)) * 100, 2) if match else None
+
+
+def _selected(arms: list[str]) -> list[str]:
+    """Expand aliases and return the selected arms in the canonical order."""
+
+    expanded: set[str] = set()
+    for arm in arms or ["fast"]:
+        expanded.update(ALIASES.get(arm, (arm,)))
+    unknown = sorted(expanded - set(ARM_ORDER))
+    if unknown:
+        raise ValueError("unknown arm(s): " + ", ".join(unknown))
+    return [arm for arm in ARM_ORDER if arm in expanded]
+
+
+def _write_receipt(path: Path, receipt: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Execute the requested gate arms and optionally record their runtimes."""
+
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--arm",
+        action="append",
+        choices=[*ALIASES, *ARM_ORDER],
+        help="arm to run; repeatable (default: fast)",
+    )
+    parser.add_argument("--list", action="store_true", help="list arms and their commands")
+    parser.add_argument("--timings", type=Path, help="write a JSON runtime receipt")
+    parser.add_argument("--json", action="store_true", help="print a JSON summary")
+    parser.add_argument("--gnn-runtime", help="interpreter with the pinned GNN distribution")
+    parser.add_argument(
+        "--require-gnn",
+        action="store_true",
+        help="fail when no pinned GNN runtime or checkout is available",
+    )
+    args = parser.parse_args(argv)
+
+    selected = _selected(args.arm or [])
+    gnn_runtime = args.gnn_runtime or os.environ.get("GNN_RUNTIME_PYTHON")
+    gnn_available = bool(gnn_runtime or os.environ.get("GNN_ROOT"))
+    if args.list:
+        for arm in (*ALIASES, *ARM_ORDER):
+            print(f"{arm:10s} {ARM_HELP[arm]}")
+            if arm in ALIASES:
+                continue
+            plan = _plan(
+                arm,
+                workdir=Path("<temporary>"),
+                gnn_runtime=gnn_runtime,
+                gnn_available=gnn_available,
+            )
+            for command in plan or [["(python-driven arm)"]]:
+                print("           $", " ".join(command))
+        return 0
+
+    if "gnn" in selected and not gnn_available:
+        if args.require_gnn:
+            parser.error("--require-gnn needs --gnn-runtime, GNN_RUNTIME_PYTHON, or GNN_ROOT")
         print(
             "gnn validation not run: set GNN_RUNTIME_PYTHON or GNN_ROOT to run the pinned "
             "parser conformance check (see docs/gnn.md)",
             flush=True,
         )
-    after_generated = _changed_paths()
-    new_changes = sorted(after_generated - before_generated)
-    if new_changes:
-        raise RuntimeError("generated files drifted during release check: " + ", ".join(new_changes))
-    _package_smoke()
-    print("release gate passed")
+
+    receipt: dict[str, object] = {
+        "schema": SCHEMA,
+        "generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "host": platform.platform(),
+        "python": platform.python_version(),
+    }
+    arms_receipt: dict[str, object] = {}
+    tests: dict[str, object] = {}
+    failed = False
+    with tempfile.TemporaryDirectory(prefix="activeblockference-gate-") as directory:
+        workdir = Path(directory)
+        for arm in selected:
+            print(f"\n== {arm}: {ARM_HELP[arm]}", flush=True)
+            started = time.perf_counter()
+            commands: list[list[str]] = []
+            try:
+                if arm == "package":
+                    commands = _package_smoke()
+                else:
+                    commands = (
+                        _plan(
+                            arm,
+                            workdir=workdir,
+                            gnn_runtime=gnn_runtime,
+                            gnn_available=gnn_available,
+                        )
+                        or []
+                    )
+                    before = _changed_paths() if arm == "manuscript" else None
+                    for command in commands:
+                        if arm == "smoke":
+                            _assert_json(command)
+                        elif arm in {"test", "test-full"}:
+                            result = _run(command, capture=True)
+                            print(result.stdout, flush=True)
+                            if result.stderr:
+                                print(result.stderr, file=sys.stderr, flush=True)
+                            tests["passed"] = _last_number(r"(\d+) passed", result.stdout)
+                            tests["skipped"] = _last_number(r"(\d+) skipped", result.stdout) or 0
+                        else:
+                            _run(command)
+                    if before is not None:
+                        new_changes = sorted(_changed_paths() - before)
+                        if new_changes:
+                            raise RuntimeError(
+                                "generated files drifted during the manuscript arm: "
+                                + ", ".join(new_changes)
+                            )
+                    if arm == "test-full":
+                        tests["coverage_percent"] = _coverage_percent()
+            except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError, ValueError) as exc:
+                failed = True
+                arms_receipt[arm] = {
+                    "seconds": round(time.perf_counter() - started, 2),
+                    "status": "failed",
+                    "error": str(exc),
+                    "commands": [" ".join(command) for command in commands],
+                }
+                print(f"{arm} failed: {exc}", file=sys.stderr, flush=True)
+                break
+            elapsed = time.perf_counter() - started
+            arms_receipt[arm] = {
+                "seconds": round(elapsed, 2),
+                "status": "passed",
+                "commands": [" ".join(command) for command in commands],
+            }
+            print(f"{arm} passed in {elapsed:.2f}s", flush=True)
+
+    receipt["arms"] = arms_receipt
+    if tests:
+        receipt["tests"] = tests
+    if args.timings:
+        _write_receipt(args.timings, receipt)
+    if args.json:
+        print(json.dumps({"ok": not failed, "arms": arms_receipt}, sort_keys=True))
+    if failed:
+        print("release gate failed", file=sys.stderr)
+        return 1
+    print("fast gate passed" if selected == list(FAST_ARMS) else "release gate passed", flush=True)
     return 0
 
 

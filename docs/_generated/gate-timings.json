@@ -1,0 +1,86 @@
+{
+  "arms": {
+    "docs": {
+      "commands": [
+        "uv run python scripts/check_docs_links.py",
+        "uv run python scripts/gate_metrics.py --check"
+      ],
+      "seconds": 11.02,
+      "status": "passed"
+    },
+    "gnn": {
+      "commands": [
+        "uv run python scripts/export_gnn_spec.py --check",
+        "uv run python scripts/validate_gnn_spec.py --json"
+      ],
+      "seconds": 5.61,
+      "status": "passed"
+    },
+    "lint": {
+      "commands": [
+        "uv run ruff check blockference tests GRTs scripts"
+      ],
+      "seconds": 0.07,
+      "status": "passed"
+    },
+    "manuscript": {
+      "commands": [
+        "uv run python scripts/manuscript_variables.py --check",
+        "uv run python scripts/validate_manuscript.py",
+        "uv run python scripts/build_manuscript.py",
+        "uv run python scripts/build_manuscript.py --check"
+      ],
+      "seconds": 7.84,
+      "status": "passed"
+    },
+    "package": {
+      "commands": [
+        "uv build",
+        "uv venv --python /Users/friedman/Documents/Git/gitvault/Username/ActiveInferenceInstitute/Public/ActiveBlockference/.venv/bin/python /var/folders/qs/rxkntx5d4hlgz0c7x8v15gym0000gn/T/activeblockference-package-fn41c71n/venv",
+        "uv pip install --python /var/folders/qs/rxkntx5d4hlgz0c7x8v15gym0000gn/T/activeblockference-package-fn41c71n/venv/bin/python /Users/friedman/Documents/Git/gitvault/Username/ActiveInferenceInstitute/Public/ActiveBlockference/dist/active_blockference-1.0.0-py3-none-any.whl",
+        "/var/folders/qs/rxkntx5d4hlgz0c7x8v15gym0000gn/T/activeblockference-package-fn41c71n/venv/bin/python -c from blockference import GridWorld; assert GridWorld(2, {'agent': (0, 0)}).current_state == {'agent': (0, 0)}"
+      ],
+      "seconds": 12.91,
+      "status": "passed"
+    },
+    "smoke": {
+      "commands": [
+        "uv run blockference pipeline --config configs/smoke.yml --output-root /var/folders/qs/rxkntx5d4hlgz0c7x8v15gym0000gn/T/activeblockference-gate-avw6d67s/output --run-name gate_smoke",
+        "uv run blockference validation --run-dir /var/folders/qs/rxkntx5d4hlgz0c7x8v15gym0000gn/T/activeblockference-gate-avw6d67s/output/gate_smoke",
+        "uv run blockference run --config configs/smoke.yml --output /var/folders/qs/rxkntx5d4hlgz0c7x8v15gym0000gn/T/activeblockference-gate-avw6d67s/run.csv"
+      ],
+      "seconds": 5.23,
+      "status": "passed"
+    },
+    "test": {
+      "commands": [
+        "uv run pytest -m not slow"
+      ],
+      "seconds": 12.88,
+      "status": "passed"
+    },
+    "test-full": {
+      "commands": [
+        "uv run pytest --cov=blockference --cov-report=term --cov-report=xml --cov-fail-under=90"
+      ],
+      "seconds": 58.06,
+      "status": "passed"
+    },
+    "types": {
+      "commands": [
+        "uv run mypy blockference"
+      ],
+      "seconds": 0.35,
+      "status": "passed"
+    }
+  },
+  "generated": "2026-11-12T13:09:06Z",
+  "host": "macOS-27.0.1-arm64-arm-64bit",
+  "python": "3.12.16",
+  "schema": "activeblockference-gate/v1",
+  "tests": {
+    "coverage_percent": 90.94,
+    "passed": 85,
+    "skipped": 0
+  }
+}

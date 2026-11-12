@@ -3,9 +3,12 @@
 from pathlib import Path
 
 import nbformat
+import pytest
 from nbclient import NotebookClient
 
 from scripts.validate_notebooks import validate_all
+
+pytestmark = pytest.mark.slow
 
 
 def test_notebooks_parse_and_execute(tmp_path):
