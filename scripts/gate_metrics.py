@@ -1,13 +1,18 @@
 """Write the generated gate metrics document.
 
-The measured numbers in ``docs/_generated/gate-metrics.md`` come from one
-recorded run of the canonical gate. This script never invents a runtime: an arm
-missing from the receipt is reported as not recorded. Test counts are derived
-from the current suite with ``pytest --collect-only``.
+The numbers in ``docs/_generated/gate-metrics.md`` come from recorded receipts:
+
+* ``gate-timings.json`` -- one run of the canonical gate (``--timings``);
+* ``gate-baseline.json`` -- the pre-change arm commands and their measured wall
+  times, recorded once when the composable gate landed.
+
+The producer never invents a runtime: an arm missing from a receipt is reported
+as not recorded. Test counts are derived from the current suite with
+``pytest --collect-only``.
 
 Refresh after changing the gate or the test selection::
 
-    uv run python scripts/release_check.py --arm all --arm test \
+    uv run python scripts/release_check.py --arm all --arm test --arm render \
         --timings docs/_generated/gate-timings.json
     uv run python scripts/gate_metrics.py
 """
@@ -22,8 +27,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 RECEIPT = ROOT / "docs" / "_generated" / "gate-timings.json"
+BASELINE = ROOT / "docs" / "_generated" / "gate-baseline.json"
 OUTPUT = ROOT / "docs" / "_generated" / "gate-metrics.md"
 SCHEMA = "activeblockference-gate/v1"
+BASELINE_SCHEMA = "activeblockference-gate-baseline/v1"
 FAST_SELECTION = "not slow"
 
 ARM_ORDER = (
@@ -67,10 +74,22 @@ def _receipt() -> dict[str, object]:
     return payload
 
 
-def render(payload: dict[str, object]) -> str:
-    """Render the metrics document for one gate receipt."""
+def _baseline() -> dict[str, object]:
+    """Return the recorded pre-change baseline, or an empty record."""
+
+    if not BASELINE.is_file():
+        return {}
+    payload = json.loads(BASELINE.read_text(encoding="utf-8"))
+    if payload.get("schema") != BASELINE_SCHEMA:
+        raise ValueError(f"unsupported baseline schema {payload.get('schema')!r}")
+    return payload
+
+
+def render(payload: dict[str, object], baseline: dict[str, object]) -> str:
+    """Render the metrics document from the recorded receipts."""
 
     arms = payload.get("arms") or {}
+    before = baseline.get("arms") or {}
     tests = payload.get("tests") or {}
     lines = [
         "# Gate metrics",
@@ -84,24 +103,49 @@ def render(payload: dict[str, object]) -> str:
         "Refresh with:",
         "",
         "```bash",
-        "uv run python scripts/release_check.py --arm all --arm test \\",
+        "uv run python scripts/release_check.py --arm all --arm test --arm render \\",
         "    --timings docs/_generated/gate-timings.json",
         "uv run python scripts/gate_metrics.py",
         "```",
         "",
-        "## Arm wall times",
+        "## Before and after",
         "",
-        "| Arm | Wall seconds | Status | First command |",
-        "| --- | --- | --- | --- |",
+        "`n/a` means the arm or selection did not exist before the composable gate.",
+        "",
+        "| Arm | Before (s) | After (s) | After status | After command |",
+        "| --- | --- | --- | --- | --- |",
     ]
     for arm in ARM_ORDER:
-        entry = arms.get(arm)
-        if not entry:
-            lines.append(f"| `{arm}` | not recorded | — | — |")
-            continue
-        commands = entry.get("commands") or []
+        recorded = before.get(arm) or {}
+        current = arms.get(arm) or {}
+        before_seconds = recorded.get("seconds", "n/a")
+        after_seconds = current.get("seconds", "not recorded")
+        status = current.get("status", "—")
+        commands = current.get("commands") or []
         command = f"`{commands[0]}`" if commands else "—"
-        lines.append(f"| `{arm}` | {entry.get('seconds')} | {entry.get('status')} | {command} |")
+        lines.append(
+            f"| `{arm}` | {before_seconds} | {after_seconds} | {status} | {command} |"
+        )
+    notes = [
+        f"- `{arm}`: {recorded['note']}"
+        for arm, recorded in before.items()
+        if recorded.get("note") and not recorded.get("comparable", True)
+    ]
+    if notes:
+        lines += [
+            "",
+            "Baseline workloads that are not equivalent to their arms:",
+            "",
+            *notes,
+        ]
+    if baseline:
+        lines += [
+            "",
+            "Baseline conditions: " + str(baseline.get("conditions", "")),
+            "",
+            "The baseline and current receipts are historical evidence. Timings "
+            "include host load and warm caches; they are not a controlled benchmark.",
+        ]
     lines += ["", "## Test selection", "", "| Selection | Collected tests |", "| --- | --- |"]
     total = _collected()
     slow = _collected("-m", "slow")
@@ -123,11 +167,13 @@ def render(payload: dict[str, object]) -> str:
         )
     lines += [
         "",
-        "## Receipt",
+        "## Receipts",
         "",
-        "The source of these numbers is [`gate-timings.json`](gate-timings.json), "
-        "written by `scripts/release_check.py --timings`. An arm absent from that "
-        "receipt is reported as not recorded, never as passing.",
+        "The current numbers come from [`gate-timings.json`](gate-timings.json), "
+        "written by `scripts/release_check.py --timings`; the before numbers come "
+        "from [`gate-baseline.json`](gate-baseline.json), recorded once before the "
+        "composable gate landed. An arm absent from a receipt is reported as not "
+        "recorded, never as passing.",
         "",
     ]
     return "\n".join(lines)
@@ -140,7 +186,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--check", action="store_true", help="fail when the document is stale")
     args = parser.parse_args(argv)
     try:
-        content = render(_receipt())
+        content = render(_receipt(), _baseline())
     except (FileNotFoundError, ValueError, subprocess.CalledProcessError) as exc:
         print(f"gate metrics failed: {exc}", file=sys.stderr)
         return 1

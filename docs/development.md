@@ -17,7 +17,9 @@ smoke runs, and the wheel import check.
 mypy targets the `requires-python` floor (`python_version = "3.11"` in
 `pyproject.toml`), so one run covers the minimum supported stubs. Notebook
 execution, real-pipeline integration, CLI smoke, and figure-byte checks carry
-the `slow` marker and are excluded from `--arm test`.
+the `slow` marker and are excluded from `--arm test`. The recorded before/after
+arm times, including the render arm, are in
+[`_generated/gate-metrics.md`](_generated/gate-metrics.md).
 
 The pinned GNN parser conformance check (`scripts/validate_gnn_spec.py`) is
 part of the `gnn` arm only when `GNN_ROOT` or `GNN_RUNTIME_PYTHON` is set,
