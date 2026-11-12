@@ -73,7 +73,7 @@ tasks:
 docs:
 - README.md
 - AGENTS.md
-- .aii/docs/INTEGRATION.md
+- docs/INTEGRATION.md
 - docs/README.md
 - docs/AGENTS.md
 schema: aii-sidecar/v1
