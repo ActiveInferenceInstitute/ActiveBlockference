@@ -88,6 +88,8 @@ The receipt is written to `docs/_build/gnn/validation-receipt.json`
   raise `ValueError` naming the field. This interim local reader remains in use
   because the estate pin predates `gnn.importers`; shared-reader adoption requires
   a pin containing that upstream API, not a vendored copy.
+  CI provisioning uses this same reader in the locked package environment,
+  rather than independently loading unvalidated JSON.
 
 ## Scope
 
