@@ -7,15 +7,22 @@ second copy of any command.
 
 ```bash
 uv run python scripts/release_check.py              # fast arms (default)
-uv run python scripts/release_check.py --arm all    # release gate
+uv run python scripts/release_check.py --arm all --gnn-runtime /path/to/gnn-runtime/bin/python
 uv run python scripts/release_check.py --list       # arms and their commands
 ```
+
+Run `uv sync --locked --extra dev` before the gate. Its child commands set
+`UV_NO_SYNC=1` to reuse that prepared project environment instead of repeating
+dependency synchronization.
 
 Measured wall times and test counts live in the generated
 [`_generated/gate-metrics.md`](_generated/gate-metrics.md), which shows the
 recorded before/after arm times and labels baseline workloads that are not
-equivalent to their arms. Do not hand-edit those numbers: refresh them with the
-commands the generated page records.
+equivalent to their arms. These are one-run, host-specific receipts, not a
+controlled benchmark or a claimed speedup. The offline package baseline failed
+because its required package was absent from the local cache; preserve that
+failure rather than comparing it as a successful workload. Do not hand-edit
+measurements.
 
 ## Arms
 
@@ -27,10 +34,10 @@ commands the generated page records.
 | `test-full` | `uv run pytest --cov=blockference --cov-report=term --cov-report=xml --cov-fail-under=90` | yes |
 | `docs` | `scripts/check_docs_links.py`, `scripts/gate_metrics.py --check` | yes |
 | `manuscript` | `scripts/manuscript_variables.py --check`, `scripts/validate_manuscript.py`, `scripts/build_manuscript.py`, `scripts/build_manuscript.py --check` | yes |
-| `gnn` | `scripts/export_gnn_spec.py --check`, pinned `scripts/validate_gnn_spec.py` when a runtime is configured | yes |
+| `gnn` | `scripts/export_gnn_spec.py --check` and real pinned `scripts/validate_gnn_spec.py` validation; missing runtime fails | yes |
 | `smoke` | pipeline, validation, and standalone `run` JSON smoke checks in a temporary directory | yes |
-| `package` | `uv build` and a clean virtualenv import of the wheel | yes |
-| `render` | Pandoc + XeLaTeX PDF render of the manuscript | no |
+| `package` | `uv build`, locked `uv export` constraints for clean-wheel dependencies, and isolated import outside the source tree | yes |
+| `render` | `scripts/build_manuscript.py --render pdf` (Pandoc + XeLaTeX) | no |
 
 `--arm` is repeatable and arms always run in the canonical order above. `fast`
 is the default because it is the selection used while editing; `all` is the
@@ -51,10 +58,11 @@ job parses.
 The conformance job's key is `gnn-conformance` and its display name is
 `gnn conformance (pinned)`.
 
-The `gnn` arm always runs the offline drift check. Pinned-parser conformance
-runs when `GNN_ROOT` or `GNN_RUNTIME_PYTHON` is set, or when `--gnn-runtime` is
-passed; otherwise the arm reports the run as not run, never as a pass. CI
-provisions a runtime and passes `--require-gnn`.
+The `gnn` arm always runs both the offline drift check and real pinned-parser
+conformance. Select an installed pinned runtime with `--gnn-runtime` or
+`GNN_RUNTIME_PYTHON`, or supply a pinned source checkout via `GNN_ROOT` as
+described in [`gnn.md`](gnn.md). Missing or invalid runtime dependencies fail the
+arm and therefore `all`; conformance is never silently skipped.
 
 ## GitHub Actions
 
@@ -62,15 +70,41 @@ provisions a runtime and passes `--require-gnn`.
 
 | Job | Arms |
 | --- | --- |
-| `test` (matrix 3.11, 3.12) | `--arm test-full` |
-| `gate` (3.12) | `--arm lint --arm types --arm docs --arm manuscript --arm smoke --arm package` |
-| `gnn-conformance` | `--arm gnn --gnn-runtime <runtime> --require-gnn` |
+| `test` (matrix: Python 3.11 only) | `--arm test-full` |
+| `gnn-conformance` (Python 3.12; display name `gnn conformance (pinned)`) | `--arm all`, with `GNN_RUNTIME_PYTHON` set to the provisioned runtime |
 
-The matrix job therefore repeats only the test suite across supported Python
-versions; lint, types, docs, manuscript, smoke, and package work run once. The
-workflow installs uv with
+The full suite therefore runs on both supported CI Python versions. The
+remaining release arms run in `gnn-conformance` on Python 3.12, alongside the
+real pinned conformance check; there is no separate `gate` job. The pinned GNN
+runtime remains separate from the locked library environment because their
+NumPy requirements differ. PDF rendering is an explicit local `--arm render`
+selection, not part of `all` or CI.
+
+The workflow installs uv directly with
 `astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2` (`v10.3.3`,
 pinned by commit because setup-uv publishes no floating `v10` tag). It does not
-use the composite action
+use the Institute composite action
 `ActiveInferenceInstitute/.github/.github/actions/setup-python-uv@7159e67315330aac8e414aebae0ad1e999a41448`;
 the workflow installs the locked environment directly.
+
+## Recording measurements
+
+`release_check.py --timings PATH` writes the actual commands, statuses, and
+elapsed times for the selected run, including a failed arm. Use a fresh receipt
+path for each run; selecting `render` separately records the explicit local PDF
+build without adding it to CI.
+
+Import receipts before regenerating the checked metrics page:
+
+```bash
+uv run python scripts/gate_metrics.py \
+  --record-baseline /path/to/before-receipt.json \
+  --record-baseline /path/to/before-render-receipt.json \
+  --record-timings /path/to/after-receipt.json
+uv run python scripts/gate_metrics.py --check
+```
+
+Replace these paths with receipts produced by real gate runs. `--record-baseline`
+is repeatable for disjoint selections; `--record-timings` accepts one combined
+`--arm all --arm test --arm render` receipt. Do not synthesize timings or turn
+failed, missing, or non-equivalent measurements into passes.

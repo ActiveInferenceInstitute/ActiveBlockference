@@ -20,6 +20,11 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+if __package__:
+    from scripts.validate_manuscript import figure_registry_errors
+else:
+    from validate_manuscript import figure_registry_errors
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 os.environ.setdefault(
     "MPLCONFIGDIR", str(Path(os.getenv("TMPDIR", "/tmp")) / "activeblockference-mpl")
@@ -190,8 +195,8 @@ def _manuscript_variables() -> dict[str, str]:
     """Return the declared manuscript variables as substitution text.
 
     The values are produced by ``scripts/manuscript_variables.py`` from
-    ``pyproject.toml``, the GNN pin, and the CI workflow, so prose never carries
-    a hand-copied pin, job name, or Python floor.
+    ``pyproject.toml``, the executable experiment configuration, the GNN pin,
+    and the CI workflow rather than hand-copied prose values.
     """
 
     if not VARIABLES_PATH.is_file():
@@ -514,6 +519,9 @@ def build_figures(output_dir: Path = FIGURE_DIR) -> list[Path]:
     path = output_dir / "fig4_release_contract.svg"
     _save_figure(fig, path)
     paths.append(path)
+    errors = figure_registry_errors(MANUSCRIPT_DIR, output_dir)
+    if errors:
+        raise ValueError("; ".join(errors))
     return paths
 
 
@@ -707,31 +715,26 @@ def main(argv: list[str] | None = None) -> int:
     if args.check and args.render != "none":
         parser.error("--check cannot be combined with --render")
     try:
+        registry_errors = figure_registry_errors(MANUSCRIPT_DIR, check_files=False)
+        if registry_errors:
+            raise ValueError("; ".join(registry_errors))
         compiled, labels = compose_manuscript()
         if not args.check:
             if not args.no_figures:
                 build_figures()
+            else:
+                registry_errors = figure_registry_errors(MANUSCRIPT_DIR, FIGURE_DIR)
+                if registry_errors:
+                    raise ValueError("; ".join(registry_errors))
             output = _write_outputs(compiled)
             print(f"wrote {output}")
             if args.render != "none":
                 rendered = render_manuscript(output, args.render, args.output)
                 print(f"rendered {rendered}")
         else:
-            missing = [
-                str(path)
-                for path in (
-                    FIGURE_DIR / f"fig{i}_{name}.svg"
-                    for i, name in (
-                        (1, "active_inference_loop"),
-                        (2, "collision_resolution"),
-                        (3, "seeded_run"),
-                        (4, "release_contract"),
-                    )
-                )
-                if not path.is_file()
-            ]
-            if missing:
-                raise FileNotFoundError("missing manuscript figures: " + ", ".join(missing))
+            registry_errors = figure_registry_errors(MANUSCRIPT_DIR, FIGURE_DIR)
+            if registry_errors:
+                raise ValueError("; ".join(registry_errors))
             if not (BUILD_DIR / "manuscript.md").is_file():
                 raise FileNotFoundError(
                     f"missing composed manuscript: {BUILD_DIR / 'manuscript.md'}"

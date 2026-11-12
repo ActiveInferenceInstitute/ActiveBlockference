@@ -16,9 +16,12 @@ Use the following conventions:
 6. Cite scholarship with `[@BibTeXKey]` and add the key to `references.bib`.
 7. Generate figures from code and close every figure on success and failure.
 8. Do not hardcode a generated result when it can be derived by the builder.
+   Declare each figure's label, ordered source, and SVG/PNG companions in
+   `figure-registry.json`; do not leave undeclared figures in `figures/`.
 9. Use `{{token}}` placeholders from `docs/_generated/manuscript-variables.json`
-   for pins, job names, versions, and the Python floor; never type those values
-   into prose. Regenerate with `scripts/manuscript_variables.py`.
+   for pins, job names, versions, the Python floor, and reference-run parameters;
+   never type those values into prose. Regenerate with
+   `scripts/manuscript_variables.py` after changing their source configuration.
 
 Required checks are:
 

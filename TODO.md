@@ -1,10 +1,10 @@
 # ActiveBlockference TODO
 
 Owner: Active Inference Institute
-Last reviewed: 2026-11-11
+Last reviewed: 2026-11-12
 
 This file records documentation findings from the 2026-08-02 DOCS-DEEP pass and
-the 2026-11-11 completeness pass.
+the 2026-11-11 completeness pass, plus the subsequent estate alignment.
 Items are grouped by the size of the documentation change required:
 
 * **Minor** — typo, broken link, stale path, or formatting correction.
@@ -46,6 +46,15 @@ Items are grouped by the size of the documentation change required:
       the manuscript and package floor can no longer disagree. The
       `python_version < '3.11'` `tomli` fallback in `requirements.txt` remains a
       data-file pin, not a second supported floor.
+- [x] Align the documentation hub and flat index with long-lived guides,
+      generated receipts, and the manuscript figure registry; keep measured
+      values in generated metrics rather than human-maintained prose.
+- [x] Document the fail-closed GNN arm, the canonical full parser pin, the
+      Python 3.11 test-only/Python 3.12 full-gate CI mapping, and the directly
+      pinned uv setup action without claiming use of the Institute composite.
+- [x] Document receipt imports, including the failed offline package baseline
+      cache miss, without claiming a speedup; distinguish the declared NumPy
+      range from the actual lockfile resolution.
 
 ## Major
 
@@ -55,13 +64,18 @@ an executable publication validator.
 
 ## Open / deferred
 
-- The Python-version claim under **Medium** is open pending an owner decision on
-  which side to change. All 2026-08-02 docs-deep items remain complete.
+No unresolved item remains from the listed documentation findings. The Python
+floor reconciliation under **Medium** is complete, not deferred.
 
 ## Verification notes
 
-The pass verified the documented single-agent and multi-agent Python examples,
-the `docs/api.md` pipeline example, the tutorial snippets, `uv run ruff check
-blockference tests scripts GRTs`, manuscript validation/build drift checks, and
-the repository-wide relative Markdown links and anchors. Full release verification
-remains the canonical `uv run python scripts/release_check.py --arm all` command.
+The earlier completeness pass verified the documented single-agent and
+multi-agent Python examples, the `docs/api.md` pipeline example, the tutorial
+snippets, Ruff, manuscript validation/build drift checks, and repository-wide
+relative Markdown links and anchors. These are historical verification notes,
+not results from the estate alignment.
+
+The estate documentation edits were reviewed by reasoning only; integrated
+verification belongs to the canonical release selection in
+[`docs/gate.md`](docs/gate.md), with a configured pinned GNN runtime. The
+generated metrics and receipts record actual runs, including failures.

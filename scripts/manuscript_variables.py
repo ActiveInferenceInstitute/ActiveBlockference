@@ -2,8 +2,8 @@
 
 Manuscript prose uses ``{{token}}`` placeholders; the declared values come from
 this generated file rather than from hand-copied literals. The values are read
-from ``pyproject.toml`` (Python floor and package version), the canonical GNN
-pin, and the CI workflow (the conformance job key and display name).
+from ``pyproject.toml`` (Python floor and package version), the executable
+manuscript configuration, the canonical GNN pin, and the CI workflow.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ VARIABLES_PATH = ROOT / "docs" / "_generated" / "manuscript-variables.json"
 PIN_PATH = ROOT / "specs" / "gnn-pin.json"
 WORKFLOW_PATH = ROOT / ".github" / "workflows" / "ci.yml"
 SCHEMA = "manuscript-variables/v1"
+MANUSCRIPT_CONFIG_PATH = ROOT / "docs" / "manuscript" / "config.yaml"
 
 
 def _project() -> dict[str, object]:
@@ -49,6 +50,31 @@ def build() -> dict[str, object]:
     project = _project()
     pin = json.loads(PIN_PATH.read_text(encoding="utf-8"))
     job_key, job_name = _gnn_job()
+    metadata = yaml.safe_load(MANUSCRIPT_CONFIG_PATH.read_text(encoding="utf-8"))
+    config_path = metadata["experiment"]["config_path"]
+    config = yaml.safe_load((ROOT / config_path).read_text(encoding="utf-8"))
+    experiment_values = {
+        "experiment_config_path": config_path,
+        "experiment_engine": config["engine"],
+        "experiment_dimension": config["grid"]["dimension"],
+        "experiment_agents": config["simulation"]["n_agents"],
+        "experiment_planning_length": config["grid"]["planning_length"],
+        "experiment_timesteps": config["simulation"]["timesteps"],
+        "experiment_seed": config["seed"],
+        "experiment_affordance_count": len(config["grid"]["affordances"]),
+        "experiment_affordances": ", ".join(f"`{value}`" for value in config["grid"]["affordances"]),
+    }
+    experiment_sources = {
+        "experiment_config_path": "docs/manuscript/config.yaml experiment.config_path",
+        "experiment_engine": f"{config_path} engine",
+        "experiment_dimension": f"{config_path} grid.dimension",
+        "experiment_agents": f"{config_path} simulation.n_agents",
+        "experiment_planning_length": f"{config_path} grid.planning_length",
+        "experiment_timesteps": f"{config_path} simulation.timesteps",
+        "experiment_seed": f"{config_path} seed",
+        "experiment_affordance_count": f"{config_path} len(grid.affordances)",
+        "experiment_affordances": f"{config_path} grid.affordances",
+    }
     return {
         "schema": SCHEMA,
         "python_requires": _python_requires(str(project["requires-python"])),
@@ -61,6 +87,7 @@ def build() -> dict[str, object]:
         "gnn_commit": str(pin["commit"]),
         "gnn_job_key": job_key,
         "gnn_job_name": job_name,
+        **experiment_values,
         "sources": {
             "python_requires": "pyproject.toml [project].requires-python",
             "package_version": "pyproject.toml [project].version",
@@ -72,6 +99,7 @@ def build() -> dict[str, object]:
             "gnn_commit": "specs/gnn-pin.json commit",
             "gnn_job_key": ".github/workflows/ci.yml GNN job key",
             "gnn_job_name": ".github/workflows/ci.yml GNN job name",
+            **experiment_sources,
         },
     }
 

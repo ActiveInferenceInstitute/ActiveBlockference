@@ -33,6 +33,79 @@ def _bibliography_keys() -> set[str]:
     return set(re.findall(r"@\w+\{([^,]+),", content))
 
 
+def figure_registry_errors(
+    manuscript: Path, figure_dir: Path | None = None, *, check_files: bool = True
+) -> list[str]:
+    """Compare the figure declaration with source references and asset names."""
+
+    try:
+        registry = json.loads((manuscript / "figure-registry.json").read_text(encoding="utf-8"))
+        if not isinstance(registry, dict) or registry.get("schema") != "manuscript-figures/v1":
+            raise ValueError("expected manuscript-figures/v1 schema")
+        entries = registry.get("figures")
+        if not isinstance(entries, list) or not entries:
+            raise ValueError("figures must be a non-empty list")
+        declared: dict[str, dict[str, str]] = {}
+        filenames: set[str] = set()
+        for entry in entries:
+            if not isinstance(entry, dict) or any(
+                not isinstance(entry.get(key), str) for key in ("label", "source", "svg", "png")
+            ):
+                raise ValueError("each figure must declare label, source, svg, and png strings")
+            label = entry["label"]
+            if not re.fullmatch(r"fig:[A-Za-z0-9_-]+", label) or label in declared:
+                raise ValueError(f"invalid or duplicate figure label: {label}")
+            if not re.fullmatch(r"[0-9][0-9]_[^/\\]+\.md", entry["source"]):
+                raise ValueError(f"invalid figure source: {entry['source']}")
+            for suffix in ("svg", "png"):
+                name = entry[suffix]
+                if Path(name).name != name or not name.endswith(f".{suffix}") or name in filenames:
+                    raise ValueError(f"invalid or duplicate figure filename: {name}")
+                filenames.add(name)
+            if Path(entry["svg"]).stem != Path(entry["png"]).stem:
+                raise ValueError(f"figure companions have different stems: {label}")
+            declared[label] = entry
+    except (OSError, ValueError) as exc:
+        return [f"figure registry invalid: {exc}"]
+
+    errors: list[str] = []
+    referenced: set[str] = set()
+    for source in sorted(manuscript.glob("[0-9][0-9]_*.md")):
+        text = source.read_text(encoding="utf-8")
+        for label in re.findall(r"@(fig:[A-Za-z0-9_-]+)", text):
+            if label not in declared:
+                errors.append(f"figure registry has no entry for reference {label} in {source.name}")
+        for image in re.finditer(r"!\[[^\]]*\]\(figures/([^)]+)\)(?:\{([^}]*)\})?", text):
+            name, attributes = image.groups()
+            label_match = re.search(r"#(fig:[A-Za-z0-9_-]+)", attributes or "")
+            label = label_match.group(1) if label_match else ""
+            entry = declared.get(label)
+            if entry is None:
+                errors.append(f"figure registry has no entry for {name} ({label or 'unlabelled'})")
+                continue
+            referenced.add(label)
+            if source.name != entry["source"] or name not in (entry["svg"], entry["png"]):
+                errors.append(f"figure registry reference mismatch: {label} in {source.name}: {name}")
+    for label in sorted(declared.keys() - referenced):
+        errors.append(f"figure registry orphan declaration: {label}")
+    if check_files:
+        directory = figure_dir if figure_dir is not None else manuscript / "figures"
+        actual = (
+            {
+                path.name
+                for path in directory.iterdir()
+                if path.is_file() and path.suffix in {".svg", ".png"}
+            }
+            if directory.is_dir()
+            else set()
+        )
+        for name in sorted(filenames - actual):
+            errors.append(f"figure registry missing asset: {name}")
+        for name in sorted(actual - filenames):
+            errors.append(f"figure registry orphan asset: {name}")
+    return errors
+
+
 def validate() -> list[str]:
     errors: list[str] = []
     sources = sorted(MANUSCRIPT.glob("[0-9][0-9]_*.md"))
@@ -51,9 +124,7 @@ def validate() -> list[str]:
     missing_citations = sorted(citations - _bibliography_keys())
     if missing_citations:
         errors.append("missing bibliography keys: " + ", ".join(missing_citations))
-    for figure in re.findall(r"\]\((figures/[^)]+)\)", all_text):
-        if not (MANUSCRIPT / figure).is_file():
-            errors.append(f"missing referenced figure: {figure}")
+    errors.extend(figure_registry_errors(MANUSCRIPT))
     tokens = set(re.findall(r"\{\{([A-Za-z_][A-Za-z0-9_]*)\}\}", all_text))
     try:
         undeclared = sorted(tokens - _declared_variables())

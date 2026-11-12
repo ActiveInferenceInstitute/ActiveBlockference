@@ -5,22 +5,22 @@
         "uv run python scripts/check_docs_links.py",
         "uv run python scripts/gate_metrics.py --check"
       ],
-      "seconds": 10.25,
+      "seconds": 3.56,
       "status": "passed"
     },
     "gnn": {
       "commands": [
         "uv run python scripts/export_gnn_spec.py --check",
-        "uv run python scripts/validate_gnn_spec.py --json"
+        "uv run python scripts/validate_gnn_spec.py --gnn-runtime /private/tmp/gnn-rt-503/bin/python --json"
       ],
-      "seconds": 5.74,
+      "seconds": 1.51,
       "status": "passed"
     },
     "lint": {
       "commands": [
         "uv run ruff check blockference tests GRTs scripts"
       ],
-      "seconds": 0.05,
+      "seconds": 0.08,
       "status": "passed"
     },
     "manuscript": {
@@ -30,64 +30,191 @@
         "uv run python scripts/build_manuscript.py",
         "uv run python scripts/build_manuscript.py --check"
       ],
-      "seconds": 7.73,
+      "seconds": 3.24,
       "status": "passed"
     },
     "package": {
       "commands": [
         "uv build",
-        "uv venv --python /Users/friedman/Documents/Git/gitvault/Username/ActiveInferenceInstitute/Public/ActiveBlockference/.venv/bin/python /var/folders/qs/rxkntx5d4hlgz0c7x8v15gym0000gn/T/activeblockference-package-f6ywi5t7/venv",
-        "uv pip install --python /var/folders/qs/rxkntx5d4hlgz0c7x8v15gym0000gn/T/activeblockference-package-f6ywi5t7/venv/bin/python /Users/friedman/Documents/Git/gitvault/Username/ActiveInferenceInstitute/Public/ActiveBlockference/dist/active_blockference-1.0.0-py3-none-any.whl",
-        "/var/folders/qs/rxkntx5d4hlgz0c7x8v15gym0000gn/T/activeblockference-package-f6ywi5t7/venv/bin/python -c from blockference import GridWorld; assert GridWorld(2, {'agent': (0, 0)}).current_state == {'agent': (0, 0)}"
+        "uv export --locked --no-dev --no-emit-project --no-hashes --output-file /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-package-kki5eqz6/constraints.txt",
+        "uv venv --python /Users/friedman/Documents/Git/gitvault/Username/ActiveInferenceInstitute/Public/ActiveBlockference/.venv/bin/python /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-package-kki5eqz6/venv",
+        "uv pip install --python /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-package-kki5eqz6/venv/bin/python --constraint /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-package-kki5eqz6/constraints.txt /Users/friedman/Documents/Git/gitvault/Username/ActiveInferenceInstitute/Public/ActiveBlockference/dist/active_blockference-1.0.0-py3-none-any.whl",
+        "/private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-package-kki5eqz6/venv/bin/python -I -c from blockference import GridWorld; assert GridWorld(2, {'agent': (0, 0)}).current_state == {'agent': (0, 0)}"
       ],
-      "seconds": 12.87,
+      "seconds": 14.86,
       "status": "passed"
     },
     "render": {
       "commands": [
         "uv run python scripts/build_manuscript.py --render pdf"
       ],
-      "seconds": 11.65,
+      "seconds": 6.18,
       "status": "passed"
     },
     "smoke": {
       "commands": [
-        "uv run blockference pipeline --config configs/smoke.yml --output-root /var/folders/qs/rxkntx5d4hlgz0c7x8v15gym0000gn/T/activeblockference-gate-1k9b70t9/output --run-name gate_smoke",
-        "uv run blockference validation --run-dir /var/folders/qs/rxkntx5d4hlgz0c7x8v15gym0000gn/T/activeblockference-gate-1k9b70t9/output/gate_smoke",
-        "uv run blockference run --config configs/smoke.yml --output /var/folders/qs/rxkntx5d4hlgz0c7x8v15gym0000gn/T/activeblockference-gate-1k9b70t9/run.csv"
+        "uv run blockference pipeline --config configs/smoke.yml --output-root /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-gate-vx7lf7ds/output --run-name gate_smoke",
+        "uv run blockference validation --run-dir /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-gate-vx7lf7ds/output/gate_smoke",
+        "uv run blockference run --config configs/smoke.yml --output /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-gate-vx7lf7ds/run.csv"
       ],
-      "seconds": 6.1,
+      "seconds": 2.55,
       "status": "passed"
     },
     "test": {
       "commands": [
         "uv run pytest -m not slow"
       ],
-      "seconds": 15.18,
+      "seconds": 4.82,
       "status": "passed"
     },
     "test-full": {
       "commands": [
         "uv run pytest --cov=blockference --cov-report=term --cov-report=xml --cov-fail-under=90"
       ],
-      "seconds": 77.03,
+      "seconds": 31.17,
       "status": "passed"
     },
     "types": {
       "commands": [
         "uv run mypy blockference"
       ],
-      "seconds": 0.28,
+      "seconds": 0.3,
       "status": "passed"
     }
   },
-  "generated": "2026-11-12T13:20:11Z",
+  "completed": "2026-11-12T14:02:13Z",
+  "conditions": "First successful measurements retained for each arm. Package initially failed twice because offline pandas wheel metadata was unavailable; only package and the not-yet-run render arm were then run after SHA-256-verified acquisition of the exact pandas wheel in uv.lock. Those failures remain in this receipt\u2019s runs. UV_FIND_LINKS pointed to that verified local wheelhouse for the successful package run. Baseline and after test selections differ by the new regression cases. No speedup is claimed.",
+  "generated": "2026-11-12T13:56:34Z",
   "host": "macOS-27.0.1-arm64-arm-64bit",
   "python": "3.12.16",
+  "runs": [
+    {
+      "arms": {
+        "docs": {
+          "commands": [
+            "uv run python scripts/check_docs_links.py",
+            "uv run python scripts/gate_metrics.py --check"
+          ],
+          "seconds": 3.56,
+          "status": "passed"
+        },
+        "gnn": {
+          "commands": [
+            "uv run python scripts/export_gnn_spec.py --check",
+            "uv run python scripts/validate_gnn_spec.py --gnn-runtime /private/tmp/gnn-rt-503/bin/python --json"
+          ],
+          "seconds": 1.51,
+          "status": "passed"
+        },
+        "lint": {
+          "commands": [
+            "uv run ruff check blockference tests GRTs scripts"
+          ],
+          "seconds": 0.08,
+          "status": "passed"
+        },
+        "manuscript": {
+          "commands": [
+            "uv run python scripts/manuscript_variables.py --check",
+            "uv run python scripts/validate_manuscript.py",
+            "uv run python scripts/build_manuscript.py",
+            "uv run python scripts/build_manuscript.py --check"
+          ],
+          "seconds": 3.24,
+          "status": "passed"
+        },
+        "package": {
+          "commands": [],
+          "error": "Command '['uv', 'pip', 'install', '--python', '/private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-package-cppzgeqk/venv/bin/python', '--constraint', '/private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-package-cppzgeqk/constraints.txt', '/Users/friedman/Documents/Git/gitvault/Username/ActiveInferenceInstitute/Public/ActiveBlockference/dist/active_blockference-1.0.0-py3-none-any.whl']' returned non-zero exit status 1.",
+          "seconds": 1.67,
+          "status": "failed"
+        },
+        "smoke": {
+          "commands": [
+            "uv run blockference pipeline --config configs/smoke.yml --output-root /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-gate-vx7lf7ds/output --run-name gate_smoke",
+            "uv run blockference validation --run-dir /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-gate-vx7lf7ds/output/gate_smoke",
+            "uv run blockference run --config configs/smoke.yml --output /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-gate-vx7lf7ds/run.csv"
+          ],
+          "seconds": 2.55,
+          "status": "passed"
+        },
+        "test": {
+          "commands": [
+            "uv run pytest -m not slow"
+          ],
+          "seconds": 4.82,
+          "status": "passed"
+        },
+        "test-full": {
+          "commands": [
+            "uv run pytest --cov=blockference --cov-report=term --cov-report=xml --cov-fail-under=90"
+          ],
+          "seconds": 31.17,
+          "status": "passed"
+        },
+        "types": {
+          "commands": [
+            "uv run mypy blockference"
+          ],
+          "seconds": 0.3,
+          "status": "passed"
+        }
+      },
+      "generated": "2026-11-12T13:56:34Z",
+      "host": "macOS-27.0.1-arm64-arm-64bit",
+      "python": "3.12.16",
+      "schema": "activeblockference-gate/v1",
+      "tests": {
+        "coverage_percent": 90.94,
+        "passed": 92,
+        "skipped": 0
+      }
+    },
+    {
+      "arms": {
+        "package": {
+          "commands": [],
+          "error": "Command '['uv', 'pip', 'install', '--python', '/private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-package-uftvgkxi/venv/bin/python', '--constraint', '/private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-package-uftvgkxi/constraints.txt', '/Users/friedman/Documents/Git/gitvault/Username/ActiveInferenceInstitute/Public/ActiveBlockference/dist/active_blockference-1.0.0-py3-none-any.whl']' returned non-zero exit status 1.",
+          "seconds": 1.81,
+          "status": "failed"
+        }
+      },
+      "generated": "2026-11-12T13:59:29Z",
+      "host": "macOS-27.0.1-arm64-arm-64bit",
+      "python": "3.12.16",
+      "schema": "activeblockference-gate/v1"
+    },
+    {
+      "arms": {
+        "package": {
+          "commands": [
+            "uv build",
+            "uv export --locked --no-dev --no-emit-project --no-hashes --output-file /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-package-kki5eqz6/constraints.txt",
+            "uv venv --python /Users/friedman/Documents/Git/gitvault/Username/ActiveInferenceInstitute/Public/ActiveBlockference/.venv/bin/python /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-package-kki5eqz6/venv",
+            "uv pip install --python /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-package-kki5eqz6/venv/bin/python --constraint /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-package-kki5eqz6/constraints.txt /Users/friedman/Documents/Git/gitvault/Username/ActiveInferenceInstitute/Public/ActiveBlockference/dist/active_blockference-1.0.0-py3-none-any.whl",
+            "/private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-package-kki5eqz6/venv/bin/python -I -c from blockference import GridWorld; assert GridWorld(2, {'agent': (0, 0)}).current_state == {'agent': (0, 0)}"
+          ],
+          "seconds": 14.86,
+          "status": "passed"
+        },
+        "render": {
+          "commands": [
+            "uv run python scripts/build_manuscript.py --render pdf"
+          ],
+          "seconds": 6.18,
+          "status": "passed"
+        }
+      },
+      "generated": "2026-11-12T14:02:13Z",
+      "host": "macOS-27.0.1-arm64-arm-64bit",
+      "python": "3.12.16",
+      "schema": "activeblockference-gate/v1"
+    }
+  ],
   "schema": "activeblockference-gate/v1",
   "tests": {
     "coverage_percent": 90.94,
-    "passed": 85,
+    "passed": 92,
     "skipped": 0
   }
 }

@@ -3,11 +3,14 @@
 ## Seeded reference run
 
 The reference figure is generated from the same package used by the pipeline.
-It configures a $3\times3$ grid, two agents, a planning horizon of two, six
-simulation timesteps, the five default affordances, and seed 17. No trajectory
-values are transcribed by hand: `scripts/build_manuscript.py` invokes
-`run_experiment`, extracts the returned coordinates and EFE vectors, and saves
-the figure after closing the Matplotlib figure in a `finally` block.
+It reads `{{experiment_config_path}}`, configuring a
+${{experiment_dimension}}\times{{experiment_dimension}}$ grid,
+{{experiment_agents}} agents, a planning horizon of {{experiment_planning_length}},
+{{experiment_timesteps}} simulation timesteps, {{experiment_affordance_count}}
+configured affordances, and seed {{experiment_seed}}. No trajectory values are
+transcribed by hand: `scripts/build_manuscript.py` invokes `run_experiment`,
+extracts the returned coordinates and EFE vectors, and saves the figure after
+closing the Matplotlib figure in a `finally` block.
 
 ![Seeded trajectories and persisted minimum policy EFE.](figures/fig3_seeded_run.png){#fig:seeded-run width=95%}
 
@@ -18,13 +21,13 @@ the actual diagnostic object, not a proxy derived from action entropy.
 
 | Parameter | Reference value |
 |---|---|
-| Backend | radCAD; cadCAD uses the same state-update contract |
-| Grid | $3\times3$ |
-| Agents | 2 |
-| Planning length | 2 |
-| Timesteps | 6 |
-| Seed | 17 |
-| Affordances | `UP`, `DOWN`, `LEFT`, `RIGHT`, `STAY` |
+| Backend | `{{experiment_engine}}`; both supported engines use the same state-update contract |
+| Grid | ${{experiment_dimension}}\times{{experiment_dimension}}$ |
+| Agents | {{experiment_agents}} |
+| Planning length | {{experiment_planning_length}} |
+| Timesteps | {{experiment_timesteps}} |
+| Seed | {{experiment_seed}} |
+| Affordances | {{experiment_affordances}} |
 
 : Reference configuration used for the reproducible manuscript figure. {#tbl:reference-run}
 

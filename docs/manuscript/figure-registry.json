@@ -1,0 +1,29 @@
+{
+  "schema": "manuscript-figures/v1",
+  "figures": [
+    {
+      "label": "fig:loop",
+      "source": "01_introduction.md",
+      "svg": "fig1_active_inference_loop.svg",
+      "png": "fig1_active_inference_loop.png"
+    },
+    {
+      "label": "fig:collision",
+      "source": "03_deterministic_dynamics.md",
+      "svg": "fig2_collision_resolution.svg",
+      "png": "fig2_collision_resolution.png"
+    },
+    {
+      "label": "fig:seeded-run",
+      "source": "06_results.md",
+      "svg": "fig3_seeded_run.svg",
+      "png": "fig3_seeded_run.png"
+    },
+    {
+      "label": "fig:release-contract",
+      "source": "05_validation.md",
+      "svg": "fig4_release_contract.svg",
+      "png": "fig4_release_contract.png"
+    }
+  ]
+}

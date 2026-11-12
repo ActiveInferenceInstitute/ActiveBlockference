@@ -23,9 +23,13 @@ artefacts, and fail-closed validation.
 ```bash
 uv sync --locked --extra dev
 uv run python scripts/release_check.py            # fast arms (default)
-uv run python scripts/release_check.py --arm all  # release gate
+uv run python scripts/release_check.py --arm all --gnn-runtime /path/to/gnn-runtime/bin/python
 uv run blockference pipeline --config configs/smoke.yml --output-root output
 ```
+
+The release gate requires a separate pinned GNN runtime; replace the example
+interpreter path above with yours. [`docs/gate.md`](docs/gate.md) defines the
+arms and CI mapping, and [`docs/gnn.md`](docs/gnn.md) explains runtime setup.
 
 The CLI has three explicit commands:
 
@@ -109,7 +113,8 @@ The grid-world generative model is declared in
 [Generalized Notation Notation](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation)
 (GNN). The document is generated from the implementation and validated against
 the upstream parser pinned in [`specs/gnn-pin.json`](specs/gnn-pin.json)
-(GNN v5.0.3, commit `8f293d9ba`): the validator reads the declared parameters
+(schema `gnn-importer-pin/v1`, GNN v5.0.3, commit
+`8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1`): the validator reads the declared parameters
 back, builds the runtime model from them, and requires the declared matrices to
 match exactly. See [`docs/gnn.md`](docs/gnn.md) for the commands and the
 conformance contract.

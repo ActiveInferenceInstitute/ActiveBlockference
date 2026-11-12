@@ -7,11 +7,16 @@
 (`8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1`) and records SHA-256 digests for
 the five parser files under `src/gnn/`.
 
-The job installs that commit into a separate runtime, then runs
-`python scripts/validate_gnn_spec.py --gnn-runtime <runtime> --json` and checks
-that the resolved `gnn.__version__` matches the pin tag. The validator verifies
-the installed parser file digests, parses `specs/gridworld_3x3.gnn.md` with the
-pinned `MarkdownGNNParser`, and compares the declared parameters and the `A`,
+The job installs that commit into a separate Python 3.12 runtime, then invokes
+the canonical release gate with `--arm all` and `GNN_RUNTIME_PYTHON` set to that runtime. Its `gnn`
+arm always performs both the offline drift check and real pinned validation;
+a missing runtime fails instead of skipping conformance. See
+[`docs/gate.md`](../docs/gate.md) for the complete job and arm map, and
+[`docs/gnn.md`](../docs/gnn.md) for standalone validation commands.
+
+The validator checks that the resolved `gnn.__version__` matches the pin tag,
+verifies the installed parser file digests, parses `specs/gridworld_3x3.gnn.md`
+with the pinned `MarkdownGNNParser`, and compares the declared parameters and the `A`,
 `B`, `C`, `D`, and `E` matrices against the runtime model built by
 `blockference.gnn`; it also requires the pinned semantic validator, the
 B-orientation check, and the consistency checker to report no errors or

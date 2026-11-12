@@ -13,6 +13,8 @@ Start here if you are new to the repository:
 Generated facts live under [`_generated/`](_generated/README.md). Measured gate
 numbers are in [`_generated/gate-metrics.md`](_generated/gate-metrics.md); do
 not copy those numbers into prose.
+The receipts retain failed and non-equivalent workloads, including the offline
+package baseline cache miss; they do not establish a speedup.
 
 ## Concepts and design
 
@@ -37,12 +39,22 @@ not copy those numbers into prose.
   schema notes.
 * [`../notebooks/README.md`](../notebooks/README.md) — executable notebook
   examples.
+* [`../scripts/README.md`](../scripts/README.md) — release and publication tools.
+* [`../tests/README.md`](../tests/README.md) — test layout and gate coverage.
+* [`../.github/workflows/README.md`](../.github/workflows/README.md) — workflow
+  entry point; [`gate.md`](gate.md) owns the exact two-job CI map.
+* [`../SECURITY.md`](../SECURITY.md) — private security reporting.
+* [`../TODO.md`](../TODO.md) — documentation completion record.
+* [`../GRTs/README.md`](../GRTs/README.md) — optional local research orchestration.
+* [`../.aii/README.md`](../.aii/README.md) — InstituteOS metadata sidecar.
 
 ## Publication source
 
-* [`manuscript/`](manuscript/) — the ordered publication source, formal
-  definitions, numbered equations, figures, bibliography, and reproducible
-  build commands.
+* [`manuscript/README.md`](manuscript/README.md) — ordered publication source,
+  formal definitions, numbered equations, bibliography, and build commands.
+* [`manuscript/SYNTAX.md`](manuscript/SYNTAX.md) — publication syntax and variables.
+* [`manuscript/figure-registry.json`](manuscript/figure-registry.json) — figure
+  sources and artifact mapping.
 
 The software verdicts described throughout these documents certify software and
 artefact integrity only; they do not establish empirical adequacy of a

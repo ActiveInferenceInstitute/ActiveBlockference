@@ -47,11 +47,14 @@ works. Exit codes are `0` pass, `1` conformance failure, and `2` pinned runtime
 or checkout unavailable — an unavailable run is reported as not run, never as a
 pass.
 
-CI runs the same validation in the `gnn-conformance` job (display name
-`gnn conformance (pinned)`), provisioning a separate Python 3.12 runtime from
-the pinned revision because the GNN distribution requires `numpy>=2` while this
-package resolves `numpy` 1.x. Locally, `scripts/release_check.py --arm gnn`
-runs it when `GNN_ROOT` or `GNN_RUNTIME_PYTHON` is set.
+CI's `gnn-conformance` job (display name `gnn conformance (pinned)`) runs the
+full `all` selection on Python 3.12, provisioning a separate pinned runtime
+because GNN requires NumPy 2.x while the library's committed lock resolves
+NumPy 1.x. Locally, the `gnn` arm always runs both specification drift and real
+parser conformance, using `--gnn-runtime`, `GNN_RUNTIME_PYTHON`, or `GNN_ROOT`.
+An unavailable runtime fails the arm and `all`; no opt-in requirement flag or
+skip mode is needed. See [`gate.md`](gate.md) for the canonical gate commands
+and exact CI map.
 
 ## What the validation checks
 
