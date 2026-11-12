@@ -94,10 +94,30 @@ jobs:
           uv pip install --python "$RUNNER_TEMP/gnn-runtime/bin/python" \
             "generalized-notation-notation @ git+${REPO}@${COMMIT}"
 
+      - name: Verify the pinned GNN tag and commit
+        run: |
+          set -euo pipefail
+          PIN=specs/gnn-pin.json
+          PY=$(uv python find --no-project 3.12)
+          REPO=$("$PY" -c "import json;print(json.load(open('$PIN'))['repository'])")
+          COMMIT=$("$PY" -c "import json;print(json.load(open('$PIN'))['commit'])")
+          TAG=$("$PY" -c "import json;print(json.load(open('$PIN'))['tag'])")
+          # Resolve the tag in the upstream object store; an annotated tag also
+          # advertises its peeled commit. A tag that points elsewhere is a pin
+          # failure, never a warning.
+          RESOLVED=$(git ls-remote --tags "$REPO" "refs/tags/${TAG}^{}" | awk '{print $1}')
+          if [ -z "$RESOLVED" ]; then
+            RESOLVED=$(git ls-remote --tags "$REPO" "refs/tags/${TAG}" | awk '{print $1}')
+          fi
+          test -n "$RESOLVED"
+          test "$RESOLVED" = "$COMMIT"
+          echo "gnn-tag=${TAG} commit=${COMMIT}" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Validate the GNN specification against the pinned parser
         run: >-
           uv run python scripts/validate_gnn_spec.py
-          --gnn-runtime "$RUNNER_TEMP/gnn-runtime/bin/python" --json
+          --gnn-runtime "$RUNNER_TEMP/gnn-runtime/bin/python"
+          --verify-tag-remote --json
 
       - name: Report the resolved GNN version
         run: |
