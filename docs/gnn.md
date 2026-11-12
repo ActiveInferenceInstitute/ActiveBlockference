@@ -83,7 +83,11 @@ The receipt is written to `docs/_build/gnn/validation-receipt.json`
 * `render_spec(parameters)` — the document text.
 * `parameters_from_parsed(payload)` / `declared_arrays(payload)` — read a
   pinned parser payload back into parameters and matrices.
-* `load_pin()` — the recorded upstream pin.
+* `load_pin()` — the recorded upstream pin, requiring schema
+  `gnn-importer-pin/v1`, tag `v5.0.3`, and a full 40-hex commit. Invalid records
+  raise `ValueError` naming the field. This interim local reader remains in use
+  because the estate pin predates `gnn.importers`; shared-reader adoption requires
+  a pin containing that upstream API, not a vendored copy.
 
 ## Scope
 

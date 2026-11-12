@@ -1,7 +1,7 @@
 # AII sidecar — InstituteOS metadata. Schema: aii_platform.aii_sidecar
 meta:
   sidecar_version: 1.2.1
-  updated: '2026-11-10'
+  updated: '2026-11-12'
 repo:
   name: ActiveBlockference
   slug: activeblockference
@@ -73,7 +73,7 @@ tasks:
 docs:
 - README.md
 - AGENTS.md
-- docs/INTEGRATION.md
+- .aii/docs/INTEGRATION.md
 - docs/README.md
 - docs/AGENTS.md
 schema: aii-sidecar/v1
