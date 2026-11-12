@@ -27,6 +27,7 @@ Choose the shortest path for your goal:
 | Read the generative-model specification | [`docs/gnn.md`](../docs/gnn.md) and [`specs/gridworld_3x3.gnn.md`](../specs/gridworld_3x3.gnn.md) |
 | Explore executable examples | [`notebooks/README.md`](../notebooks/README.md) |
 | Read the publication source | [`docs/manuscript/README.md`](../docs/manuscript/README.md) |
+| Trace publication figures to their sources | [`docs/manuscript/figure-registry.json`](../docs/manuscript/figure-registry.json) |
 | Contribute or report a bug | [`docs/contributing.md`](../docs/contributing.md) |
 | Report a security issue | [`SECURITY.md`](../SECURITY.md) |
 
@@ -77,32 +78,29 @@ The GitHub Actions workflow runs on pushes and pull requests targeting
 `main`, using the committed `uv.lock` on Python 3.11 and 3.12. CI calls the
 arms of the canonical gate in [`scripts/release_check.py`](../scripts/release_check.py):
 
-* the `test` matrix job runs `--arm test-full` (full suite, 90% coverage floor);
-* the `gate` job runs `--arm lint --arm types --arm docs --arm manuscript
-  --arm smoke --arm package` once on Python 3.12;
-* the `gnn-conformance` job runs `--arm gnn` with a runtime provisioned from
-  `specs/gnn-pin.json`.
+* the `test` matrix contains only Python 3.11 and runs `--arm test-full`;
+* the Python 3.12 `gnn-conformance` job (display name
+  `gnn conformance (pinned)`) runs `--arm all` with `GNN_RUNTIME_PYTHON` set to a
+  separate pinned runtime provisioned from `specs/gnn-pin.json`.
 
 The arms cover Ruff linting, repository-wide Markdown link/anchor validation,
 mypy, the test suite, notebook hygiene and execution, real pipeline and CLI
-smoke checks, manuscript validation/build/render drift, and a wheel import
-smoke. [`docs/gate.md`](../docs/gate.md) lists them and
+smoke checks, manuscript validation/build drift, and a wheel import smoke.
+The full test suite therefore runs on both Python versions without a separate
+`gate` job. PDF rendering remains an explicit local `--arm render` selection.
+[`docs/gate.md`](../docs/gate.md) defines the arms, runtime-aware local
+commands, and exact pinned `astral-sh/setup-uv` action; this workflow does not
+use the Institute setup composite.
 [`docs/_generated/gate-metrics.md`](../docs/_generated/gate-metrics.md) holds
-the measured numbers.
+the measured numbers and the statuses of the one-run before/after receipts.
+Those receipts are not a claimed speedup; the failed offline package baseline
+cache miss remains a failure.
 
-Run the release gate locally with:
-
-```bash
-uv run python scripts/release_check.py --arm all
-```
-
-The fast default (`uv run python scripts/release_check.py`) runs lint, types,
-the fast test selection, and docs. A separate `gnn conformance (pinned)` job
-(job key `gnn-conformance`) installs the GNN revision pinned in
-`specs/gnn-pin.json` into its own Python 3.12 runtime and validates
-`specs/gridworld_3x3.gnn.md` against the declared runtime model. The gate is
-intentionally fail-closed: a required check is not converted into a skip when
-an optional backend or generated artefact is unavailable. See
+The no-argument fast default runs lint, types, the fast test selection, and
+docs. The release gate's `gnn` arm always validates
+`specs/gridworld_3x3.gnn.md` against the declared runtime model using the pinned
+parser. The gate is intentionally fail-closed: a missing GNN runtime, required
+backend, or generated artifact cannot turn a required check into a skip. See
 [`docs/development.md`](../docs/development.md) for the development workflow
 and [`docs/design-contract.md`](../docs/design-contract.md) for the project
 scope and invariants.

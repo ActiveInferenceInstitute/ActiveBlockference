@@ -8,8 +8,9 @@ contributions from researchers, engineers, and AI agents alike.
 
 1. Open or comment on an issue describing what you want to do.
 2. Fork → branch → code → test → PR.
-3. Run `uv run python scripts/release_check.py --arm all` before pushing; the
-   no-argument default is the fast selection.
+3. Run the full release selection described in [`gate.md`](gate.md) before
+   pushing, with a pinned GNN runtime configured; the no-argument default is
+   only the fast selection.
 4. Keep PRs scoped: one logical change per PR.
 
 ## Detailed flow
@@ -53,6 +54,14 @@ If you change a public surface, update:
 * `docs/api.md`.
 * `docs/architecture.md` if you change layering.
 * The folder-local `README.md` table.
+* [`documentation-index.md`](documentation-index.md) when adding a long-lived guide.
+* [`manuscript/figure-registry.json`](manuscript/figure-registry.json) when changing
+  a publication figure's source or artifact mapping.
+
+Gate timings and counts belong only in generated metrics. Import real
+before receipts with repeatable `--record-baseline` and one combined after receipt
+with `--record-timings`, as documented in [`gate.md`](gate.md); preserve failed
+or missing measurements rather than reporting a speedup.
 
 ### 6. Open the PR
 

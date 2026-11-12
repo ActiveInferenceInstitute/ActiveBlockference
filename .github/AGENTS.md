@@ -1,12 +1,15 @@
 # CI guidance
 
 The workflow installs `uv.lock`, then calls the arms of
-`scripts/release_check.py` instead of repeating commands. The `test` matrix job
-runs `--arm test-full`; the `gate` job runs lint, types, docs, manuscript,
-smoke, and package once on 3.12; the `gnn-conformance` job provisions a Python
-3.12 runtime from the GNN revision pinned in `specs/gnn-pin.json` and runs
-`--arm gnn`. It is a required check and must not be converted into a skip when
-the runtime cannot be provisioned.
+`scripts/release_check.py` instead of repeating commands. The `test` matrix
+contains only Python 3.11 and runs `--arm test-full`. The `gnn-conformance` job
+(display name `gnn conformance (pinned)`) runs `--arm all`
+on Python 3.12 with `GNN_RUNTIME_PYTHON` set to the separate runtime provisioned from `specs/gnn-pin.json`.
+There is no separate `gate` job. Pinned conformance always runs in the `gnn`
+arm; missing runtime dependencies must fail, never skip. PDF rendering remains
+an explicit local `--arm render` selection. The workflow uses pinned
+`astral-sh/setup-uv` directly, not the Institute composite; see
+[`../docs/gate.md`](../docs/gate.md) for the exact action and command map.
 
 Manuscript figure bytes are written by the host toolchain, and `uv.lock`
 resolves different matplotlib versions for different Python versions, so the

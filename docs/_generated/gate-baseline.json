@@ -1,77 +1,184 @@
 {
-  "schema": "activeblockference-gate-baseline/v1",
-  "measured": "2026-11-12",
-  "host": "macOS-27.0.1-arm64-arm-64bit",
-  "python": "3.12.16",
-  "conditions": "One manual run per command before the composable gate landed, on the same host. Other estate jobs drove the load average to about 100 and all caches were warm, so these are historical evidence, not a controlled benchmark.",
   "arms": {
-    "lint": {
-      "seconds": 0.34,
-      "comparable": true,
-      "commands": [
-        {"command": "uv run ruff check blockference tests GRTs scripts", "seconds": 0.34}
-      ]
-    },
-    "types": {
-      "seconds": 10.35,
-      "comparable": false,
-      "note": "The baseline mypy run targeted Python 3.12; the arm now targets the requires-python floor (3.11).",
-      "commands": [
-        {"command": "uv run mypy blockference", "seconds": 10.35}
-      ]
-    },
-    "test-full": {
-      "seconds": 88.77,
-      "comparable": false,
-      "note": "The baseline was `uv run pytest` without `--cov` or `--cov-fail-under=90`; the arm runs coverage. Recorded result: 84 passed, 1 skipped.",
-      "commands": [
-        {"command": "uv run pytest", "seconds": 88.77}
-      ]
-    },
     "docs": {
-      "seconds": 0.22,
-      "comparable": false,
-      "note": "The baseline ran only the link/anchor checker; the arm also verifies the generated metrics document.",
       "commands": [
-        {"command": "uv run python scripts/check_docs_links.py", "seconds": 0.22}
-      ]
-    },
-    "manuscript": {
-      "seconds": 18.81,
-      "comparable": false,
-      "note": "The baseline ran validation, build, and the build check; the arm also verifies the generated variables file.",
-      "commands": [
-        {"command": "uv run python scripts/validate_manuscript.py", "seconds": 3.85},
-        {"command": "uv run python scripts/build_manuscript.py", "seconds": 7.24},
-        {"command": "uv run python scripts/build_manuscript.py --check", "seconds": 7.72}
-      ]
+        "uv run python scripts/check_docs_links.py",
+        "uv run python scripts/gate_metrics.py --check"
+      ],
+      "seconds": 7.45,
+      "status": "passed"
     },
     "gnn": {
-      "seconds": 14.8,
-      "comparable": true,
       "commands": [
-        {"command": "uv run python scripts/export_gnn_spec.py --check", "seconds": 3.08},
-        {"command": "uv run python scripts/validate_gnn_spec.py --json", "seconds": 11.72}
-      ]
+        "uv run python scripts/export_gnn_spec.py --check",
+        "uv run python scripts/validate_gnn_spec.py --gnn-runtime /private/tmp/gnn-rt-503/bin/python --json"
+      ],
+      "seconds": 2.78,
+      "status": "passed"
     },
-    "smoke": {
-      "seconds": 15.42,
-      "comparable": true,
+    "lint": {
       "commands": [
-        {"command": "uv run blockference pipeline --config configs/smoke.yml --output-root <temporary>/output --run-name gate_smoke", "seconds": 7.57},
-        {"command": "uv run blockference validation --run-dir <temporary>/output/gate_smoke", "seconds": 3.66},
-        {"command": "uv run blockference run --config configs/smoke.yml --output <temporary>/run.csv", "seconds": 4.19}
-      ]
+        "uv run ruff check blockference tests GRTs scripts"
+      ],
+      "seconds": 0.11,
+      "status": "passed"
+    },
+    "manuscript": {
+      "commands": [
+        "uv run python scripts/manuscript_variables.py --check",
+        "uv run python scripts/validate_manuscript.py",
+        "uv run python scripts/build_manuscript.py",
+        "uv run python scripts/build_manuscript.py --check"
+      ],
+      "seconds": 6.04,
+      "status": "passed"
     },
     "package": {
-      "seconds": 17.67,
-      "comparable": true,
+      "commands": [],
+      "error": "Command '['uv', 'build']' returned non-zero exit status 2.",
+      "seconds": 0.08,
+      "status": "failed"
+    },
+    "render": {
       "commands": [
-        {"command": "uv build", "seconds": 4.98},
-        {"command": "uv venv --python <project>/.venv/bin/python <temporary>/venv", "seconds": 0.04},
-        {"command": "uv pip install --python <temporary>/venv/bin/python dist/*.whl", "seconds": 1.01},
-        {"command": "<temporary>/venv/bin/python -c \"from blockference import GridWorld; ...\"", "seconds": 11.64}
-      ]
+        "uv run python scripts/build_manuscript.py --render pdf"
+      ],
+      "seconds": 4.04,
+      "status": "passed"
+    },
+    "smoke": {
+      "commands": [
+        "uv run blockference pipeline --config configs/smoke.yml --output-root /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-gate-gzxa03z4/output --run-name gate_smoke",
+        "uv run blockference validation --run-dir /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-gate-gzxa03z4/output/gate_smoke",
+        "uv run blockference run --config configs/smoke.yml --output /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-gate-gzxa03z4/run.csv"
+      ],
+      "seconds": 3.48,
+      "status": "passed"
+    },
+    "test": {
+      "commands": [
+        "uv run pytest -m not slow"
+      ],
+      "seconds": 33.27,
+      "status": "passed"
+    },
+    "test-full": {
+      "commands": [
+        "uv run pytest --cov=blockference --cov-report=term --cov-report=xml --cov-fail-under=90"
+      ],
+      "seconds": 55.38,
+      "status": "passed"
+    },
+    "types": {
+      "commands": [
+        "uv run mypy blockference"
+      ],
+      "seconds": 0.61,
+      "status": "passed"
     }
-  }
+  },
+  "conditions": "One run per arm before this estate change on the same host and interpreter. Warm caches and host load are uncontrolled; failed observations are retained. The render arm was measured separately after the package cache miss.",
+  "host": "macOS-27.0.1-arm64-arm-64bit",
+  "measured": "2026-11-12T13:46:28Z",
+  "python": "3.12.16",
+  "runs": [
+    {
+      "arms": {
+        "docs": {
+          "commands": [
+            "uv run python scripts/check_docs_links.py",
+            "uv run python scripts/gate_metrics.py --check"
+          ],
+          "seconds": 7.45,
+          "status": "passed"
+        },
+        "gnn": {
+          "commands": [
+            "uv run python scripts/export_gnn_spec.py --check",
+            "uv run python scripts/validate_gnn_spec.py --gnn-runtime /private/tmp/gnn-rt-503/bin/python --json"
+          ],
+          "seconds": 2.78,
+          "status": "passed"
+        },
+        "lint": {
+          "commands": [
+            "uv run ruff check blockference tests GRTs scripts"
+          ],
+          "seconds": 0.11,
+          "status": "passed"
+        },
+        "manuscript": {
+          "commands": [
+            "uv run python scripts/manuscript_variables.py --check",
+            "uv run python scripts/validate_manuscript.py",
+            "uv run python scripts/build_manuscript.py",
+            "uv run python scripts/build_manuscript.py --check"
+          ],
+          "seconds": 6.04,
+          "status": "passed"
+        },
+        "package": {
+          "commands": [],
+          "error": "Command '['uv', 'build']' returned non-zero exit status 2.",
+          "seconds": 0.08,
+          "status": "failed"
+        },
+        "smoke": {
+          "commands": [
+            "uv run blockference pipeline --config configs/smoke.yml --output-root /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-gate-gzxa03z4/output --run-name gate_smoke",
+            "uv run blockference validation --run-dir /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-gate-gzxa03z4/output/gate_smoke",
+            "uv run blockference run --config configs/smoke.yml --output /private/tmp/activeblockference-estate.8EbtJ4/tmp/activeblockference-gate-gzxa03z4/run.csv"
+          ],
+          "seconds": 3.48,
+          "status": "passed"
+        },
+        "test": {
+          "commands": [
+            "uv run pytest -m not slow"
+          ],
+          "seconds": 33.27,
+          "status": "passed"
+        },
+        "test-full": {
+          "commands": [
+            "uv run pytest --cov=blockference --cov-report=term --cov-report=xml --cov-fail-under=90"
+          ],
+          "seconds": 55.38,
+          "status": "passed"
+        },
+        "types": {
+          "commands": [
+            "uv run mypy blockference"
+          ],
+          "seconds": 0.61,
+          "status": "passed"
+        }
+      },
+      "generated": "2026-11-12T13:46:28Z",
+      "host": "macOS-27.0.1-arm64-arm-64bit",
+      "python": "3.12.16",
+      "schema": "activeblockference-gate/v1",
+      "tests": {
+        "coverage_percent": 90.94,
+        "passed": 85,
+        "skipped": 0
+      }
+    },
+    {
+      "arms": {
+        "render": {
+          "commands": [
+            "uv run python scripts/build_manuscript.py --render pdf"
+          ],
+          "seconds": 4.04,
+          "status": "passed"
+        }
+      },
+      "generated": "2026-11-12T13:48:41Z",
+      "host": "macOS-27.0.1-arm64-arm-64bit",
+      "python": "3.12.16",
+      "schema": "activeblockference-gate/v1"
+    }
+  ],
+  "schema": "activeblockference-gate-baseline/v1"
 }
