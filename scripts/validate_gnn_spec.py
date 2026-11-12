@@ -19,8 +19,10 @@ verified sources for that pin:
 
 The pin's ``tag`` and ``commit`` name one revision. A GNN checkout resolves
 ``refs/tags/<tag>^{commit}`` locally; ``--verify-tag-remote`` resolves it upstream
-with ``git ls-remote`` (the peeled commit of an annotated tag). A tag that
-resolves elsewhere fails as ``tag-commit-mismatch``. Without a checkout or the
+with ``git ls-remote`` (the peeled commit of an annotated tag), and always asks
+upstream: a tag that moved after a checkout fetched it fails as
+``tag-commit-mismatch`` instead of passing on the stale local tag. A tag that
+resolves elsewhere fails the same way. Without a checkout or the
 flag the binding is recorded in the receipt as ``unresolvable-offline``, never
 as a pass, and no network is used. With the flag, a tag that cannot be resolved
 ends the run as *not run* (exit ``2``).
@@ -274,8 +276,11 @@ def tag_binding(
     """Bind the pin's ``tag`` to its ``commit`` in an available object store.
 
     A GNN checkout resolves the tag locally; ``remote`` resolves it upstream with
-    ``git ls-remote`` (also when the checkout lacks the tag). When neither is
-    available the status says so instead of assuming the binding holds.
+    ``git ls-remote``. An explicit upstream request is never answered by a local
+    tag: a tag that moved upstream after this checkout fetched it is stale here,
+    so ``remote`` overrides the local reading instead of accepting it. When
+    neither store can answer the status says so instead of assuming the binding
+    holds.
     """
 
     tag = pin["tag"]
@@ -286,9 +291,10 @@ def tag_binding(
         "resolved": None,
         "detail": "no GNN object store was supplied and --verify-tag-remote was not requested",
     }
+    local: dict[str, Any] | None = None
     if gnn_root is not None and (gnn_root / ".git").exists():
         try:
-            local = subprocess.run(
+            local_run = subprocess.run(
                 [
                     "git", "-C", str(gnn_root), "rev-parse", "--verify", "-q",
                     f"refs/tags/{tag}^{{commit}}",
@@ -300,15 +306,16 @@ def tag_binding(
         except OSError as exc:
             record["detail"] = f"git could not run: {exc}"
         else:
-            if local.returncode == 0 and local.stdout.strip():
-                record.update(
-                    status="verified",
-                    resolved=local.stdout.strip(),
-                    detail=f"local object store {gnn_root}",
-                )
-                return record
-            record["detail"] = f"tag {tag} is not present in {gnn_root}"
+            if local_run.returncode == 0 and local_run.stdout.strip():
+                local = {
+                    "resolved": local_run.stdout.strip(),
+                    "detail": f"local object store {gnn_root}",
+                }
+            else:
+                record["detail"] = f"tag {tag} is not present in {gnn_root}"
     if not remote:
+        if local is not None:
+            record.update(status="verified", **local)
         return record
     try:
         completed = subprocess.run(
