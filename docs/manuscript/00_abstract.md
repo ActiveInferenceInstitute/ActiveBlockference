@@ -1,6 +1,6 @@
 # Abstract {#sec:abstract}
 
-ActiveBlockference is a Python 3.10+ implementation of discrete Active
+ActiveBlockference is a Python {{python_requires}} implementation of discrete Active
 Inference agents embedded in radCAD and cadCAD simulations. This manuscript
 specifies and evaluates the reconstructed implementation as a methods
 artifact. The central design decision is to treat action semantics, state
