@@ -31,7 +31,9 @@ their type and number in source order and resolves a reference such as
 ```
 
 Figure and table numbers are also assigned by source order. The image path is
-relative to this directory and must exist when validation runs.
+relative to this directory. Declare the figure label, ordered source, and its
+SVG/PNG companion filenames in `figure-registry.json`; both companions must
+exist, and no undeclared SVG or PNG may remain in `figures/`.
 
 ## Variables
 
@@ -39,10 +41,11 @@ Write `{{token}}` where a value must come from the generated variables file
 (`docs/_generated/manuscript-variables.json`), for example
 `Python {{python_requires}}` or the pinned GNN commit. The file is produced by
 `scripts/manuscript_variables.py` from `pyproject.toml`, `specs/gnn-pin.json`,
-and `.github/workflows/ci.yml`. Do not type a pin, job name, or supported Python
-version into prose; add a key to the generator instead. The builder fails on an
-undeclared token, and validation reports tokens the variables file does not
-declare.
+`.github/workflows/ci.yml`, and the experiment configuration selected by
+`config.yaml`. Do not type pins, job names, supported Python versions, or
+reference-run parameters into prose; add a key to the generator instead. The
+builder fails on an undeclared token, and validation reports tokens the
+variables file does not declare.
 
 ## Citations
 
