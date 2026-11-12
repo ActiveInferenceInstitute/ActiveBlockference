@@ -43,8 +43,8 @@ The baseline and current receipts are historical evidence. Timings include host 
 
 | Selection | Collected tests |
 | --- | --- |
-| full suite | 97 |
-| fast (`-m "not slow"`) | 84 |
+| full suite | 112 |
+| fast (`-m "not slow"`) | 99 |
 | slow (`-m slow`) | 13 |
 
 Recorded run: 97 passed, 0 skipped.

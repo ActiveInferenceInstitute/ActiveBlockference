@@ -63,8 +63,10 @@ GNN_ROOT=/path/to/Generalized_Notation_Notation \
 GNN_PYTHON=/path/to/parser-runtime/bin/python \
 uv run python scripts/validate_gnn_spec.py --json
 
-# Installed pinned runtime (what CI uses)
-uv run python scripts/validate_gnn_spec.py --gnn-runtime /path/to/venv/bin/python --json
+# Installed pinned runtime (what CI uses); --verify-tag-remote resolves the
+# pin's tag upstream with `git ls-remote` and needs network access
+uv run python scripts/validate_gnn_spec.py --gnn-runtime /path/to/venv/bin/python \
+  --verify-tag-remote --json
 ```
 
 `GNN_ROOT` is a `Generalized_Notation_Notation` checkout: the validator resolves
@@ -72,8 +74,8 @@ the pinned commit with `git archive`, verifies every recorded parser digest, and
 runs the parser from that materialized tree, so a live working copy under
 development is never imported. `GNN_PYTHON` (or `--gnn-runtime`) selects the
 interpreter that has the parser dependencies; the GNN checkout's own `.venv`
-works. Exit codes are `0` pass, `1` conformance failure, and `2` pinned runtime
-or checkout unavailable — an unavailable run is reported as not run, never as a
+works. Exit codes are `0` pass, `1` conformance failure, and `2` pinned runtime,
+checkout, or requested remote tag resolution unavailable — an unavailable run is reported as not run, never as a
 pass. With `GNN_ROOT` set and no runtime named, the gate uses the checkout's own
 `.venv/bin/python` for both the reader and the pin.
 
@@ -94,7 +96,19 @@ and exact CI map.
    revision, `.github/workflows/ci.yml`, and job `gnn-conformance`.
 2. The document parses with the pinned `gnn` parser with no errors or warnings,
    and the parser version equals the pinned tag; every recorded parser digest
-   matches the installed (or archived) parser files.
+   matches the installed (or archived) parser files, and for an installed
+   runtime that check runs *before* the document is parsed and the parser must be
+   imported from the verified package.
+   The pin's `tag` must resolve to the pinned `commit` (`tag-commit-mismatch`):
+   locally in a `GNN_ROOT` checkout, or upstream with `--verify-tag-remote`
+   (`git ls-remote`, the peeled commit of an annotated tag; the release gate's
+   `gnn` arm passes the flag, so it needs network access). The commit the
+   installer recorded for the runtime (`direct_url.json` `vcs_info.commit_id`)
+   must equal the pin's commit. Without a checkout or the flag, and for an
+   install with no recorded VCS commit, the receipt reports `tag_binding` /
+   `revision` as `unresolvable-offline` rather than a pass; with
+   `--verify-tag-remote`, a tag that cannot be resolved ends the run as *not
+   run* (exit `2`).
 3. The declared `ModelParameters` are read back and used to build the runtime
    model, whose `A`/`B`/`C`/`D`/`E` arrays must equal the declared matrices
    exactly; declared `StateSpaceBlock` dimensions must match the array shapes.

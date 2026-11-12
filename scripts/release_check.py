@@ -201,9 +201,13 @@ def _plan(
                     "--job", "gnn-conformance",
                 ]
             )
-        validator = ["uv", "run", "python", "scripts/validate_gnn_spec.py", "--json"]
+        # The pin's tag is resolved upstream (needs network), so a tag that was
+        # moved off the pinned commit fails the release gate.
+        validator = [
+            "uv", "run", "python", "scripts/validate_gnn_spec.py", "--verify-tag-remote", "--json",
+        ]
         if gnn_runtime:
-            validator[-1:-1] = ["--gnn-runtime", gnn_runtime]
+            validator[-2:-2] = ["--gnn-runtime", gnn_runtime]
         commands.append(validator)
         return commands
     if arm == "smoke":

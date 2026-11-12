@@ -42,6 +42,7 @@ def test_gnn_arm_runs_the_shared_pin_reader_before_conformance():
         "scripts/validate_gnn_spec.py",
         "--gnn-runtime",
         runtime,
+        "--verify-tag-remote",
         "--json",
     ]
 
@@ -129,3 +130,12 @@ def test_render_provenance_requires_the_pdf(tmp_path, monkeypatch):
     monkeypatch.setitem(gate.RENDER_TARGETS, "pdf", tmp_path / "absent.pdf")
     with pytest.raises(FileNotFoundError):
         gate._render_artifact()
+
+
+def test_gnn_arm_always_asks_the_validator_to_resolve_the_tag_upstream():
+    for runtime in (None, "/opt/gnn-runtime/bin/python"):
+        plan = gate._plan("gnn", workdir=Path("<temporary>"), gnn_runtime=runtime)
+
+        assert plan is not None
+        assert "--verify-tag-remote" in plan[-1]
+        assert plan[-1][-1] == "--json"
