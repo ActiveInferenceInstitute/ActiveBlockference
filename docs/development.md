@@ -11,8 +11,8 @@ uv run python scripts/release_check.py --arm all --gnn-runtime /path/to/gnn-runt
 [`gate.md`](gate.md) lists every arm and CI job; `--list` prints the exact
 commands. The fast default runs lint, types, the fast test selection, and docs.
 The release gate adds the full suite with the 90% coverage floor, manuscript
-validation/build/drift checks, the GNN drift and conformance checks, pipeline
-smoke runs, and the wheel import check.
+validation/build/drift checks, the GNN pin/pointer reader, drift and conformance
+checks, pipeline smoke runs, and the wheel import check.
 
 mypy targets the `requires-python` floor (`python_version = "3.11"` in
 `pyproject.toml`), so one run covers the minimum supported stubs. Notebook
@@ -21,7 +21,8 @@ the `slow` marker and are excluded from `--arm test`. The recorded before/after
 arm times, including the render arm, are in
 [`_generated/gate-metrics.md`](_generated/gate-metrics.md).
 
-The `gnn` arm always runs pinned parser conformance
+The `gnn` arm always runs the shared `python -m gnn.importers check --repo .`
+pin and pointer reader plus pinned parser conformance
 (`scripts/validate_gnn_spec.py`); it fails without the external runtime rather
 than skipping validation. Replace the runtime path above with an installed
 pinned interpreter, or configure the source-checkout route in [`gnn.md`](gnn.md).

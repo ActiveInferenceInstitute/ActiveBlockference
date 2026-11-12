@@ -33,8 +33,8 @@ measurements.
 | `test` | `uv run pytest -m "not slow"` | no |
 | `test-full` | `uv run pytest --cov=blockference --cov-report=term --cov-report=xml --cov-fail-under=90` | yes |
 | `docs` | `scripts/check_docs_links.py`, `scripts/gate_metrics.py --check` | yes |
-| `manuscript` | `scripts/manuscript_variables.py --check`, `scripts/validate_manuscript.py`, `scripts/build_manuscript.py`, `scripts/build_manuscript.py --check` | yes |
-| `gnn` | `scripts/export_gnn_spec.py --check` and real pinned `scripts/validate_gnn_spec.py` validation; missing runtime fails | yes |
+| `manuscript` | `scripts/manuscript_variables.py --check`, `scripts/validate_manuscript.py`, `scripts/build_manuscript.py`, `scripts/build_manuscript.py --check`; the `gnn_*` variables come from `gnn.importers` in the pinned runtime | yes |
+| `gnn` | `scripts/export_gnn_spec.py --check`, the shared `python -m gnn.importers check --repo .` pin and pointer check, and real pinned `scripts/validate_gnn_spec.py` validation; missing runtime fails | yes |
 | `smoke` | pipeline, validation, and standalone `run` JSON smoke checks in a temporary directory | yes |
 | `package` | `uv build`, locked `uv export` constraints for clean-wheel dependencies, and isolated import outside the source tree | yes |
 | `render` | `scripts/build_manuscript.py --render pdf` (Pandoc + XeLaTeX) | no |
@@ -49,8 +49,8 @@ the fast arm. They stay in `test-full`.
 
 The canonical pin is [`../specs/gnn-pin.json`](../specs/gnn-pin.json) with schema
 `gnn-importer-pin/v1`. It pins
-`ActiveInferenceInstitute/Generalized_Notation_Notation` at `v5.0.3`
-(`8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1`) and records SHA-256 digests for the
+`ActiveInferenceInstitute/Generalized_Notation_Notation` at `v5.1.0`
+(`75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf`) and records SHA-256 digests for the
 five parser files under `src/gnn/`. The pointer
 [`../.github/GNN.md`](../.github/GNN.md) records exactly what the conformance
 job parses.
@@ -58,11 +58,18 @@ job parses.
 The conformance job's key is `gnn-conformance` and its display name is
 `gnn conformance (pinned)`.
 
-The `gnn` arm always runs both the offline drift check and real pinned-parser
-conformance. Select an installed pinned runtime with `--gnn-runtime` or
+The pin, the pointer and the specification are read by the estate's shared
+reader, `gnn.importers`, so this repository carries no copy of the pin shape. The
+`gnn` arm runs `python -m gnn.importers check --repo . --require-pointer
+--workflow .github/workflows/ci.yml --job gnn-conformance` from the pinned
+runtime, then the offline drift check, then real pinned-parser conformance.
+
+Select an installed pinned runtime with `--gnn-runtime` or
 `GNN_RUNTIME_PYTHON`, or supply a pinned source checkout via `GNN_ROOT` as
-described in [`gnn.md`](gnn.md). Missing or invalid runtime dependencies fail the
-arm and therefore `all`; conformance is never silently skipped.
+described in [`gnn.md`](gnn.md); with `GNN_ROOT` and no runtime named, the
+checkout's own `.venv/bin/python` is used. Missing or invalid runtime
+dependencies fail the arm and therefore `all`; conformance is never silently
+skipped.
 
 ## GitHub Actions
 

@@ -16,13 +16,13 @@ the single canonical construction shared by both directions:
   model *from* the parsed document and compare it with the declared matrices.
 
 The pin record in ``specs/gnn-pin.json`` names the exact upstream revision whose
-parser validates the document; see ``docs/gnn.md`` for the commands.
+parser validates the document. The pin is read by the upstream
+``gnn.importers`` reader, which this repository calls instead of keeping its own;
+see ``docs/gnn.md`` for the commands.
 """
 
 from __future__ import annotations
 
-import json
-import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,13 +34,11 @@ from blockference.actions import DEFAULT_AFFORDANCES, validate_affordances
 from blockference.gridference import ActiveGridference, make_grid
 
 __all__ = [
-    "GNN_PIN_PATH",
     "GNN_SPEC_PATH",
     "SPEC_DIR",
     "GridWorldSpecParameters",
     "build_spec_model",
     "declared_arrays",
-    "load_pin",
     "parameters_from_parsed",
     "render_spec",
     "spec_arrays",
@@ -50,7 +48,6 @@ __all__ = [
 ROOT = Path(__file__).resolve().parents[1]
 SPEC_DIR = ROOT / "specs"
 GNN_SPEC_PATH = SPEC_DIR / "gridworld_3x3.gnn.md"
-GNN_PIN_PATH = SPEC_DIR / "gnn-pin.json"
 
 #: GNN language revision declared by the document header.
 GNN_LANGUAGE_VERSION = "GNN v1.1"
@@ -150,22 +147,6 @@ def spec_arrays(parameters: GridWorldSpecParameters | None = None) -> dict[str, 
         "D": np.asarray(model.D, dtype=float),
         "E": np.full(resolved.n_actions, 1.0 / resolved.n_actions, dtype=float),
     }
-
-
-def load_pin(path: Path | None = None) -> dict[str, Any]:
-    """Return the upstream pin, rejecting records outside the local pin contract."""
-
-    pin = json.loads((path or GNN_PIN_PATH).read_text(encoding="utf-8"))
-    if not isinstance(pin, dict):
-        raise ValueError("invalid GNN pin: expected a JSON object")
-    if pin.get("schema") != "gnn-importer-pin/v1":
-        raise ValueError("invalid GNN pin schema: expected gnn-importer-pin/v1")
-    if pin.get("tag") != "v5.0.3":
-        raise ValueError("invalid GNN pin tag: expected v5.0.3")
-    commit = pin.get("commit")
-    if not isinstance(commit, str) or re.fullmatch(r"[0-9a-fA-F]{40}", commit) is None:
-        raise ValueError("invalid GNN pin commit: expected a full 40-hex revision")
-    return pin
 
 
 def _format_value(value: float) -> str:

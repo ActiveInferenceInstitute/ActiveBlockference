@@ -16,7 +16,6 @@ from blockference.gnn import (
     GNN_SPEC_PATH,
     build_spec_model,
     declared_arrays,
-    load_pin,
     parameters_from_parsed,
     render_spec,
     spec_arrays,
@@ -67,44 +66,6 @@ def _parsed_payload() -> dict:
             }
         }
     }
-
-
-def test_local_pin_reader_accepts_the_committed_contract():
-    pin = load_pin()
-    assert pin["schema"] == "gnn-importer-pin/v1"
-    assert pin["tag"] == "v5.0.3"
-    assert len(pin["commit"]) == 40
-
-
-@pytest.mark.parametrize(
-    ("field", "value", "message"),
-    [
-        ("schema", None, "schema"),
-        ("schema", "unknown/v1", "schema"),
-        ("tag", None, "tag"),
-        ("tag", "v5.0.4", "tag"),
-        ("commit", None, "commit"),
-        ("commit", "8f293d9b", "commit"),
-        ("commit", "z" * 40, "commit"),
-    ],
-)
-def test_local_pin_reader_rejects_invalid_declared_fields(tmp_path, field, value, message):
-    pin = load_pin()
-    if value is None:
-        del pin[field]
-    else:
-        pin[field] = value
-    path = tmp_path / "pin.json"
-    path.write_text(json.dumps(pin), encoding="utf-8")
-    with pytest.raises(ValueError, match=f"invalid GNN pin {message}"):
-        load_pin(path)
-
-
-def test_local_pin_reader_rejects_non_object_json(tmp_path):
-    path = tmp_path / "pin.json"
-    path.write_text("[]", encoding="utf-8")
-    with pytest.raises(ValueError, match="expected a JSON object"):
-        load_pin(path)
 
 
 def test_committed_spec_is_generated_from_the_implementation():
@@ -234,6 +195,6 @@ def test_pinned_parser_validates_the_committed_spec(tmp_path):
     payload = json.loads(receipt.read_text(encoding="utf-8"))
     assert payload["ok"] is True
     assert payload["failures"] == []
-    assert payload["gnn_version"] == "5.0.3"
+    assert payload["gnn_version"] == "5.1.0"
     assert payload["orientation"] == ["canonical"]
     assert payload["consistency_score"] == 1.0

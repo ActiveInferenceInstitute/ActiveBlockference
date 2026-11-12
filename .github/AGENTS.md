@@ -6,7 +6,8 @@ contains only Python 3.11 and runs `--arm test-full`. The `gnn-conformance` job
 (display name `gnn conformance (pinned)`) runs `--arm all`
 on Python 3.12 with `GNN_RUNTIME_PYTHON` set to the separate runtime provisioned from `specs/gnn-pin.json`.
 There is no separate `gate` job. Pinned conformance always runs in the `gnn`
-arm; missing runtime dependencies must fail, never skip. PDF rendering remains
+arm, where the shared `python -m gnn.importers check --repo .` reads the pin and
+the pointer; missing runtime dependencies must fail, never skip. PDF rendering remains
 an explicit local `--arm render` selection. The workflow uses pinned
 `astral-sh/setup-uv` directly, not the Institute composite; see
 [`../docs/gate.md`](../docs/gate.md) for the exact action and command map.

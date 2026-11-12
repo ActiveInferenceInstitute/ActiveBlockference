@@ -1,7 +1,9 @@
 """Validate the committed GNN specification with the pinned upstream parser.
 
 The canonical GNN pin is recorded in ``specs/gnn-pin.json`` (repository, tag,
-commit, and SHA-256 digests of the parser files). This script supports two
+commit, and SHA-256 digests of the parser files). The pin is read by the
+upstream ``gnn.importers`` reader through ``scripts/gnn_importer_report.py``, so
+this repository carries no copy of the pin shape. This script supports two
 verified sources for that pin:
 
 * a GNN git checkout (``--gnn-root`` or ``GNN_ROOT``): the pinned commit is
@@ -47,10 +49,8 @@ from typing import Any
 import numpy as np
 
 from blockference.gnn import (
-    GNN_PIN_PATH,
     GNN_SPEC_PATH,
     declared_arrays,
-    load_pin,
     parameters_from_parsed,
     render_spec,
     spec_arrays,
@@ -59,6 +59,7 @@ from blockference.gnn import (
 
 ROOT = Path(__file__).resolve().parents[1]
 PROBE = ROOT / "scripts" / "gnn_parser_probe.py"
+REPORT = ROOT / "scripts" / "gnn_importer_report.py"
 DEFAULT_RECEIPT = ROOT / "docs" / "_build" / "gnn" / "validation-receipt.json"
 PACKAGE_PREFIX = "src/gnn/"
 
@@ -75,11 +76,45 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _verify_digests(package_dir: Path, pin: dict[str, Any], *, origin: str) -> dict[str, str]:
+def read_importer_report(python: str, *, source: Path | None = None) -> dict[str, Any]:
+    """Return the shared ``gnn.importers`` reading of this repository's pin.
+
+    ``source`` puts a GNN source tree first on ``PYTHONPATH``, which is how a
+    checkout supplies the reader when no installed distribution is present.
+    """
+
+    environment = dict(os.environ)
+    if source is not None:
+        existing = environment.get("PYTHONPATH", "")
+        environment["PYTHONPATH"] = str(source) + (
+            os.pathsep + existing if existing else ""
+        )
+    completed = subprocess.run(
+        [python, str(REPORT), "--repo", str(ROOT)],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=environment,
+    )
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout).strip().splitlines()
+        tail = " | ".join(detail[-3:]) if detail else "no output"
+        raise Unavailable(
+            f"the shared gnn.importers reader could not be run with {python}: {tail}. "
+            "Supply --gnn-runtime/GNN_RUNTIME_PYTHON, or --python naming an interpreter "
+            "with the pinned GNN distribution, or a GNN checkout via GNN_ROOT."
+        )
+    payload = json.loads(completed.stdout)
+    if not isinstance(payload, dict) or not isinstance(payload.get("pin"), dict):
+        raise Unavailable(f"the shared gnn.importers reader returned no pin: {payload!r}")
+    return payload
+
+
+def _verify_digests(package_dir: Path, digests: dict[str, str], *, origin: str) -> dict[str, str]:
     """Verify every recorded parser digest under an installed ``gnn`` package."""
 
     observed: dict[str, str] = {}
-    for relative, expected in sorted(pin["parser_files"].items()):
+    for relative, expected in sorted(digests.items()):
         suffix = relative[len(PACKAGE_PREFIX) :] if relative.startswith(PACKAGE_PREFIX) else relative
         path = package_dir / suffix
         if not path.is_file():
@@ -93,13 +128,16 @@ def _verify_digests(package_dir: Path, pin: dict[str, Any], *, origin: str) -> d
     return observed
 
 
-def materialize_pin(gnn_root: Path, pin: dict[str, Any]) -> tuple[Path, str]:
-    """Return a directory holding the pinned source tree and how it was obtained."""
+def materialize_pin(gnn_root: Path, pin: dict[str, Any], target: Path) -> tuple[Path, str]:
+    """Materialize the pinned commit into ``target`` and return it with its origin.
+
+    ``target`` belongs to the caller, so a run leaves no materialized tree behind.
+    """
 
     if not gnn_root.is_dir():
         raise Unavailable(f"GNN checkout is not a directory: {gnn_root}")
     if not (gnn_root / ".git").exists():
-        _verify_digests(gnn_root / "src" / "gnn", pin, origin=str(gnn_root))
+        _verify_digests(gnn_root / "src" / "gnn", pin["parser_files"], origin=str(gnn_root))
         return gnn_root, f"digest-verified source tree {gnn_root} (no git metadata)"
 
     commit = pin["commit"]
@@ -116,7 +154,7 @@ def materialize_pin(gnn_root: Path, pin: dict[str, Any]) -> tuple[Path, str]:
             f"resolved commit {resolved.stdout.strip()} differs from the pin {commit}"
         )
 
-    target = Path(tempfile.mkdtemp(prefix="activeblockference-gnn-pin-"))
+    target.mkdir(parents=True, exist_ok=True)
     archive = target / "pinned.tar"
     completed = subprocess.run(
         ["git", "-C", str(gnn_root), "archive", "--format=tar", f"--output={archive}", commit],
@@ -132,7 +170,7 @@ def materialize_pin(gnn_root: Path, pin: dict[str, Any]) -> tuple[Path, str]:
         except TypeError:  # pragma: no cover - Python < 3.12 fallback
             handle.extractall(target)
     archive.unlink()
-    _verify_digests(target / "src" / "gnn", pin, origin=f"archive of {commit}")
+    _verify_digests(target / "src" / "gnn", pin["parser_files"], origin=f"archive of {commit}")
     return target, f"git archive of {commit}"
 
 
@@ -287,12 +325,10 @@ def main(argv: list[str] | None = None) -> int:
         help="parser interpreter used with --gnn-root (default: $GNN_PYTHON or this interpreter)",
     )
     parser.add_argument("--spec", type=Path, default=GNN_SPEC_PATH)
-    parser.add_argument("--pin", type=Path, default=GNN_PIN_PATH)
     parser.add_argument("--receipt", type=Path, default=DEFAULT_RECEIPT)
     parser.add_argument("--json", action="store_true", help="print the receipt to stdout")
     args = parser.parse_args(argv)
 
-    pin = load_pin(args.pin)
     if args.gnn_root is None and not args.gnn_runtime:
         print(
             "gnn validation not run: supply --gnn-root/GNN_ROOT or --gnn-runtime/"
@@ -301,11 +337,23 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
 
+    reader_python = args.gnn_runtime or args.python or sys.executable
+    try:
+        pin = read_importer_report(
+            reader_python,
+            source=args.gnn_root / "src" if args.gnn_root is not None else None,
+        )["pin"]
+    except Unavailable as exc:
+        print(f"gnn validation not run: {exc}", file=sys.stderr)
+        return 2
+
     with tempfile.TemporaryDirectory(prefix="activeblockference-gnn-") as directory:
         output = Path(directory) / "probe.json"
         try:
             if args.gnn_root is not None:
-                source, origin = materialize_pin(args.gnn_root, pin)
+                source, origin = materialize_pin(
+                    args.gnn_root, pin, Path(directory) / "gnn-pin"
+                )
                 payload = run_probe(
                     args.python or sys.executable, args.spec, output, source=source
                 )
@@ -313,7 +361,7 @@ def main(argv: list[str] | None = None) -> int:
                 source = None
                 payload = run_probe(args.gnn_runtime, args.spec, output, source=None)
                 package_dir = Path(str(payload["gnn_module"])).resolve().parent
-                _verify_digests(package_dir, pin, origin=args.gnn_runtime)
+                _verify_digests(package_dir, pin["parser_files"], origin=args.gnn_runtime)
                 origin = f"installed runtime {args.gnn_runtime} ({package_dir})"
         except Unavailable as exc:
             print(f"gnn validation not run: {exc}", file=sys.stderr)

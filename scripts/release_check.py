@@ -13,7 +13,8 @@ Arms:
 * ``test-full`` -- the whole suite with the 90% coverage floor.
 * ``docs`` -- Markdown links/anchors and the generated gate metrics.
 * ``manuscript`` -- variables freshness, source validation, build, and drift.
-* ``gnn`` -- specification drift and pinned-parser conformance.
+* ``gnn`` -- the shared ``gnn.importers`` pin check, specification drift, and
+  pinned-parser conformance.
 * ``smoke`` -- pipeline, validation, and standalone ``run`` JSON smoke checks.
 * ``package`` -- wheel build and clean virtualenv import.
 * ``render`` -- render the manuscript to PDF (needs Pandoc and XeLaTeX).
@@ -72,7 +73,7 @@ ARM_HELP = {
     "test-full": "full pytest suite with the 90% coverage floor",
     "docs": "Markdown links/anchors and generated gate metrics",
     "manuscript": "manuscript variables, validation, build, and drift check",
-    "gnn": "GNN specification drift and pinned-parser conformance",
+    "gnn": "GNN pin/pointer check, specification drift, and pinned-parser conformance",
     "smoke": "pipeline, validation, and run JSON smoke checks",
     "package": "wheel build and clean virtualenv import",
     "render": "manuscript PDF render (Pandoc + XeLaTeX)",
@@ -119,6 +120,24 @@ def _changed_paths() -> set[str]:
         if line
         and not (line.startswith("docs/manuscript/figures/") and line.endswith((".svg", ".png")))
     }
+
+
+def _checkout_runtime() -> str | None:
+    """Return the interpreter of the GNN checkout named by ``GNN_ROOT``, if any.
+
+    A source checkout is an alternative to an installed pinned runtime. The
+    reader has to run in the same environment as the pinned parser, so the
+    checkout's own virtual environment supplies it.
+    """
+
+    root = os.environ.get("GNN_ROOT")
+    if not root:
+        return None
+    relative = Path("Scripts" if os.name == "nt" else "bin") / (
+        "python.exe" if os.name == "nt" else "python"
+    )
+    candidate = Path(root) / ".venv" / relative
+    return str(candidate) if candidate.is_file() else None
 
 
 def _assert_json(command: list[str]) -> None:
@@ -173,6 +192,15 @@ def _plan(
         ]
     if arm == "gnn":
         commands = [["uv", "run", "python", "scripts/export_gnn_spec.py", "--check"]]
+        if gnn_runtime:
+            commands.append(
+                [
+                    gnn_runtime, "-m", "gnn.importers", "check", "--repo", ".",
+                    "--require-pointer",
+                    "--workflow", ".github/workflows/ci.yml",
+                    "--job", "gnn-conformance",
+                ]
+            )
         validator = ["uv", "run", "python", "scripts/validate_gnn_spec.py", "--json"]
         if gnn_runtime:
             validator[-1:-1] = ["--gnn-runtime", gnn_runtime]
@@ -321,11 +349,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--list", action="store_true", help="list arms and their commands")
     parser.add_argument("--timings", type=Path, help="write a JSON runtime receipt")
     parser.add_argument("--json", action="store_true", help="print a JSON summary")
-    parser.add_argument("--gnn-runtime", help="interpreter with the pinned GNN distribution")
+    parser.add_argument(
+        "--gnn-runtime",
+        help="interpreter with the pinned GNN distribution (default: $GNN_RUNTIME_PYTHON, "
+        "else the GNN checkout's own .venv under $GNN_ROOT)",
+    )
     args = parser.parse_args(argv)
 
     selected = _selected(args.arm or [])
-    gnn_runtime = args.gnn_runtime or os.environ.get("GNN_RUNTIME_PYTHON")
+    gnn_runtime = (
+        args.gnn_runtime or os.environ.get("GNN_RUNTIME_PYTHON") or _checkout_runtime()
+    )
     if args.list:
         for arm in (*ALIASES, *ARM_ORDER):
             print(f"{arm:10s} {ARM_HELP[arm]}")

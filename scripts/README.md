@@ -6,7 +6,7 @@ Repository gates and generators, all run from the repository root:
 |---|---|
 | `release_check.py` | The canonical gate: composable arms for lint, types, fast/full tests, docs, manuscript, GNN, smoke, package, and render. |
 | `gate_metrics.py` | Imports disjoint baseline receipts with repeatable `--record-baseline PATH` and one current receipt with `--record-timings PATH`, writes `docs/_generated/gate-metrics.md`, and checks drift with `--check`. |
-| `manuscript_variables.py` | Derives `docs/_generated/manuscript-variables.json` from `pyproject.toml`, the GNN pin, and CI; `--check` gates drift. |
+| `manuscript_variables.py` | Derives `docs/_generated/manuscript-variables.json` from `pyproject.toml`, CI, and the `gnn_*` keys that `gnn.importers.importer_variables` produces in the pinned runtime; `--check` gates drift. |
 | `check_docs_links.py` | Validates internal Markdown links and anchors across tracked documentation. |
 | `build_manuscript.py` | Builds the manuscript and its figures, injects declared variables, and renders with Pandoc (`--render pdf\|html`). |
 | `validate_manuscript.py` | Fail-closed manuscript validation, including declared variables. |
@@ -14,11 +14,13 @@ Repository gates and generators, all run from the repository root:
 | `validate_notebooks.py` | Notebook hygiene checks before execution. |
 | `export_gnn_spec.py` | Writes or verifies `specs/gridworld_3x3.gnn.md` from the implementation. |
 | `validate_gnn_spec.py` | Validates the committed specification with the pinned parser, using a separate interpreter selected by `--gnn-runtime` or the documented environment variables. |
-| `gnn_parser_probe.py` | The only module that imports the upstream `gnn` package; runs as a subprocess under the pin. |
+| `gnn_parser_probe.py` | Imports the upstream `gnn` parser; runs as a subprocess under the pin. |
+| `gnn_importer_report.py` | Imports the upstream `gnn.importers` reader and prints this repository's normalized pin and `gnn-importer-variables/v1` map for the two scripts above. |
 
 Run the release selection with a pinned GNN runtime configured before
 publishing; the no-argument default is the fast selection. The `gnn` arm always
-runs real pinned conformance and fails if its runtime is unavailable.
+runs the shared `python -m gnn.importers check --repo .` and real pinned
+conformance, and fails if its runtime is unavailable.
 [`../docs/gate.md`](../docs/gate.md) owns the arm commands, CI mapping,
 `--timings PATH` recording and metrics-import workflow.
 
