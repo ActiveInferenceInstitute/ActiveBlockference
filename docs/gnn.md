@@ -11,7 +11,7 @@ Python code and are checked against it.
 * `specs/gridworld_3x3.gnn.md` — the GNN document for the canonical 3x3
   fixture: identity likelihood `A`, deterministic boundary-clamped transition
   `B[next_state, previous_state, action]`, one-hot preference `C`, one-hot
-  prior `D`, and the uniform policy prior `E` over the five affordances.
+  prior `D`, and a numeric uniform policy prior `E` over 25 length-two policies.
 * `specs/gnn-pin.json` — the pin record (schema `gnn-importer-pin/v1`):
   upstream repository, tag `v5.1.0`, commit
   `75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf`, recorded date, and SHA-256
@@ -22,20 +22,37 @@ The document is generated from the implementation by
 `ActiveGridference`, so the document cannot describe a model the package does
 not build.
 
-## The pin is read by `gnn.importers`, not here
+Exported `E`, `pi`, and `G` have complete-policy cardinality; `B` retains
+action cardinality. Runtime `ActiveGridference.E` remains the ordered action
+labels. Three actions at horizon two produce nine policies. Float text keeps
+round-trip precision, and a singleton vector remains a tuple rather than a
+scalar. The pinned parser canonicalizes source `pi` to `π`; parsed-payload
+dimension checks use `π`.
 
-The pin record is read and validated by the estate's shared reader,
-`gnn.importers` in the pinned upstream revision. This repository keeps no copy
-of that logic:
+## Shared producer admission
 
-* the artifact uses `read_pin`, `find_pin`, `check_pointer` and
-  `importer_variables` from that module;
-* the release gate's `gnn` arm calls `python -m gnn.importers check --repo .`
-  from the pinned runtime;
-* `scripts/gnn_importer_report.py` is the only bridge: it runs in an
-  interpreter where `gnn` is importable and prints the normalized pin and the
-  `gnn-importer-variables/v1` map as JSON for
-  `scripts/validate_gnn_spec.py` and `scripts/manuscript_variables.py`.
+`blockference/gnn_source.py` is a stdlib-only external worker, launched directly
+with `-I -B` in the selected GNN interpreter. It first checks and executes the
+independently reviewed producer bootstrap, without importing target `gnn`.
+The bootstrap owns pin discovery, reading, and manuscript metadata inspection;
+inspection reports `qualified=false` and is not a parser verdict.
+
+Every actual parser, semantic, orientation, consistency, and shared
+`gnn.importers` check runs inside producer admission through final import/content
+revalidation. The project validator owns these separate guarded lifetimes.
+There is no direct unchecked `-m gnn.importers` gate command, copied local pin
+reader, or surviving `gnn_importer_report.py`/`gnn_parser_probe.py` entry point.
+
+Supply `GNN_BOOTSTRAP` and `GNN_SOURCE_MANIFEST` from independently reviewed
+producer artifacts. The source-owned expected SHA-256 values are:
+
+* bootstrap: `f638d4c01fe7de31e43d793e59bf382d0c3d1a82f365c59238334a2b40adfb37`;
+* full v5.1.0 manifest: `43b33c0b2b40386afa3f306fec4cc13bc1fd7c3b570fbf11d5008bad5c8e6b51`.
+
+Do not derive expected identity from the target package or replace complete
+content/module ownership with a version string or the five parser digests.
+Artifact publication/acquisition is release-owner work; no public download
+location is assumed here.
 
 The cutover replaced the interim local reader. Until this change `specs/gnn-pin.json`
 pinned `v5.0.3` at `8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1`, a revision that
@@ -50,71 +67,63 @@ adoption follows the pin and not the contract date.
 ## Commands
 
 ```bash
-# The shared reader, from the pinned runtime (release gate, `gnn` arm)
-"$GNN_RUNTIME_PYTHON" -m gnn.importers check --repo . --require-pointer \
-    --workflow .github/workflows/ci.yml --job gnn-conformance
+# Select existing independently reviewed resources and a prepared interpreter.
+export GNN_BOOTSTRAP=/reviewed/gnn_bootstrap.py
+export GNN_SOURCE_MANIFEST=/reviewed/v5.1.0-source-manifest.json
+export GNN_RUNTIME_PYTHON=/prepared/gnn/bin/python
 
 # Regenerate the document, or verify it is current (release gate)
 uv run python scripts/export_gnn_spec.py
 uv run python scripts/export_gnn_spec.py --check
 
-# Validate with the pinned upstream parser (requires a GNN source or runtime)
-GNN_ROOT=/path/to/Generalized_Notation_Notation \
-GNN_PYTHON=/path/to/parser-runtime/bin/python \
-uv run python scripts/validate_gnn_spec.py --json
+# Explicit source checkout: materialize the exact pin, then validate.
+uv run python scripts/validate_gnn_spec.py \
+  --gnn-root /path/to/Generalized_Notation_Notation --json
 
-# Installed pinned runtime (what CI uses); --verify-tag-remote resolves the
-# pin's tag upstream with `git ls-remote` and needs network access
-uv run python scripts/validate_gnn_spec.py --gnn-runtime /path/to/venv/bin/python \
-  --verify-tag-remote --json
+# Installed mode: requires real matching PEP610 Git origin and full content.
+# --verify-tag-remote additionally needs network access.
+uv run python scripts/validate_gnn_spec.py --verify-tag-remote --json
 ```
 
-`GNN_ROOT` is a `Generalized_Notation_Notation` checkout: the validator resolves
-the pinned commit with `git archive`, verifies every recorded parser digest, and
-runs the parser from that materialized tree, so a live working copy under
-development is never imported. `GNN_PYTHON` (or `--gnn-runtime`) selects the
-interpreter that has the parser dependencies; the GNN checkout's own `.venv`
-works. Exit codes are `0` pass, `1` conformance failure, and `2` pinned runtime,
-checkout, or requested remote tag resolution unavailable — an unavailable run is reported as not run, never as a
-pass. With `GNN_ROOT` set and no runtime named, the gate uses the checkout's own
-`.venv/bin/python` for both the reader and the pin.
+Interpreter precedence is explicit `--gnn-runtime`, `GNN_RUNTIME_PYTHON`,
+explicit legacy `--python`, `GNN_PYTHON`, then the selected `GNN_ROOT/.venv`
+launcher. A missing explicit selection fails; it never substitutes project
+Python. Venv launcher paths are preserved. The project and GNN NumPy
+environments remain separate.
 
-CI's `gnn-conformance` job (display name `gnn conformance (pinned)`) runs the
-full `all` selection on Python 3.12, provisioning a separate pinned runtime
-because GNN requires NumPy 2.x while the library's committed lock resolves
-NumPy 1.x. That runtime is also what the `manuscript` arm uses for the `gnn_*`
-documented variables, whose values come from `gnn.importers.importer_variables`.
-An unavailable runtime fails the `gnn` arm and `all`; no opt-in requirement flag
-or skip mode is needed. See [`gate.md`](gate.md) for the canonical gate commands
-and exact CI map.
+For a Git checkout, the project validator resolves and archives the exact pin
+before execution. A separately admitted plain source tree is explicitly
+source-only: complete-content/import proof does not invent Git or installed
+provenance, and plain-artifact receipts retain `vcs_verified=false`.
+Installed mode requires actual distribution ownership, canonical PEP610 Git
+origin with the pinned commit, and complete package content. An editable-local
+installation or missing origin is not an installed pass and cannot fall back
+to source.
+
+Exit codes are `0` pass, `1` conformance failure, and `2` unavailable required
+runtime/resources/origin or requested tag resolution. Missing prerequisites
+are not passes. CI must separately provision the reviewed bootstrap and full
+manifest alongside its pinned runtime before hosted acceptance; local source
+proof does not supply those hosted inputs. See [`gate.md`](gate.md).
 
 ## What the validation checks
 
-1. The pin and the pointer: `gnn.importers` reports the pin file, its schema,
-   `repository`, `tag` and 40-hex `commit`, and requires
-   [`.github/GNN.md`](../.github/GNN.md) to name the pin file, the pinned
-   revision, `.github/workflows/ci.yml`, and job `gnn-conformance`.
-2. The document parses with the pinned `gnn` parser with no errors or warnings,
-   and the parser version equals the pinned tag; every recorded parser digest
-   matches the installed (or archived) parser files, and for an installed
-   runtime that check runs *before* the document is parsed and the parser must be
-   imported from the verified package.
-   The pin's `tag` must resolve to the pinned `commit` (`tag-commit-mismatch`):
-   locally in a `GNN_ROOT` checkout, or upstream with `--verify-tag-remote`
-   (`git ls-remote`, the peeled commit of an annotated tag; the release gate's
-   `gnn` arm passes the flag, so it needs network access). The upstream answer is
-   authoritative: when the flag is given, upstream is always queried, so a tag
-   that moved after a checkout fetched it fails even though the local tag still
-   names the pinned commit. The commit the
-   installer recorded for the runtime (`direct_url.json` `vcs_info.commit_id`)
-   must equal the pin's commit. Without a checkout or the flag, and for an
-   install with no recorded VCS commit, the receipt reports `tag_binding` /
-   `revision` as `unresolvable-offline` rather than a pass; with
-   `--verify-tag-remote`, a tag that cannot be resolved ends the run as *not
-   run* (exit `2`).
+1. The shared producer reports the pin and requires
+   [`.github/GNN.md`](../.github/GNN.md) to name its file, revision, workflow
+   `.github/workflows/ci.yml`, and job `gnn-conformance`.
+2. Independent bootstrap/full-manifest admission precedes all target GNN
+   execution. Actual imported modules and verdict exit revalidation must
+   remain qualified. Parsing has no errors or warnings and the version
+   matches the pinned tag.
+   The tag must resolve to the pinned commit: locally for a Git checkout, or
+   upstream when `--verify-tag-remote` is requested. Remote verification
+   always queries upstream rather than trusting a stale local tag. Missing
+   offline tag/revision observations remain `unresolvable-offline`; they are
+   not invented VCS proof or a substitute for installed-origin admission.
 3. The declared `ModelParameters` are read back and used to build the runtime
    model, whose `A`/`B`/`C`/`D`/`E` arrays must equal the declared matrices
-   exactly; declared `StateSpaceBlock` dimensions must match the array shapes.
+   exactly; state-space dimensions and redundant action/policy counts must
+   agree. Parsed `π` and `G` have complete-policy cardinality.
 4. The pinned semantic validator accepts the document, the B-tensor orientation
    diagnostic reports `canonical`, and the consistency checker reports a
    complete score.
@@ -134,8 +143,9 @@ The receipt is written to `docs/_build/gnn/validation-receipt.json`
 * `parameters_from_parsed(payload)` / `declared_arrays(payload)` — read a
   pinned parser payload back into parameters and matrices.
 
-Reading the pin is not part of this package: `gnn.importers` owns that, and the
-gate calls it from the pinned runtime.
+The producer owns pin inspection and execution admission. Manuscript `gnn_*`
+metadata is inspection only, not an installed, source-execution, or scientific
+qualification result.
 
 ## Scope
 

@@ -233,13 +233,32 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
         raise FileNotFoundError(f"config file not found: {config_path}")
     if config_path.suffix.lower() in {".yml", ".yaml"}:
         with config_path.open("r", encoding="utf-8") as stream:
-            data = yaml.safe_load(stream) or {}
+            data = yaml.safe_load(stream)
+        if data is None:
+            data = {}
     elif config_path.suffix.lower() == ".toml":
         with config_path.open("rb") as stream:
             data = tomllib.load(stream)
     else:
         raise ValueError("unsupported config extension; use .yml, .yaml, or .toml")
     return ExperimentConfig.from_dict(data)
+
+
+def load_manuscript_experiment(
+    root: str | Path, metadata: Mapping[str, Any],
+) -> tuple[Path, ExperimentConfig]:
+    """Load the metadata-selected, repository-confined typed experiment."""
+    if not isinstance(metadata, Mapping):
+        raise TypeError("manuscript metadata must be a mapping")
+    experiment = _mapping(metadata.get("experiment"), "manuscript experiment")
+    selection = experiment.get("config_path")
+    if not isinstance(selection, str) or not selection.strip() or Path(selection).is_absolute():
+        raise ValueError("experiment.config_path must be a non-empty repository-relative path")
+    repository = Path(root).resolve()
+    path = (repository / selection).resolve()
+    if not path.is_relative_to(repository):
+        raise ValueError("experiment.config_path escapes the repository")
+    return path, load_experiment_config(path)
 
 
 __all__ = [
@@ -249,4 +268,5 @@ __all__ = [
     "OutputConfig",
     "SimulationConfig",
     "load_experiment_config",
+    "load_manuscript_experiment",
 ]

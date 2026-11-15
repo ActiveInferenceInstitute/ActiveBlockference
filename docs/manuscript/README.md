@@ -39,6 +39,25 @@ the rendered PDF/HTML live under `docs/_build/`, which is reproducible and
 excluded from version control. Change the ordered source, then rerun the
 builder and validation commands.
 
+The metadata's `experiment.config_path` must be a nonempty repository-relative
+path confined to the selected root. Figures, variables, and validation share
+the typed YAML/TOML loader; there is no hardcoded `manuscript.yml` fallback.
+Seeded paths and EFE curves retain run/agent histories and actual times, and
+plot bounds follow the selected grid dimension.
+
+Composition rebases local inline, image, and reference-definition destinations
+from each source document into the actual output directory, including
+`99_references.md`. Queries, fragments, titles, encoded/escaped parentheses,
+external URLs, code, and scholarly citations are preserved. Ordinary missing
+resources fail. Registered figures have explicit output destinations;
+bibliography and metadata are copied alongside them and rendering consumes
+those copies. A relocated GNN link still points to its actual source document.
+
+Generating variables requires the reviewed external GNN resources in
+[`../gnn.md`](../gnn.md). Metadata inspection is not a conformance verdict.
+Software composition/render tests do not authorize changing scientific
+definitions, accepting manuscript claims, or refreshing canonical figures.
+
 ## Figure bytes
 
 `figures/` keeps both an SVG and a PNG for every figure. Both formats are

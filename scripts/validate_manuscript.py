@@ -10,7 +10,7 @@ from pathlib import Path
 
 import yaml
 
-from blockference.config import load_experiment_config
+from blockference.config import load_manuscript_experiment
 
 ROOT = Path(__file__).resolve().parents[1]
 MANUSCRIPT = ROOT / "docs" / "manuscript"
@@ -140,37 +140,33 @@ def validate() -> list[str]:
     metadata_path = MANUSCRIPT / "config.yaml"
     try:
         metadata = yaml.safe_load(metadata_path.read_text(encoding="utf-8"))
-        experiment = metadata.get("experiment", {}) if isinstance(metadata, dict) else {}
-        relative_config = experiment.get("config_path")
-        if not isinstance(relative_config, str):
-            errors.append("manuscript metadata must name experiment.config_path")
-        else:
-            config = load_experiment_config(ROOT / relative_config)
-            expected = {
-                "engine": config.engine,
-                "dimension": config.grid.dimension,
-                "planning_length": config.grid.planning_length,
-                "max_policies": config.grid.max_policies,
-                "timesteps": config.simulation.timesteps,
-                "runs": config.simulation.runs,
-                "agents": config.simulation.n_agents,
-                "seed": config.seed,
-                "target": list(config.simulation.target)
-                if config.simulation.target != "random"
-                else "random",
-                "initial_states": [list(value) for value in config.simulation.resolved_initial_states],
-                "affordances": list(config.grid.affordances),
-            }
-            mismatches = [
-                f"{key} metadata={experiment.get(key)!r} config={value!r}"
-                for key, value in expected.items()
-                if experiment.get(key) != value
-            ]
-            if mismatches:
-                errors.append(
-                    "manuscript metadata disagrees with executable config: "
-                    + "; ".join(mismatches)
-                )
+        _selected, config = load_manuscript_experiment(ROOT, metadata)
+        experiment = metadata["experiment"]
+        expected = {
+            "engine": config.engine,
+            "dimension": config.grid.dimension,
+            "planning_length": config.grid.planning_length,
+            "max_policies": config.grid.max_policies,
+            "timesteps": config.simulation.timesteps,
+            "runs": config.simulation.runs,
+            "agents": config.simulation.n_agents,
+            "seed": config.seed,
+            "target": list(config.simulation.target)
+            if config.simulation.target != "random"
+            else "random",
+            "initial_states": [list(value) for value in config.simulation.resolved_initial_states],
+            "affordances": list(config.grid.affordances),
+        }
+        mismatches = [
+            f"{key} metadata={experiment.get(key)!r} config={value!r}"
+            for key, value in expected.items()
+            if experiment.get(key) != value
+        ]
+        if mismatches:
+            errors.append(
+                "manuscript metadata disagrees with executable config: "
+                + "; ".join(mismatches)
+            )
     except (OSError, TypeError, ValueError, yaml.YAMLError) as exc:
         errors.append(f"manuscript executable config invalid: {exc}")
     return errors

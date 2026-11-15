@@ -68,14 +68,20 @@ def test_figure_registry_mismatches_fail_validation_and_build(
     monkeypatch, tmp_path, capsys, mode, fault, message
 ):
     manuscript = builder.MANUSCRIPT_DIR
+    copied = tmp_path / "docs" / "manuscript"
+    copied.mkdir(parents=True)
+    (copied.parent / "gnn.md").write_text("# GNN\n", encoding="utf-8")
+    pointer = tmp_path / ".github" / "GNN.md"
+    pointer.parent.mkdir()
+    pointer.write_text("# GNN\n", encoding="utf-8")
     for source in [
         *manuscript.glob("[0-9][0-9]_*.md"),
         manuscript / "references.bib",
         manuscript / "config.yaml",
     ]:
-        (tmp_path / source.name).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+        (copied / source.name).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
     registry = json.loads((manuscript / "figure-registry.json").read_text(encoding="utf-8"))
-    figures = tmp_path / "figures"
+    figures = copied / "figures"
     figures.mkdir()
     for entry in registry["figures"]:
         for suffix in ("svg", "png"):
@@ -86,9 +92,9 @@ def test_figure_registry_mismatches_fail_validation_and_build(
         (figures / registry["figures"][0]["png"]).unlink()
     else:
         (figures / "orphan.svg").write_bytes(b"")
-    (tmp_path / "figure-registry.json").write_text(json.dumps(registry), encoding="utf-8")
-    monkeypatch.setattr(validator, "MANUSCRIPT", tmp_path)
-    monkeypatch.setattr(builder, "MANUSCRIPT_DIR", tmp_path)
+    (copied / "figure-registry.json").write_text(json.dumps(registry), encoding="utf-8")
+    monkeypatch.setattr(validator, "MANUSCRIPT", copied)
+    monkeypatch.setattr(builder, "MANUSCRIPT_DIR", copied)
     monkeypatch.setattr(builder, "FIGURE_DIR", figures)
 
     assert any(message in error for error in validator.validate())

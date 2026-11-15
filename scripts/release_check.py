@@ -40,6 +40,8 @@ import tempfile
 import time
 from pathlib import Path
 
+from blockference.gnn_runtime import resolve_gnn_runtime
+
 if __package__:
     from scripts.build_manuscript import RENDER_TARGETS
 else:
@@ -122,22 +124,6 @@ def _changed_paths() -> set[str]:
     }
 
 
-def _checkout_runtime() -> str | None:
-    """Return the interpreter of the GNN checkout named by ``GNN_ROOT``, if any.
-
-    A source checkout is an alternative to an installed pinned runtime. The
-    reader has to run in the same environment as the pinned parser, so the
-    checkout's own virtual environment supplies it.
-    """
-
-    root = os.environ.get("GNN_ROOT")
-    if not root:
-        return None
-    relative = Path("Scripts" if os.name == "nt" else "bin") / (
-        "python.exe" if os.name == "nt" else "python"
-    )
-    candidate = Path(root) / ".venv" / relative
-    return str(candidate) if candidate.is_file() else None
 
 
 def _assert_json(command: list[str]) -> None:
@@ -185,33 +171,25 @@ def _plan(
         ]
     if arm == "manuscript":
         return [
-            ["uv", "run", "python", "scripts/manuscript_variables.py", "--check"],
+            [
+                "uv", "run", "python", "scripts/manuscript_variables.py", "--check",
+                *(["--gnn-runtime", gnn_runtime] if gnn_runtime else []),
+            ],
             ["uv", "run", "python", "scripts/validate_manuscript.py"],
             ["uv", "run", "python", "scripts/build_manuscript.py"],
             ["uv", "run", "python", "scripts/build_manuscript.py", "--check"],
         ]
     if arm == "gnn":
         commands = [["uv", "run", "python", "scripts/export_gnn_spec.py", "--check"]]
-        # The validator verifies the pinned parser file digests before it parses
-        # anything, so it runs before the shared reader's specification check:
-        # ``gnn.importers check`` parses the document with the installed parser
-        # and must not reach it before the digests are verified. It also resolves
-        # the pin's tag upstream, so a tag moved off the pinned commit fails.
+        # The validator owns both the deep parser verdict and the producer's
+        # syntax/pointer check. Each runs in its own fully qualified external
+        # lifetime; no direct ``-m gnn.importers`` path bypasses admission.
         validator = [
             "uv", "run", "python", "scripts/validate_gnn_spec.py", "--verify-tag-remote", "--json",
         ]
         if gnn_runtime:
             validator[-2:-2] = ["--gnn-runtime", gnn_runtime]
         commands.append(validator)
-        if gnn_runtime:
-            commands.append(
-                [
-                    gnn_runtime, "-m", "gnn.importers", "check", "--repo", ".",
-                    "--require-pointer",
-                    "--workflow", ".github/workflows/ci.yml",
-                    "--job", "gnn-conformance",
-                ]
-            )
         return commands
     if arm == "smoke":
         output_root = workdir / "output"
@@ -250,12 +228,16 @@ def _plan(
 def _package_smoke() -> list[list[str]]:
     """Build a wheel and import it from a clean temporary virtualenv."""
 
-    commands: list[list[str]] = [["uv", "build"]]
-    _run(commands[-1])
-    wheels = sorted((ROOT / "dist").glob("*.whl"))
-    if not wheels:
-        raise FileNotFoundError("uv build produced no wheel")
+    commands: list[list[str]] = []
     with tempfile.TemporaryDirectory(prefix="activeblockference-package-") as directory:
+        wheel_dir = Path(directory) / "dist"
+        commands.append(["uv", "build", "--wheel", "--out-dir", str(wheel_dir)])
+        _run(commands[-1])
+        wheels = [
+            path for path in wheel_dir.glob("*.whl") if path.is_file() and not path.is_symlink()
+        ]
+        if len(wheels) != 1:
+            raise ValueError(f"uv build must produce exactly one fresh wheel; found {len(wheels)}")
         constraints = Path(directory) / "constraints.txt"
         commands.append(
             [
@@ -271,7 +253,7 @@ def _package_smoke() -> list[list[str]]:
         commands.append(
             [
                 "uv", "pip", "install", "--python", str(python),
-                "--constraint", str(constraints), str(wheels[-1]),
+                "--constraint", str(constraints), str(wheels[0]),
             ]
         )
         _run(commands[-1])
@@ -364,9 +346,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     selected = _selected(args.arm or [])
-    gnn_runtime = (
-        args.gnn_runtime or os.environ.get("GNN_RUNTIME_PYTHON") or _checkout_runtime()
-    )
+    runtime_error = None
+    try:
+        gnn_runtime = resolve_gnn_runtime(args.gnn_runtime, required=False)
+    except (OSError, ValueError) as exc:
+        gnn_runtime, runtime_error = None, str(exc)
     if args.list:
         for arm in (*ALIASES, *ARM_ORDER):
             print(f"{arm:10s} {ARM_HELP[arm]}")
@@ -397,6 +381,12 @@ def main(argv: list[str] | None = None) -> int:
             started = time.perf_counter()
             commands: list[list[str]] = []
             try:
+                if arm in {"gnn", "manuscript"} and (runtime_error or gnn_runtime is None):
+                    raise ValueError(
+                        "gnn validation not run: " + (
+                            runtime_error or "select --gnn-runtime/GNN_RUNTIME_PYTHON or GNN_ROOT"
+                        )
+                    )
                 if arm == "package":
                     commands = _package_smoke()
                 else:

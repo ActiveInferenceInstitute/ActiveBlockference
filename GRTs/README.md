@@ -15,3 +15,10 @@ The optional OpenAI provider is selected explicitly with `--provider openai` and
 configured by the caller; there are no implicit global paths or provider instances. Offline
 tests and release gates never make network requests. A provider response is research input,
 not a software-integrity or scientific-validity verdict; preserve its provenance separately.
+
+An explicit `Path` corpus means a readable regular UTF-8 file. It is admitted
+before workspace preparation or optional provider construction; missing,
+directory, broken-link, unreadable, and invalid-UTF-8 inputs fail without
+changing request/data/report sentinels. `None` selects the built-in corpus.
+Existing readable filename strings retain file behavior; other strings remain
+literal text, including empty or long text. No provider fallback is inferred.

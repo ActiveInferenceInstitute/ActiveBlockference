@@ -57,9 +57,10 @@ jobs:
     # Validates the committed GNN specification with the parser pinned in
     # specs/gnn-pin.json. The pinned revision is installed into a separate runtime
     # because the GNN distribution requires numpy>=2 while this package
-    # resolves numpy 1.x. The gnn arm runs the shared `python -m gnn.importers
-    # check` from that runtime, and the validator verifies the installed parser
-    # file digests against the pin record before parsing.
+    # resolves numpy 1.x. The project validator owns both guarded conformance
+    # and shared importer checks. Hosted acceptance also requires independently
+    # reviewed GNN_BOOTSTRAP/GNN_SOURCE_MANIFEST resource delivery; parser-file
+    # digests alone are not complete source or installed-origin admission.
     name: gnn conformance (pinned)
     runs-on: ubuntu-latest
 

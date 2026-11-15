@@ -133,9 +133,9 @@ def build_spec_model(parameters: GridWorldSpecParameters) -> ActiveGridference:
 def spec_arrays(parameters: GridWorldSpecParameters | None = None) -> dict[str, np.ndarray]:
     """Return the declared ``A``/``B``/``C``/``D``/``E`` arrays.
 
-    ``E`` is the uniform policy prior over the declared affordances, which is
-    the GNN convention; the affordance *labels* are declared separately in the
-    document's ``ModelParameters`` section.
+    ``E`` is the declaration-only uniform prior over complete policy sequences.
+    Runtime ``ActiveGridference.E`` remains the ordered action-label vocabulary;
+    the document declares those labels separately in ``ModelParameters``.
     """
 
     resolved = parameters or spec_parameters()
@@ -145,16 +145,17 @@ def spec_arrays(parameters: GridWorldSpecParameters | None = None) -> dict[str, 
         "B": np.asarray(model.B, dtype=float),
         "C": np.asarray(model.C, dtype=float),
         "D": np.asarray(model.D, dtype=float),
-        "E": np.full(resolved.n_actions, 1.0 / resolved.n_actions, dtype=float),
+        "E": np.full(resolved.n_policies, 1.0 / resolved.n_policies, dtype=float),
     }
 
 
 def _format_value(value: float) -> str:
-    return f"{float(value):.1f}"
+    return repr(float(value))
 
 
 def _format_vector(values: Iterable[float]) -> str:
-    return "(" + ", ".join(_format_value(value) for value in values) + ")"
+    formatted = [_format_value(value) for value in values]
+    return "(" + ", ".join(formatted) + (",)" if len(formatted) == 1 else ")")
 
 
 def _format_matrix(matrix: np.ndarray) -> str:
@@ -214,7 +215,7 @@ Discrete, deterministic, fully observed grid-world POMDP implemented by
   deterministic and column-stochastic: every column selects exactly one next
   cell, and moves outside the grid clamp to the border.
 - `C` is a one-hot preference over the preferred cell {preferred}; `D` is a one-hot prior over
-  the initial cell {initial}; `E` is the uniform policy prior over the {resolved.n_actions} affordances.
+  the initial cell {initial}; `E` is the uniform prior over the {resolved.n_policies} length-{horizon} policies.
 - `G` is the expected free energy per policy and `pi` the policy posterior;
   the pipeline persists both components (`update_efe_epistemic`,
   `update_efe_pragmatic`) for every step.
@@ -225,14 +226,14 @@ A[{n},{n},type=float]        # Likelihood: identity, fully observed
 B[{n},{n},{resolved.n_actions},type=float]        # Transition: B[next_state,previous_state,action]
 C[{n},type=float]        # Preference over observations
 D[{n},type=float]        # Prior over hidden states
-E[{resolved.n_actions},type=float]        # Policy prior over affordances
+E[{resolved.n_policies},type=float]        # Uniform prior over complete policies
 
 s[{n},1,type=float]      # Current hidden state distribution
 s_prime[{n},1,type=float] # Next hidden state distribution
 o[{n},1,type=int]        # Current observation
-pi[{resolved.n_actions},type=float]       # Policy posterior over affordances
+pi[{resolved.n_policies},type=float]       # Posterior over complete policies
 u[1,type=int]            # Sampled affordance index
-G[{resolved.n_actions},type=float]        # Expected free energy per affordance
+G[{resolved.n_policies},type=float]        # Expected free energy per policy
 t[1,type=int]            # Discrete time step
 
 ## Connections

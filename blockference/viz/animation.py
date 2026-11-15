@@ -13,7 +13,11 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.animation import FFMpegWriter, FuncAnimation, PillowWriter
 
-from blockference.viz._common import extract_agent_positions, infer_grid_dimension
+from blockference.viz._common import (
+    extract_agent_positions,
+    extract_history_steps,
+    infer_grid_dimension,
+)
 
 __all__ = ["animate_trajectory"]
 
@@ -39,7 +43,8 @@ def animate_trajectory(
     n = inferred if grid_dim is None else grid_dim
     if isinstance(n, bool) or not isinstance(n, int) or n < 2 or n != inferred:
         raise ValueError(f"grid_dim must equal the trajectory dimension {inferred}")
-    n_frames = len(next(iter(positions.values())))
+    steps = extract_history_steps(df, "env_states")
+    n_frames = max(len(history) for history in positions.values())
     fig, ax = plt.subplots(figsize=(6, 6))
     try:
         ax.set_xlim(-0.5, n - 0.5)
@@ -53,7 +58,10 @@ def animate_trajectory(
         lines, dots, labels = {}, {}, {}
         for index, agent_id in enumerate(positions):
             color = cmap(index % 10)
-            (line,) = ax.plot([], [], "-", color=color, alpha=0.6, label=f"agent {agent_id}")
+            (line,) = ax.plot(
+                [], [], "-", color=color, alpha=0.6,
+                label=f"run {agent_id[0]} / agent {agent_id[1]}",
+            )
             (dot,) = ax.plot([], [], "o", color=color, markersize=10)
             lines[agent_id] = line
             dots[agent_id] = dot
@@ -76,9 +84,13 @@ def animate_trajectory(
                 lines[agent_id].set_data(xs, ys)
                 dots[agent_id].set_data([xs[-1]], [ys[-1]])
                 labels[agent_id].set_position((xs[-1] + 0.05, ys[-1] - 0.1))
-                labels[agent_id].set_text(str(agent_id))
-            step_text.set_text(f"step {frame}")
-            return list(lines.values()) + list(dots.values()) + [step_text]
+                labels[agent_id].set_text(f"r{agent_id[0]} / a{agent_id[1]}")
+            run_labels = {}
+            for key, history in steps.items():
+                time, substep = history[min(frame, len(history) - 1)]
+                run_labels[key[0]] = f"run {key[0]}: t={time}, substep={substep}"
+            step_text.set_text("\n".join(run_labels.values()))
+            return list(lines.values()) + list(dots.values()) + list(labels.values()) + [step_text]
 
         animation = FuncAnimation(
             fig, update, frames=n_frames, init_func=init, blit=False, interval=1000 / fps

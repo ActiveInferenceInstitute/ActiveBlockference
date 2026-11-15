@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 import tomllib
@@ -21,10 +20,13 @@ from pathlib import Path
 
 import yaml
 
+from blockference.config import load_manuscript_experiment
+from blockference.gnn_runtime import resolve_gnn_runtime
+from blockference.gnn_source import worker_command
+
 ROOT = Path(__file__).resolve().parents[1]
 VARIABLES_PATH = ROOT / "docs" / "_generated" / "manuscript-variables.json"
 WORKFLOW_PATH = ROOT / ".github" / "workflows" / "ci.yml"
-REPORT = ROOT / "scripts" / "gnn_importer_report.py"
 SCHEMA = "manuscript-variables/v1"
 MANUSCRIPT_CONFIG_PATH = ROOT / "docs" / "manuscript" / "config.yaml"
 
@@ -49,26 +51,18 @@ def _gnn_job() -> tuple[str, str]:
     raise ValueError("no GNN conformance job in .github/workflows/ci.yml")
 
 
-def _gnn_interpreter() -> str:
-    """Return the interpreter that has the pinned GNN distribution installed."""
-
-    runtime = os.environ.get("GNN_RUNTIME_PYTHON")
-    if runtime and Path(runtime).is_file():
-        return runtime
-    return sys.executable
 
 
-def _gnn_variables(job_key: str, job_name: str) -> dict[str, str]:
+def _gnn_variables(
+    job_key: str, job_name: str, *, gnn_runtime: str | None = None,
+) -> dict[str, str]:
     """Return the ``gnn_*`` keys from ``gnn.importers.importer_variables``."""
 
     completed = subprocess.run(
-        [
-            _gnn_interpreter(),
-            str(REPORT),
-            "--repo", str(ROOT),
-            "--job", job_key,
-            "--job-name", job_name,
-        ],
+        worker_command(
+            resolve_gnn_runtime(gnn_runtime), "inspect",
+            "--repo", str(ROOT), "--job", job_key, "--job-name", job_name,
+        ),
         cwd=ROOT,
         stdin=subprocess.DEVNULL,
         capture_output=True,
@@ -78,34 +72,34 @@ def _gnn_variables(job_key: str, job_name: str) -> dict[str, str]:
     if completed.returncode != 0:
         detail = (completed.stderr or completed.stdout).strip().splitlines()
         raise ValueError(
-            "the shared gnn.importers reader could not produce the gnn_* variables: "
+            "the checked producer reader could not produce the gnn_* metadata variables: "
             + (" | ".join(detail[-3:]) if detail else "no output")
-            + "; set GNN_RUNTIME_PYTHON to the pinned GNN runtime"
+            + "; select the external GNN runtime and reviewed GNN_BOOTSTRAP"
         )
     variables = dict(json.loads(completed.stdout)["variables"])
     variables.pop("schema", None)  # gnn-importer-variables/v1 names the map, not this file
     return variables
 
 
-def build() -> dict[str, object]:
+def build(*, gnn_runtime: str | None = None) -> dict[str, object]:
     """Return the declared manuscript variables and their sources."""
 
     project = _project()
     job_key, job_name = _gnn_job()
-    gnn = _gnn_variables(job_key, job_name)
     metadata = yaml.safe_load(MANUSCRIPT_CONFIG_PATH.read_text(encoding="utf-8"))
-    config_path = metadata["experiment"]["config_path"]
-    config = yaml.safe_load((ROOT / config_path).read_text(encoding="utf-8"))
+    selected, config = load_manuscript_experiment(ROOT, metadata)
+    config_path = selected.relative_to(ROOT.resolve()).as_posix()
+    gnn = _gnn_variables(job_key, job_name, gnn_runtime=gnn_runtime)
     experiment_values = {
         "experiment_config_path": config_path,
-        "experiment_engine": config["engine"],
-        "experiment_dimension": config["grid"]["dimension"],
-        "experiment_agents": config["simulation"]["n_agents"],
-        "experiment_planning_length": config["grid"]["planning_length"],
-        "experiment_timesteps": config["simulation"]["timesteps"],
-        "experiment_seed": config["seed"],
-        "experiment_affordance_count": len(config["grid"]["affordances"]),
-        "experiment_affordances": ", ".join(f"`{value}`" for value in config["grid"]["affordances"]),
+        "experiment_engine": config.engine,
+        "experiment_dimension": config.grid.dimension,
+        "experiment_agents": config.simulation.n_agents,
+        "experiment_planning_length": config.grid.planning_length,
+        "experiment_timesteps": config.simulation.timesteps,
+        "experiment_seed": config.seed,
+        "experiment_affordance_count": len(config.grid.affordances),
+        "experiment_affordances": ", ".join(f"`{value}`" for value in config.grid.affordances),
     }
     experiment_sources = {
         "experiment_config_path": "docs/manuscript/config.yaml experiment.config_path",
@@ -162,10 +156,11 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="fail when the file is stale")
+    parser.add_argument("--gnn-runtime", help="external GNN interpreter; otherwise shared selection")
     args = parser.parse_args(argv)
     try:
-        content = render(build())
-    except (OSError, ValueError, KeyError, yaml.YAMLError) as exc:
+        content = render(build(gnn_runtime=args.gnn_runtime))
+    except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError) as exc:
         print(f"manuscript variables failed: {exc}", file=sys.stderr)
         return 1
     if args.check:

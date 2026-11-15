@@ -82,6 +82,9 @@ arms of the canonical gate in [`scripts/release_check.py`](../scripts/release_ch
 * the Python 3.12 `gnn-conformance` job (display name
   `gnn conformance (pinned)`) runs `--arm all` with `GNN_RUNTIME_PYTHON` set to a
   separate pinned runtime provisioned from `specs/gnn-pin.json`.
+  Independently reviewed `GNN_BOOTSTRAP` and `GNN_SOURCE_MANIFEST` inputs must
+  also be delivered before hosted acceptance; source-only local proof does
+  not establish installed provenance or provide those hosted artifacts.
 
 The arms cover Ruff linting, repository-wide Markdown link/anchor validation,
 mypy, the test suite, notebook hygiene and execution, real pipeline and CLI

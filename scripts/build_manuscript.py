@@ -10,7 +10,6 @@ has composed the source files.
 from __future__ import annotations
 
 import argparse
-import ast
 import json
 import os
 import re
@@ -19,6 +18,11 @@ import subprocess
 import sys
 from collections import defaultdict
 from pathlib import Path
+
+import yaml
+
+from blockference.config import load_manuscript_experiment
+from blockference.manuscript_links import rebase_local_links
 
 if __package__:
     from scripts.validate_manuscript import figure_registry_errors
@@ -230,8 +234,22 @@ def _substitute_variables(text: str, path: Path, values: dict[str, str]) -> str:
     return resolved
 
 
-def compose_manuscript() -> tuple[str, dict[str, dict[str, int]]]:
+def compose_manuscript(*, output_dir: Path | None = None) -> tuple[str, dict[str, dict[str, int]]]:
     variables = _manuscript_variables()
+    destination = BUILD_DIR if output_dir is None else output_dir
+    errors = figure_registry_errors(MANUSCRIPT_DIR, check_files=False)
+    if errors:
+        raise ValueError("; ".join(errors))
+    registry = json.loads((MANUSCRIPT_DIR / "figure-registry.json").read_text(encoding="utf-8"))
+    copied = {
+        (FIGURE_DIR / entry[kind]).resolve(): destination / "figures" / entry[kind]
+        for entry in registry["figures"] for kind in ("svg", "png")
+    }
+    for name in ("references.bib", "config.yaml"):
+        resource = MANUSCRIPT_DIR / name
+        if not resource.is_file():
+            raise FileNotFoundError(f"missing manuscript resource: {resource}")
+        copied[resource.resolve()] = destination / name
     sources = [
         (path, _substitute_variables(text, path, variables))
         for path, text in _read_sources()
@@ -243,6 +261,9 @@ def compose_manuscript() -> tuple[str, dict[str, dict[str, int]]]:
         "",
     ]
     for path, source in sources:
+        source = rebase_local_links(
+            source, source=path, output_dir=destination, copied=copied,
+        )
         if path.name == "99_references.md":
             sections.append(source.strip())
             continue
@@ -357,6 +378,9 @@ def build_figures(output_dir: Path = FIGURE_DIR) -> list[Path]:
     import matplotlib.pyplot as plt
     from matplotlib.patches import FancyArrowPatch, Rectangle
 
+    metadata = yaml.safe_load((MANUSCRIPT_DIR / "config.yaml").read_text(encoding="utf-8"))
+    _selected, cfg = load_manuscript_experiment(REPO_ROOT, metadata)
+
     output_dir.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []
 
@@ -444,41 +468,39 @@ def build_figures(output_dir: Path = FIGURE_DIR) -> list[Path]:
     _save_figure(fig, path)
     paths.append(path)
 
-    from blockference.config import load_experiment_config
     from blockference.simulations.grid_sim import run_experiment
+    from blockference.viz._common import (
+        extract_agent_positions,
+        extract_efe_history,
+        extract_history_steps,
+    )
 
-    cfg = load_experiment_config(REPO_ROOT / "configs" / "manuscript.yml")
     frame = run_experiment(cfg)
 
-    def as_mapping(value):
-        return value if isinstance(value, dict) else ast.literal_eval(str(value))
 
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
     try:
-        positions = [as_mapping(value) for value in frame["env_states"]]
-        for agent_id in sorted(positions[0], key=repr):
-            ys = [state[agent_id][0] for state in positions]
-            xs = [state[agent_id][1] for state in positions]
-            axes[0].plot(xs, ys, "-o", label=f"agent {agent_id}")
-        axes[0].set_xlim(-0.25, 2.25)
-        axes[0].set_ylim(2.25, -0.25)
-        axes[0].set_xticks(range(3))
-        axes[0].set_yticks(range(3))
+        for (run, agent_id), positions in extract_agent_positions(frame).items():
+            ys, xs = zip(*positions, strict=True)
+            axes[0].plot(xs, ys, "-o", label=f"run {run} / agent {agent_id}")
+        border = cfg.grid.dimension - 1
+        axes[0].set_xlim(-0.25, border + 0.25)
+        axes[0].set_ylim(border + 0.25, -0.25)
+        axes[0].set_xticks(range(cfg.grid.dimension))
+        axes[0].set_yticks(range(cfg.grid.dimension))
         axes[0].grid(True, alpha=0.3)
         axes[0].set_title("Seeded paths")
         axes[0].set_xlabel("x")
         axes[0].set_ylabel("y")
         axes[0].legend()
-        efe_values: dict[object, list[float]] = defaultdict(list)
-        for value in frame["efe"]:
-            parsed = as_mapping(value)
-            for agent_id, vector in parsed.items():
-                if vector is not None:
-                    efe_values[agent_id].append(min(map(float, vector)))
-        for agent_id, values in efe_values.items():
-            axes[1].plot(range(len(values)), values, "-o", label=f"agent {agent_id}")
+        steps = extract_history_steps(frame, "efe")
+        for key, history in extract_efe_history(frame).items():
+            axes[1].plot(
+                [time for time, _substep in steps[key]], [float(vector.min()) for vector in history],
+                "-o", label=f"run {key[0]} / agent {key[1]}",
+            )
         axes[1].set_title("Persisted policy EFE")
-        axes[1].set_xlabel("step")
+        axes[1].set_xlabel("timestep")
         axes[1].set_ylabel("min G(π) (nats)")
         axes[1].grid(True, alpha=0.3)
         axes[1].legend()
@@ -535,6 +557,8 @@ def _write_outputs(compiled: str) -> Path:
         shutil.copy2(figure, build_figures_dir / figure.name)
     for figure in FIGURE_DIR.glob("*.png"):
         shutil.copy2(figure, build_figures_dir / figure.name)
+    for name in ("references.bib", "config.yaml"):
+        shutil.copy2(MANUSCRIPT_DIR / name, BUILD_DIR / name)
     return output
 
 
@@ -672,11 +696,11 @@ def render_manuscript(compiled: Path, fmt: str, output: Path | None = None) -> P
         "--standalone",
         "--citeproc",
         "--bibliography",
-        str(MANUSCRIPT_DIR / "references.bib"),
+        str(compiled.parent / "references.bib"),
         "--metadata-file",
-        str(MANUSCRIPT_DIR / "config.yaml"),
+        str(compiled.parent / "config.yaml"),
         "--resource-path",
-        str(BUILD_DIR),
+        str(compiled.parent),
         "-o",
         str(target),
     ]
@@ -715,9 +739,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.check and args.render != "none":
         parser.error("--check cannot be combined with --render")
     try:
-        registry_errors = figure_registry_errors(MANUSCRIPT_DIR, check_files=False)
-        if registry_errors:
-            raise ValueError("; ".join(registry_errors))
         compiled, labels = compose_manuscript()
         if not args.check:
             if not args.no_figures:

@@ -26,7 +26,7 @@ Discrete, deterministic, fully observed grid-world POMDP implemented by
   deterministic and column-stochastic: every column selects exactly one next
   cell, and moves outside the grid clamp to the border.
 - `C` is a one-hot preference over the preferred cell 2, 2; `D` is a one-hot prior over
-  the initial cell 0, 0; `E` is the uniform policy prior over the 5 affordances.
+  the initial cell 0, 0; `E` is the uniform prior over the 25 length-2 policies.
 - `G` is the expected free energy per policy and `pi` the policy posterior;
   the pipeline persists both components (`update_efe_epistemic`,
   `update_efe_pragmatic`) for every step.
@@ -37,14 +37,14 @@ A[9,9,type=float]        # Likelihood: identity, fully observed
 B[9,9,5,type=float]        # Transition: B[next_state,previous_state,action]
 C[9,type=float]        # Preference over observations
 D[9,type=float]        # Prior over hidden states
-E[5,type=float]        # Policy prior over affordances
+E[25,type=float]        # Uniform prior over complete policies
 
 s[9,1,type=float]      # Current hidden state distribution
 s_prime[9,1,type=float] # Next hidden state distribution
 o[9,1,type=int]        # Current observation
-pi[5,type=float]       # Policy posterior over affordances
+pi[25,type=float]       # Posterior over complete policies
 u[1,type=int]            # Sampled affordance index
-G[5,type=float]        # Expected free energy per affordance
+G[25,type=float]        # Expected free energy per policy
 t[1,type=int]            # Discrete time step
 
 ## Connections
@@ -182,7 +182,7 @@ C=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0)
 
 D=(1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
-E=(0.2, 0.2, 0.2, 0.2, 0.2)
+E=(0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04)
 
 ## Equations
 

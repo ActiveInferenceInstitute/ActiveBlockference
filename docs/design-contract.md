@@ -29,8 +29,8 @@ the model itself:
    enumeration, action sampling, environment stepping, and plots.
 3. Probability arrays are finite, non-negative, shape-compatible, and
    normalized wherever they represent a distribution.
-4. A multi-agent step is simultaneous: every proposal is computed from the
-   same pre-step occupancy map and resolved deterministically.
+4. A shared-world multi-agent step is simultaneous: every proposal is computed
+   from the same pre-step occupancy map and resolved deterministically.
 5. A persisted prior describes the realized world transition. A rejected
    collision proposal therefore produces a one-hot prior at the agent's
    realized coordinate.
@@ -38,6 +38,16 @@ the model itself:
    state.
 7. A release verdict is meaningful only after parsing the persisted files
    independently of the producing objects.
+
+`GridWorld.step` and `p_actinf_dict` share occupancy: initially occupied cells
+remain unavailable, swaps are refused, and free-cell conflicts use the
+established `(type name, repr)` identity order. `actinf_graph` instead gives
+each graph node an independent world; matching coordinates across nodes are
+not shared-world collisions.
+
+Built-in integer and string IDs are distinct. Version-2 typed serialization
+preserves registry insertion order for sequence actions without changing
+conflict priority (for example, integer `10` precedes integer `2` by `repr`).
 
 ## Constraint classification
 
@@ -47,7 +57,7 @@ the model itself:
 | YAML and TOML input | Soft choice | Accept both through one strict dataclass schema. |
 | CSV and JSON required artefacts | Soft choice | Keep readable interchange formats as the minimum contract. |
 | Parquet output | Optional convenience | Write it only when a compatible writer exists. |
-| One shared `initial_state` field | Compatibility assumption | Preserve it by broadcasting; add `initial_states` for explicit starts. |
+| One `initial_state` field | Compatibility assumption | Retain for one agent; multiple agents require distinct `initial_states`. |
 | Fully observed identity `A` | Model scope | Keep as the control condition; partial observation is a new model feature. |
 | Deterministic square-grid `B` | Model scope | Do not imply stochastic or obstacle dynamics without new validation. |
 | Large policy horizons | Physical resource limit | Fail or redesign before exponential enumeration becomes accidental. |

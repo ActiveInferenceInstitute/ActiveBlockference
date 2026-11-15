@@ -73,6 +73,7 @@ from blockference.viz._common import (
     extract_agent_positions,
     extract_belief_history,
     infer_grid_dimension,
+    ordered_trajectory,
 )
 
 __all__ = [
@@ -134,23 +135,34 @@ class PipelineResult:
 
 
 def summarise_trajectory(df: pd.DataFrame) -> dict:
-    """Compute a JSON-friendly summary of an experiment run."""
+    """Summarise each run/agent without concatenating independent histories."""
     positions = extract_agent_positions(df)
     beliefs = extract_belief_history(df)
-    n = infer_grid_dimension(df)
-    summary = {
+    ordered = ordered_trajectory(df)
+    runs = {}
+    for run, rows in ordered.groupby("run", sort=False):
+        run_positions = {agent: history for (number, agent), history in positions.items() if number == run}
+        runs[str(run)] = {
+            "n_rows": int(len(rows)),
+            "n_agents": len(run_positions),
+            "final_positions": {str(agent): history[-1] for agent, history in run_positions.items()},
+            "trajectory_lengths": {str(agent): len(history) for agent, history in run_positions.items()},
+            "belief_history_lengths": {
+                str(agent): len(history)
+                for (number, agent), history in beliefs.items() if number == run
+            },
+            "max_timestep": int(rows["timestep"].max()),
+        }
+    return {
+        "version": 2,
         "n_rows": int(len(df)),
-        "n_agents": int(len(positions)),
-        "grid_dimension": int(n),
-        "final_positions": {str(k): v[-1] if v else None for k, v in positions.items()},
-        "trajectory_lengths": {str(k): len(v) for k, v in positions.items()},
-        "belief_history_lengths": {str(k): len(v) for k, v in beliefs.items()},
+        "n_runs": len(runs),
+        "n_agents": len({agent for _run, agent in positions}),
+        "grid_dimension": int(infer_grid_dimension(df)),
+        "max_timestep": int(ordered["timestep"].max()),
+        "max_run": int(ordered["run"].max()),
+        "runs": runs,
     }
-    if "timestep" in df.columns:
-        summary["max_timestep"] = int(df["timestep"].max())
-    if "run" in df.columns:
-        summary["max_run"] = int(df["run"].max())
-    return summary
 
 
 def _as_float_array(v: Any) -> np.ndarray | None:
@@ -255,23 +267,12 @@ def render_visualisations(
     log.info("rendering persisted expected free energy")
     viz["efe"] = plot_efe(df, paths.viz_dir / "efe.png")
 
-    beliefs = extract_belief_history(df)
-    if beliefs:
-        first_agent = next(iter(beliefs))
-        n_steps = len(beliefs[first_agent])
-        if n_steps > 0:
-            log.info("rendering belief heatmaps for agent %s (first/last)", first_agent)
-            viz["belief_heatmap_first"] = plot_belief_heatmap(
-                df,
-                paths.viz_dir / "belief_heatmap_first.png",
-                agent_id=first_agent,
-                timestep=0,
-            )
-            viz["belief_heatmap_last"] = plot_belief_heatmap(
-                df,
-                paths.viz_dir / "belief_heatmap_last.png",
-                agent_id=first_agent,
-                timestep=-1,
+    for run, agent_id in extract_belief_history(df):
+        for label, index in (("first", 0), ("last", -1)):
+            name = f"belief_heatmap_run_{run}_agent_{agent_id}_{label}"
+            viz[name] = plot_belief_heatmap(
+                df, paths.viz_dir / f"{name}.png",
+                run=run, agent_id=agent_id, timestep=index,
             )
 
     log.info("rendering trajectory animation")
@@ -279,29 +280,29 @@ def render_visualisations(
     return viz, anims
 
 
-def _extract_agents_dict(df: pd.DataFrame) -> dict:
-    """Return the post-run ``agents`` dict from the final cadCAD row."""
-    if df.empty or "agents" not in df.columns:
-        return {}
-    last_agents = df.iloc[-1]["agents"]
-    if isinstance(last_agents, dict):
-        return last_agents
-    return {}
+def _extract_run_agents(df: pd.DataFrame) -> dict[tuple[int, str], Any]:
+    """Return each run's final agents, retaining its own immutable model."""
+    models = {}
+    for run, rows in ordered_trajectory(df).groupby("run", sort=False):
+        agents = rows.iloc[-1]["agents"]
+        if not isinstance(agents, dict) or not agents:
+            raise ValueError(f"run {run} has no final agent registry")
+        for agent_id, agent in agents.items():
+            models[(int(run), str(agent_id))] = agent
+    return models
 
 
-def _extract_policies(agents: dict) -> list:
-    """Return the policy set the inference loop used."""
-    from blockference.maths import construct_policies as _cp
+def _extract_policies(agents: dict[tuple[int, str], Any]) -> dict[tuple[int, str], list]:
+    """Reconstruct each model's exact ordered policy set under its actual cap."""
+    from blockference.maths import construct_policies
 
-    if not agents:
-        return []
-    first = next(iter(agents.values()))
-    n_states = int(getattr(first, "n_states", 0))
-    n_actions = len(getattr(first, "E", []))
-    policy_len = int(getattr(first, "policy_len", 1))
-    if n_states == 0 or n_actions == 0:
-        return []
-    return _cp([n_states], [n_actions], policy_len=policy_len)
+    return {
+        key: construct_policies(
+            [agent.n_states], [len(agent.E)], policy_len=agent.policy_len,
+            max_policies=agent.max_policies,
+        )
+        for key, agent in agents.items()
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -338,20 +339,20 @@ def persist(
     persist_config(cfg, paths)
     log.info("persisted config to %s", paths.config_path)
 
-    written = persist_dataframe(df, paths)
+    agents = _extract_run_agents(df)
+    written = persist_dataframe(df, paths, models=agents)
     log.info("persisted trajectory: %s", {k: str(v) for k, v in written.items()})
 
     summary = summarise_trajectory(df)
     persist_summary(summary, paths)
     log.info("persisted summary: %d agents, %d rows", summary["n_agents"], summary["n_rows"])
 
-    agents = _extract_agents_dict(df)
     persist_generative_model(agents, paths)
     persist_generative_model_npz(agents, paths)
-    log.info("persisted generative model (JSON + NPZ) for %d agent(s)", len(agents))
+    log.info("persisted generative models (JSON + NPZ) for %d run/agent pairs", len(agents))
     policies = _extract_policies(agents)
     persist_policies(policies, paths)
-    log.info("persisted %d policies of length %d", len(policies), policies[0].shape[0])
+    log.info("persisted policy sets for %d run/agent pairs", len(policies))
 
     per_step = build_per_step_records(df)
     persist_per_step_records(per_step, paths)
@@ -385,9 +386,9 @@ def validate(
         log.info("trajectory schema OK")
 
     model_reports: dict[str, ValidationReport] = {}
-    for agent_id, agent in agents.items():
+    for (run, agent_id), agent in agents.items():
         rep = validate_generative_model(agent)
-        model_reports[str(agent_id)] = rep
+        model_reports[f"run_{run}/agent_{agent_id}"] = rep
         if not rep.ok:
             log.warning(
                 "generative model invariant failures for agent %s: %s", agent_id, rep.issues
@@ -400,6 +401,9 @@ def validate(
         per_step,
         n_states=getattr(first_agent, "n_states", None),
         n_actions=len(getattr(first_agent, "E", [])) if first_agent is not None else None,
+        n_policies=(
+            len(first_agent.E) ** first_agent.policy_len if first_agent is not None else None
+        ),
     )
     if not per_step_report.ok:
         log.warning("per-step diagnostics issues: %s", per_step_report.issues)

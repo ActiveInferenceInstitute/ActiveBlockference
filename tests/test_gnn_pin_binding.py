@@ -1,14 +1,12 @@
-"""Offline tests for the pin-binding checks in ``scripts/validate_gnn_spec.py``.
+"""Offline tag-binding and pure document-conformance checks.
 
-No test here uses the network or an installed GNN runtime: remote tag resolution
-is exercised against a stubbed ``git ls-remote``, the checkout path uses a
-throwaway local git repository, and the runtime is a stub.
+Git tag resolution uses throwaway local repositories or explicit failed-reader
+fixtures. Real producer/bootstrap/runtime controls live in test_gnn_source_admission.
 """
 
 from __future__ import annotations
 
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -214,75 +212,6 @@ def test_failed_remote_is_unresolved_never_a_pass(monkeypatch: pytest.MonkeyPatc
 
     assert binding["status"] == "unresolvable-offline"
     assert "ls-remote failed" in binding["detail"]
-
-
-def test_installed_commit_must_match_the_pin() -> None:
-    pin = _pin()
-
-    assert vgs.revision_failures({"status": "verified", "commit": COMMIT}, pin) == []
-    assert vgs.revision_failures({"status": "unresolvable-offline", "commit": None}, pin) == []
-    assert vgs.revision_failures({"status": "verified", "commit": OTHER}, pin)[0].startswith(
-        vgs.TAG_COMMIT_MISMATCH
-    )
-    assert vgs.revision_failures({"status": "conflicting", "detail": "two"}, pin)[0].startswith(
-        vgs.TAG_COMMIT_MISMATCH
-    )
-
-
-def _run_main(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *extra: str):
-    probed: list[str] = []
-
-    def fake_probe(*_args, **_kwargs):
-        probed.append("probe")
-        raise AssertionError("the parser must not run before the digests verify")
-
-    monkeypatch.setattr(vgs, "run_probe", fake_probe)
-    monkeypatch.setattr(
-        vgs, "read_importer_report", lambda *_a, **_k: {"pin": _pin(), "variables": {}}
-    )
-    code = vgs.main(
-        ["--gnn-runtime", sys.executable, "--receipt", str(tmp_path / "r.json"), *extra]
-    )
-    return code, probed
-
-
-def test_digests_are_verified_before_the_document_is_parsed(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    package = tmp_path / "gnn"
-    package.mkdir()
-    (package / "__init__.py").write_text("tampered", encoding="utf-8")
-    monkeypatch.setattr(vgs, "locate_package", lambda *_a, **_k: package)
-
-    code, probed = _run_main(monkeypatch, tmp_path)
-
-    assert code == 2
-    assert probed == []
-    assert "digest mismatch" in capsys.readouterr().err
-
-
-def test_a_missing_pinned_package_is_not_run_before_parsing(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    def absent(*_args, **_kwargs):
-        raise vgs.Unavailable("the gnn package is not installed")
-
-    monkeypatch.setattr(vgs, "locate_package", absent)
-    code, probed = _run_main(monkeypatch, tmp_path)
-
-    assert code == 2
-    assert probed == []
-
-
-def test_verify_tag_remote_that_cannot_answer_is_not_run_not_a_pass(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    _stub_ls_remote(monkeypatch, "", returncode=128)
-    code, probed = _run_main(monkeypatch, tmp_path, "--verify-tag-remote")
-
-    assert code == 2
-    assert probed == []
-    assert "--verify-tag-remote" in capsys.readouterr().err
 
 
 def test_a_remote_tag_moved_off_the_pinned_commit_reaches_the_conformance_failures() -> None:

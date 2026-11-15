@@ -2,25 +2,13 @@
 
 from pathlib import Path
 
-import nbformat
 import pytest
-from nbclient import NotebookClient
 
-from scripts.validate_notebooks import validate_all
+from blockference.notebook_inventory import execute_notebooks
 
 pytestmark = pytest.mark.slow
 
 
 def test_notebooks_parse_and_execute(tmp_path):
     root = Path(__file__).parents[1]
-    assert validate_all(root) == {}
-    for path in sorted(root.rglob("*.ipynb")):
-        if ".venv" in path.parts:
-            continue
-        notebook = nbformat.read(path, as_version=4)
-        NotebookClient(
-            notebook,
-            timeout=120,
-            kernel_name="python3",
-            resources={"metadata": {"path": str(tmp_path)}},
-        ).execute()
+    execute_notebooks(root, workspace=tmp_path)
