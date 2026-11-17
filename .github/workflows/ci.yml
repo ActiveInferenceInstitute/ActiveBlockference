@@ -58,8 +58,8 @@ jobs:
     # specs/gnn-pin.json. The pinned revision is installed into a separate runtime
     # because the GNN distribution requires numpy>=2 while this package
     # resolves numpy 1.x. The project validator owns both guarded conformance
-    # and shared importer checks. Hosted acceptance also requires independently
-    # reviewed GNN_BOOTSTRAP/GNN_SOURCE_MANIFEST resource delivery; parser-file
+    # and shared importer checks. Independently reviewed immutable resources are
+    # downloaded and SHA-256 checked before release execution; parser-file
     # digests alone are not complete source or installed-origin admission.
     name: gnn conformance (pinned)
     runs-on: ubuntu-latest
@@ -81,6 +81,26 @@ jobs:
       - name: Install locked package and development dependencies
         run: uv sync --locked --extra dev --python 3.12
 
+      - name: Prepare reviewed GNN admission resources
+        id: resources
+        run: |
+          set -euo pipefail
+          # Resource delivery revision, not the parser revision in specs/gnn-pin.json.
+          BASE="https://raw.githubusercontent.com/ActiveInferenceInstitute/Generalized_Notation_Notation/66d491f86895443cf588011cc6f40c37b8bae8fd/interop"
+          RESOURCES="$RUNNER_TEMP/gnn-resources"
+          mkdir -p "$RESOURCES"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            "$BASE/gnn_bootstrap.py" --output "$RESOURCES/gnn_bootstrap.py"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            "$BASE/v5.1.0-source-manifest.json" --output "$RESOURCES/v5.1.0-source-manifest.json"
+          (
+            cd "$RESOURCES"
+            echo "f638d4c01fe7de31e43d793e59bf382d0c3d1a82f365c59238334a2b40adfb37  gnn_bootstrap.py" | sha256sum --check --strict
+            echo "43b33c0b2b40386afa3f306fec4cc13bc1fd7c3b570fbf11d5008bad5c8e6b51  v5.1.0-source-manifest.json" | sha256sum --check --strict
+          )
+          echo "bootstrap=$RESOURCES/gnn_bootstrap.py" >> "$GITHUB_OUTPUT"
+          echo "manifest=$RESOURCES/v5.1.0-source-manifest.json" >> "$GITHUB_OUTPUT"
+
       - name: Provision the pinned GNN parser runtime
         id: runtime
         run: |
@@ -99,4 +119,6 @@ jobs:
       - name: Release arms (including Python 3.12 full tests and GNN conformance)
         env:
           GNN_RUNTIME_PYTHON: ${{ steps.runtime.outputs.python }}
+          GNN_BOOTSTRAP: ${{ steps.resources.outputs.bootstrap }}
+          GNN_SOURCE_MANIFEST: ${{ steps.resources.outputs.manifest }}
         run: uv run python scripts/release_check.py --arm all

@@ -51,8 +51,20 @@ producer artifacts. The source-owned expected SHA-256 values are:
 
 Do not derive expected identity from the target package or replace complete
 content/module ownership with a version string or the five parser digests.
-Artifact publication/acquisition is release-owner work; no public download
-location is assumed here.
+The hosted workflow acquires these two files from the published immutable
+[producer resource revision `66d491f`](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/tree/66d491f86895443cf588011cc6f40c37b8bae8fd/interop),
+checks both digests before use, and forwards their paths to the release gate.
+The full manifest is for v5.1.0, not the separately published v5.0.3 manifest;
+the resource revision does not change `specs/gnn-pin.json`.
+
+The frozen bootstrap has a known contextual origin-normalization defect: a
+non-GitHub URL can be misclassified as the canonical repository identity.
+Existing installed proof with the actual canonical HTTPS GitHub origin remains
+valid only in its recorded scope; source-artifact proof remains
+`vcs_verified=false`. Resource delivery does not repair or waive this defect.
+Adopting a strict-origin replacement requires the producer's completed native
+qualification and a newly published immutable resource identity. Do not adopt
+an unpublished private candidate or modify the historical artifact.
 
 The cutover replaced the interim local reader. Until this change `specs/gnn-pin.json`
 pinned `v5.0.3` at `8f293d9ba810e6eda5c09842d9c7ed9ffa5f92c1`, a revision that
@@ -102,9 +114,9 @@ to source.
 
 Exit codes are `0` pass, `1` conformance failure, and `2` unavailable required
 runtime/resources/origin or requested tag resolution. Missing prerequisites
-are not passes. CI must separately provision the reviewed bootstrap and full
-manifest alongside its pinned runtime before hosted acceptance; local source
-proof does not supply those hosted inputs. See [`gate.md`](gate.md).
+are not passes. CI provisions the checksum-verified reviewed bootstrap and full
+manifest alongside its pinned runtime; this wiring is not itself hosted,
+installed, or full-release acceptance. See [`gate.md`](gate.md).
 
 ## What the validation checks
 

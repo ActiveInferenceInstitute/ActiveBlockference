@@ -17,6 +17,10 @@ dependency synchronization.
 Release selections also require the independently reviewed `GNN_BOOTSTRAP`
 and `GNN_SOURCE_MANIFEST` inputs described in [`gnn.md`](gnn.md).
 
+Captured command failures retain their original stdout and stderr before the
+nonzero exit is recorded. A failed pytest/coverage arm cannot hide its
+diagnostics or become a passing receipt.
+
 Measured wall times and test counts live in the generated
 [`_generated/gate-metrics.md`](_generated/gate-metrics.md), which shows the
 recorded before/after arm times and labels baseline workloads that are not
@@ -85,7 +89,7 @@ contents. Protocol unit controls are not an actual build/install smoke.
 | Job | Arms |
 | --- | --- |
 | `test` (matrix: Python 3.11 only) | `--arm test-full` |
-| `gnn-conformance` (Python 3.12; display name `gnn conformance (pinned)`) | `--arm all`, with `GNN_RUNTIME_PYTHON` set to the provisioned runtime |
+| `gnn-conformance` (Python 3.12; display name `gnn conformance (pinned)`) | `--arm all`, with the provisioned `GNN_RUNTIME_PYTHON` and checksum-verified `GNN_BOOTSTRAP` / `GNN_SOURCE_MANIFEST` |
 
 The full suite therefore runs on both supported CI Python versions. The
 remaining release arms run in `gnn-conformance` on Python 3.12, alongside the
@@ -94,11 +98,13 @@ runtime remains separate from the locked library environment because their
 NumPy requirements differ. PDF rendering is an explicit local `--arm render`
 selection, not part of `all` or CI.
 
-Hosted resource delivery is still a release prerequisite: the workflow must
-receive the reviewed bootstrap and exact full manifest as explicit
-`GNN_BOOTSTRAP`/`GNN_SOURCE_MANIFEST` inputs. Do not insert machine-local
-campaign paths, invent a published artifact URL, or waive admission when
-these inputs are unavailable.
+Before provisioning the parser runtime, the workflow downloads the reviewed
+bootstrap and full v5.1.0 manifest from immutable producer resource commit
+`66d491f86895443cf588011cc6f40c37b8bae8fd`, verifies both source-owned SHA-256
+digests, and forwards their paths to `all`. That delivery revision is not a
+parser repin. Acquisition or digest failure stops the job before execution.
+The bootstrap's known strict-origin limitation and the separate producer
+qualification prerequisite are retained in [`gnn.md`](gnn.md).
 
 The workflow installs uv directly with
 `astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2` (`v10.3.3`,

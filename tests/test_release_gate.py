@@ -10,8 +10,10 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 import scripts.release_check as gate
+from blockference.gnn_source import BOOTSTRAP_SHA256, SOURCE_MANIFEST_SHA256
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -96,3 +98,33 @@ def test_render_provenance_requires_the_pdf(tmp_path, monkeypatch):
         gate._render_artifact()
 
 
+def test_workflow_delivers_reviewed_resources_before_release():
+    """Keep immutable resource delivery and release-environment forwarding together."""
+    workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["gnn-conformance"]["steps"]
+    resources = next(step for step in steps if step.get("id") == "resources")
+    release = next(step for step in steps if "--arm all" in step.get("run", ""))
+    assert steps.index(resources) < steps.index(release)
+    script = resources["run"]
+    assert "66d491f86895443cf588011cc6f40c37b8bae8fd/interop" in script
+    assert f"{BOOTSTRAP_SHA256}  gnn_bootstrap.py" in script
+    assert f"{SOURCE_MANIFEST_SHA256}  v5.1.0-source-manifest.json" in script
+    assert script.count("sha256sum --check --strict") == 2
+    assert script.index("sha256sum --check --strict") < script.index('>> "$GITHUB_OUTPUT"')
+    assert release["env"]["GNN_BOOTSTRAP"] == "${{ steps.resources.outputs.bootstrap }}"
+    assert release["env"]["GNN_SOURCE_MANIFEST"] == "${{ steps.resources.outputs.manifest }}"
+    assert release["env"]["GNN_RUNTIME_PYTHON"] == "${{ steps.runtime.outputs.python }}"
+
+
+def test_failed_captured_command_keeps_real_diagnostics_and_exit(tmp_path, capsys):
+    command = [
+        sys.executable, "-c",
+        "import sys; print('real failure detail'); "
+        "print('real stderr detail', file=sys.stderr); sys.exit(7)",
+    ]
+    with pytest.raises(subprocess.CalledProcessError) as caught:
+        gate._run(command, cwd=tmp_path, capture=True)
+    assert caught.value.returncode == 7
+    captured = capsys.readouterr()
+    assert "real failure detail" in captured.out
+    assert "real stderr detail" in captured.err

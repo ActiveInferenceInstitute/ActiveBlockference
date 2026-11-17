@@ -88,15 +88,23 @@ def _run(
     """Run one gate command without re-synchronizing the prepared locked environment."""
 
     print("$", " ".join(command), flush=True)
-    return subprocess.run(
-        command,
-        cwd=cwd,
-        check=True,
-        text=True,
-        capture_output=capture,
-        env={**os.environ, "PYTHONUNBUFFERED": "1", "UV_NO_SYNC": "1"},
-        stdin=subprocess.DEVNULL,
-    )
+    try:
+        return subprocess.run(
+            command,
+            cwd=cwd,
+            check=True,
+            text=True,
+            capture_output=capture,
+            env={**os.environ, "PYTHONUNBUFFERED": "1", "UV_NO_SYNC": "1"},
+            stdin=subprocess.DEVNULL,
+        )
+    except subprocess.CalledProcessError as exc:
+        if capture:
+            if exc.stdout:
+                print(exc.stdout, end="", flush=True)
+            if exc.stderr:
+                print(exc.stderr, end="", file=sys.stderr, flush=True)
+        raise
 
 
 def _changed_paths() -> set[str]:

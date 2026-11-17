@@ -103,8 +103,12 @@ source. Current scope:
 - [x] **B07:** one external interpreter-selection contract preserves venv
   launchers and separate NumPy environments without project-Python fallback.
 - [ ] **B08:** source and installed-origin/content admission controls plus
-  actual pinned parser/importer validation passed. Hosted reviewed-resource
-  delivery remains required; full native-ecosystem qualification is not claimed.
+  actual pinned parser/importer validation passed in their recorded scopes.
+  The workflow now prepares and forwards checksum-verified immutable producer
+  resources (`66d491f`, bootstrap `f638d4c`, v5.1.0 manifest `43b33c0`). Fresh
+  hosted/full-release acceptance remains required. A strict-origin replacement
+  needs producer qualification and a new public immutable identity; the private
+  candidate is not adopted and full native-ecosystem qualification is not claimed.
 - [x] **B09:** retain actual policy caps and ordered allowed policies.
 - [x] **B10:** preserve built-in integer/string identities, registry order,
   and established conflict priority through typed serialization.

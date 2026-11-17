@@ -109,18 +109,21 @@ def test_docs_link_checker_reports_broken_links_and_anchors(tmp_path):
         "[missing](nope.md)\n"
         "[anchor](b.md#nope)\n"
         "[escape](../../outside.md)\n"
-        "```\nfenced [fake](fake.md)\n```\n"
-        "[external](https://example.com/page)\n",
+        "```\nfenced [fake](fake.md)\n```\n",
         encoding="utf-8",
     )
     (tmp_path / "b.md").write_text("# Title\n", encoding="utf-8")
+    external = Path("external.md")
+    (tmp_path / external).write_text(
+        "[external](https://example.com/page)\n", encoding="utf-8",
+    )
     failures = docs_links.validate(tmp_path)
     messages = [message for issues in failures.values() for message in issues]
     assert any("nope.md" in message for message in messages)
     assert any("#nope" in message and "b.md" in message for message in messages)
     assert any("outside" in message for message in messages)
     assert not any("fake.md" in message for message in messages)
-    assert not any("example.com" in message for message in messages)
+    assert external not in failures
     assert not any("same-file anchor" in message for message in messages)
 
 

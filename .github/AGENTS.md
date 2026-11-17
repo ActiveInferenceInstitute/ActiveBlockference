@@ -10,7 +10,8 @@ There is no separate `gate` job. The `gnn` arm checks exporter drift, then
 shared pin/pointer/workflow/job check through qualified external workers.
 Require independently reviewed `GNN_BOOTSTRAP` and `GNN_SOURCE_MANIFEST` job
 inputs and complete content/module/installed-origin admission through exit.
-Their hosted delivery remains a release prerequisite; never invent download
+The workflow downloads both from the immutable producer resource revision and
+verifies their source-owned SHA-256 digests before use; never invent download
 URLs or weaken admission. Missing prerequisites fail, never skip. PDF rendering remains
 an explicit local `--arm render` selection. The workflow uses pinned
 `astral-sh/setup-uv` directly, not the Institute composite; see
