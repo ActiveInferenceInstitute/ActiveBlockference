@@ -68,14 +68,20 @@ def test_figure_registry_mismatches_fail_validation_and_build(
     monkeypatch, tmp_path, capsys, mode, fault, message
 ):
     manuscript = builder.MANUSCRIPT_DIR
+    copied = tmp_path / "docs" / "manuscript"
+    copied.mkdir(parents=True)
+    (copied.parent / "gnn.md").write_text("# GNN\n", encoding="utf-8")
+    pointer = tmp_path / ".github" / "GNN.md"
+    pointer.parent.mkdir()
+    pointer.write_text("# GNN\n", encoding="utf-8")
     for source in [
         *manuscript.glob("[0-9][0-9]_*.md"),
         manuscript / "references.bib",
         manuscript / "config.yaml",
     ]:
-        (tmp_path / source.name).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+        (copied / source.name).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
     registry = json.loads((manuscript / "figure-registry.json").read_text(encoding="utf-8"))
-    figures = tmp_path / "figures"
+    figures = copied / "figures"
     figures.mkdir()
     for entry in registry["figures"]:
         for suffix in ("svg", "png"):
@@ -86,9 +92,9 @@ def test_figure_registry_mismatches_fail_validation_and_build(
         (figures / registry["figures"][0]["png"]).unlink()
     else:
         (figures / "orphan.svg").write_bytes(b"")
-    (tmp_path / "figure-registry.json").write_text(json.dumps(registry), encoding="utf-8")
-    monkeypatch.setattr(validator, "MANUSCRIPT", tmp_path)
-    monkeypatch.setattr(builder, "MANUSCRIPT_DIR", tmp_path)
+    (copied / "figure-registry.json").write_text(json.dumps(registry), encoding="utf-8")
+    monkeypatch.setattr(validator, "MANUSCRIPT", copied)
+    monkeypatch.setattr(builder, "MANUSCRIPT_DIR", copied)
     monkeypatch.setattr(builder, "FIGURE_DIR", figures)
 
     assert any(message in error for error in validator.validate())
@@ -103,18 +109,21 @@ def test_docs_link_checker_reports_broken_links_and_anchors(tmp_path):
         "[missing](nope.md)\n"
         "[anchor](b.md#nope)\n"
         "[escape](../../outside.md)\n"
-        "```\nfenced [fake](fake.md)\n```\n"
-        "[external](https://example.com/page)\n",
+        "```\nfenced [fake](fake.md)\n```\n",
         encoding="utf-8",
     )
     (tmp_path / "b.md").write_text("# Title\n", encoding="utf-8")
+    external = Path("external.md")
+    (tmp_path / external).write_text(
+        "[external](https://example.com/page)\n", encoding="utf-8",
+    )
     failures = docs_links.validate(tmp_path)
     messages = [message for issues in failures.values() for message in issues]
     assert any("nope.md" in message for message in messages)
     assert any("#nope" in message and "b.md" in message for message in messages)
     assert any("outside" in message for message in messages)
     assert not any("fake.md" in message for message in messages)
-    assert not any("example.com" in message for message in messages)
+    assert external not in failures
     assert not any("same-file anchor" in message for message in messages)
 
 

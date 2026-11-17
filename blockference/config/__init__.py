@@ -7,6 +7,7 @@ from blockference.config.experiment import (
     OutputConfig,
     SimulationConfig,
     load_experiment_config,
+    load_manuscript_experiment,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "SUPPORTED_ENGINES",
     "SimulationConfig",
     "load_experiment_config",
+    "load_manuscript_experiment",
 ]

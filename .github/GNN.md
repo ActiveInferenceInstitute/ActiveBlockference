@@ -7,21 +7,21 @@
 (`75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf`) and records SHA-256 digests for
 the five parser files under `src/gnn/`.
 
-The job installs that commit into a separate Python 3.12 runtime, then invokes
-the canonical release gate with `--arm all` and `GNN_RUNTIME_PYTHON` set to that runtime. Its `gnn`
-arm runs the estate's shared reader,
-`python -m gnn.importers check --repo . --require-pointer --workflow
-.github/workflows/ci.yml --job gnn-conformance`, from that runtime, then the
-offline drift check and the deep pinned-parser conformance check. The reader
-owns pin discovery and validation, and reports a pointer that fails to name the
-pin file, the pinned revision, the workflow or the job. A missing runtime
-fails instead of skipping conformance. See
+The job selects the canonical release gate with `--arm all` and a separate
+`GNN_RUNTIME_PYTHON`. It must also receive independently reviewed
+`GNN_BOOTSTRAP` and `GNN_SOURCE_MANIFEST` resources before hosted acceptance.
+Within the `gnn` arm, exporter drift is checked first; the project validator
+then owns deep conformance and the producer's syntax/pointer/workflow/job
+check in separate isolated qualified lifetimes. The shared producer remains
+authoritative for pin discovery and validation. Missing resources, runtime,
+installed provenance, or exit revalidation fail rather than skip. See
 [`docs/gate.md`](../docs/gate.md) for the complete job and arm map, and
 [`docs/gnn.md`](../docs/gnn.md) for standalone validation commands.
 
-The validator checks that the resolved `gnn.__version__` matches the pin tag,
-verifies the installed parser file digests, parses `specs/gridworld_3x3.gnn.md`
-with the pinned `MarkdownGNNParser`, and compares the declared parameters and the `A`,
+Independent full-package content and actual module ownership are admitted
+before target GNN execution and revalidated at verdict exit. The validator
+also checks version and recorded parser hashes, parses the committed document
+with the pinned `MarkdownGNNParser`, and compares declared parameters and `A`,
 `B`, `C`, `D`, and `E` matrices against the runtime model built by
 `blockference.gnn`; it also requires the pinned semantic validator, the
 B-orientation check, and the consistency checker to report no errors or

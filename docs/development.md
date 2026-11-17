@@ -21,13 +21,15 @@ the `slow` marker and are excluded from `--arm test`. The recorded before/after
 arm times, including the render arm, are in
 [`_generated/gate-metrics.md`](_generated/gate-metrics.md).
 
-The `gnn` arm always runs the shared `python -m gnn.importers check --repo .`
-pin and pointer reader plus pinned parser conformance
-(`scripts/validate_gnn_spec.py`); it fails without the external runtime rather
-than skipping validation. Replace the runtime path above with an installed
-pinned interpreter, or configure the source-checkout route in [`gnn.md`](gnn.md).
-CI's `gnn-conformance` job runs `all` on Python 3.12 with that separate runtime;
-the Python 3.11 `test` job runs `test-full`. There is no separate `gate` job.
+The `gnn` arm performs exporter drift checks and invokes the project validator,
+which owns deep conformance and the shared importer check inside independent
+qualified external lifetimes. Select the separate runtime and reviewed
+`GNN_BOOTSTRAP`/`GNN_SOURCE_MANIFEST` resources per [`gnn.md`](gnn.md).
+Missing resources, installed provenance, or failed exit revalidation fail;
+there is no unchecked direct-import or project-Python fallback.
+CI's Python 3.12 `gnn-conformance` job selects `all`; reviewed resource delivery
+must be provisioned before hosted acceptance. The Python 3.11 `test` job
+selects `test-full`. There is no separate `gate` job.
 
 Markdown links and anchors across all tracked documentation are validated by
 `scripts/check_docs_links.py`, which is also part of the canonical release

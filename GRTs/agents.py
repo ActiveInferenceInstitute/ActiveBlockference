@@ -52,19 +52,31 @@ class ResearchWorkspace:
             self.research_data.write_text("", encoding="utf-8")
 
 
+def _read_corpus_file(path: Path) -> str:
+    if path.is_dir():
+        raise IsADirectoryError(f"corpus must be a readable UTF-8 file: {path}")
+    if not path.is_file():
+        raise FileNotFoundError(f"corpus file not found: {path}")
+    return path.read_text(encoding="utf-8")
+
+
 class OfflineCorpusProvider:
-    """Deterministic provider that answers from a local text corpus."""
+    """Use readable explicit Paths, existing filename strings, or literal/default text."""
 
     def __init__(self, corpus: str | Path | None = None) -> None:
         if corpus is None:
             self.corpus = (
                 "Active inference links observations, beliefs, actions, and expected free energy."
             )
+        elif isinstance(corpus, Path):
+            self.corpus = _read_corpus_file(corpus)
         else:
             corpus_path = Path(corpus)
-            self.corpus = (
-                corpus_path.read_text(encoding="utf-8") if corpus_path.is_file() else str(corpus)
-            )
+            try:
+                is_file = corpus_path.is_file()
+            except (OSError, ValueError):
+                is_file = False
+            self.corpus = _read_corpus_file(corpus_path) if is_file else corpus
 
     def complete(self, prompt: str) -> str:
         """Return stable corpus sentences selected by prompt terms."""
@@ -182,6 +194,8 @@ def build_provider(
     if name == "offline":
         return OfflineCorpusProvider(corpus)
     if name == "openai":
+        if isinstance(corpus, Path):
+            _read_corpus_file(corpus)
         return OpenAIProvider(model=model, timeout=timeout)
     raise ValueError("provider must be 'offline' or 'openai'")
 

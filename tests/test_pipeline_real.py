@@ -168,8 +168,33 @@ def test_validate_stages_are_focused_and_aggregate(tmp_path):
     model_report, model_payload = validate_model_boundary(paths, cfg)
     assert model_report.ok and model_payload is not None
     assert validate_manifest_boundary(paths).ok
-    assert validate_policies_boundary(paths).ok
-    assert validate_per_step_boundary(paths, cfg, trajectory).ok
+    assert validate_policies_boundary(paths, cfg, model_payload).ok
+    assert validate_per_step_boundary(paths, cfg, trajectory, model_payload).ok
     assert validate_config_trajectory_agreement(cfg, trajectory, summary).ok
-    assert validate_config_model_agreement(cfg, model_payload).ok
+    assert validate_config_model_agreement(cfg, model_payload, trajectory).ok
     assert validate_run_outputs(paths).ok
+
+
+@pytest.mark.parametrize("engine", ["radcad", "cadcad"])
+def test_real_two_run_pipeline_retains_each_model_and_keyed_diagnostics(tmp_path, engine):
+    import numpy as np
+
+    values = config(engine).to_dict()
+    values["simulation"].update(runs=2, timesteps=1, target="random")
+    selected = ExperimentConfig.from_dict(values)
+    result = run_pipeline(selected, output_root=tmp_path, run_name=f"two_runs_{engine}")
+    assert result.ok
+    models = json.loads(result.paths.matrices_json.read_text(encoding="utf-8"))["runs"]
+    assert set(models) == {"1", "2"}
+    with np.load(result.paths.matrices_npz, allow_pickle=False) as archive:
+        for run in (1, 2):
+            agent = result.trajectory.loc[result.trajectory["run"] == run].iloc[-1]["agents"][0]
+            assert np.array_equal(models[str(run)]["0"]["C"], agent.C)
+            assert np.array_equal(archive[f"run_{run}/agent_0/C"], agent.C)
+    records = pd.read_csv(result.paths.per_step_csv)
+    assert set(records[["run", "timestep", "substep", "agent_id"]].itertuples(index=False, name=None)) == {
+        (1, 1, 1, 0), (2, 1, 1, 0),
+    }
+    summary = json.loads(result.paths.summary_json.read_text(encoding="utf-8"))
+    assert summary["runs"]["1"]["trajectory_lengths"] == {"0": 2}
+    assert summary["runs"]["2"]["trajectory_lengths"] == {"0": 2}

@@ -43,6 +43,7 @@ coverage.xml
 
 # Generated artefacts (commit on demand)
 result.csv
+ignored.csv
 *.csv.bak
 results/
 output/

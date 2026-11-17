@@ -2,9 +2,10 @@
 
 - These are thin entry points over `blockference.*`; new computation belongs in
   the package and gets a test under `tests/`.
-- Keep `gnn_parser_probe.py` the only importer of the upstream `gnn` package.
-  The validator runs it in a subprocess with the pinned tree first on
-  `PYTHONPATH`.
+- Target GNN imports belong only inside the fully qualified external
+  `blockference/gnn_source.py` worker, launched directly with `-I -B`.
+  Project orchestration and checked metadata inspection do not bypass
+  independent bootstrap/full-manifest admission or merge NumPy environments.
 - Do not add a file to `docs/manuscript/figures/`. `build_manuscript.py`
   requires every file there to be produced by a fresh build, so a guide in that
   directory fails the release gate.

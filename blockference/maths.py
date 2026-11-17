@@ -56,36 +56,37 @@ def softmax(x: np.ndarray, axis: int = -1) -> np.ndarray:
 
 
 def norm_dist(x: np.ndarray, axis: int = 0) -> np.ndarray:
-    """Normalise non-negative values along ``axis``.
+    """Normalise finite, non-negative weights along ``axis`` without overflow.
 
-    Zero-sum slices are represented by a uniform distribution.
+    All-zero slices become uniform; input arrays and RNG state are unchanged.
     """
     values = _as_probability_array(x, name="x")
     if values.ndim == 0:
         raise ValueError("norm_dist requires an array with at least one dimension")
     if not -values.ndim <= axis < values.ndim:
         raise ValueError(f"axis {axis} is out of bounds for an array with {values.ndim} dimensions")
-    total = values.sum(axis=axis, keepdims=True)
     size = values.shape[axis]
     if size == 0:
         raise ValueError("norm_dist cannot normalise an empty axis")
-    uniform = np.full_like(values, 1.0 / size)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        normalised = np.divide(values, total, out=np.zeros_like(values), where=total > 0)
-    return np.where(total == 0, uniform, normalised)
+    maximum = values.max(axis=axis, keepdims=True)
+    scaled = np.divide(values, maximum, out=np.zeros_like(values), where=maximum > 0)
+    total = scaled.sum(axis=axis, keepdims=True)
+    return np.divide(scaled, total, out=np.full_like(values, 1.0 / size), where=total > 0)
 
 
 def sample(p: np.ndarray, rng: np.random.Generator | None = None) -> int:
-    """Sample one index from a non-empty one-dimensional distribution."""
+    """Sample finite, non-negative weights using the supplied or global RNG.
+
+    Unlike :func:`norm_dist`, zero-mass sampling is an error.
+    """
     probabilities = _as_probability_array(p, name="p")
     if probabilities.ndim != 1:
         raise ValueError(f"sample expects a one-dimensional vector, got {probabilities.ndim} dimensions")
     if probabilities.size == 0:
         raise ValueError("sample requires at least one probability")
-    total = float(probabilities.sum())
-    if total <= 0:
+    if probabilities.max() == 0:
         raise ValueError("sample requires a positive probability total")
-    probabilities = probabilities / total
+    probabilities = norm_dist(probabilities)
     if rng is None:
         return int(np.random.choice(probabilities.size, p=probabilities))
     return int(rng.choice(probabilities.size, p=probabilities))

@@ -21,6 +21,7 @@ from blockference.gnn import (
     spec_arrays,
     spec_parameters,
 )
+from blockference.gnn_runtime import resolve_gnn_runtime
 from blockference.gridference import _move
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -43,7 +44,7 @@ REQUIRED_SECTIONS = (
 
 
 def _parsed_payload() -> dict:
-    """Return a payload shaped like ``scripts/gnn_parser_probe.py`` output."""
+    """Return the JSON data contract emitted by ``blockference/gnn_source.py``."""
 
     parameters = spec_parameters()
     arrays = spec_arrays(parameters)
@@ -101,7 +102,7 @@ def test_declared_arrays_match_the_runtime_model():
     assert arrays["B"].shape == (9, 9, 5)
     assert arrays["C"].shape == (9,)
     assert arrays["D"].shape == (9,)
-    assert arrays["E"].shape == (5,)
+    assert arrays["E"].shape == (25,)
     assert np.array_equal(arrays["A"], model.A)
     assert np.array_equal(arrays["B"], model.B)
     assert np.array_equal(arrays["C"], model.C)
@@ -119,7 +120,7 @@ def test_declared_matrices_are_valid_probability_arrays():
     for name in ("C", "D", "E"):
         assert np.isclose(arrays[name].sum(), 1.0)
         assert (arrays[name] >= 0).all()
-    assert np.array_equal(arrays["E"], np.full(5, 0.2))
+    assert np.array_equal(arrays["E"], np.full(25, 0.04))
 
 
 def test_transition_tensor_matches_the_declared_movement_rules():
@@ -160,15 +161,7 @@ def test_parameter_reconstruction_rejects_malformed_documents():
 
 
 def _pinned_runtime_python() -> str | None:
-    runtime = os.environ.get("GNN_RUNTIME_PYTHON")
-    if runtime and Path(runtime).is_file():
-        return runtime
-    root = os.environ.get("GNN_ROOT")
-    if root:
-        candidate = Path(root) / ".venv" / "bin" / "python"
-        if candidate.is_file():
-            return str(candidate)
-    return None
+    return resolve_gnn_runtime(required=False)
 
 
 @pytest.mark.gnn
@@ -186,15 +179,139 @@ def test_pinned_parser_validates_the_committed_spec(tmp_path):
         "--receipt",
         str(receipt),
     ]
+    command += ["--gnn-runtime", runtime]
     if os.environ.get("GNN_ROOT"):
-        command += ["--gnn-root", os.environ["GNN_ROOT"], "--python", runtime]
-    else:
-        command += ["--gnn-runtime", runtime]
+        command += ["--gnn-root", os.environ["GNN_ROOT"]]
     completed = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, check=False)
     assert completed.returncode == 0, completed.stdout + completed.stderr
     payload = json.loads(receipt.read_text(encoding="utf-8"))
     assert payload["ok"] is True
+    assert payload["source_qualification"]["ok"] is True
+    assert payload["source_qualification"]["imports_verified"] is True
+    assert payload["importer_check"]["qualified"] is True
+    assert payload["importer_check"]["source_qualification"]["imports_verified"] is True
     assert payload["failures"] == []
     assert payload["gnn_version"] == "5.1.0"
     assert payload["orientation"] == ["canonical"]
     assert payload["consistency_score"] == 1.0
+
+
+@pytest.mark.parametrize(("affordances", "horizon", "count"), [
+    (("UP", "DOWN", "LEFT", "RIGHT", "STAY"), 2, 25),
+    (("RIGHT", "DOWN", "STAY"), 2, 9),
+    (("STAY",), 3, 1),
+])
+def test_exported_policy_prior_round_trips_without_changing_action_vocabulary(affordances, horizon, count):
+    import ast
+    import re
+
+    from blockference.gnn import GridWorldSpecParameters
+
+    parameters = GridWorldSpecParameters(affordances=affordances, planning_length=horizon)
+    model = build_spec_model(parameters)
+    rendered = render_spec(parameters)
+    declared = ast.literal_eval(re.search(r"^E=(\([^\n]+\))$", rendered, re.MULTILINE).group(1))
+    assert np.array_equal(np.asarray(declared), np.full(count, 1.0 / count))
+    for name in ("E", "pi", "G"):
+        shape = re.search(rf"^{name}\[(\d+),type=float\]", rendered, re.MULTILINE)
+        assert int(shape.group(1)) == count
+    assert spec_arrays(parameters)["B"].shape == (9, 9, len(affordances))
+    assert model.E == list(affordances)
+
+
+@pytest.mark.parametrize("value", [1 / 3, 1 / 25, np.nextafter(0.0, 1.0), 1 - np.finfo(float).eps])
+def test_probability_text_is_float_round_trip_exact(value):
+    from blockference.gnn import _format_value
+
+    assert float(_format_value(value)) == value
+
+
+def _conformance_fixture():
+    parameters = spec_parameters()
+    arrays = spec_arrays()
+    parser = _parsed_payload()["parser"]
+    parser.update(
+        success=True, errors=[], warnings=[], model_name=parameters.model_name,
+        variables=[
+            {"name": name, "dimensions": list(array.shape)} for name, array in arrays.items()
+        ] + [
+            {"name": "π", "dimensions": [parameters.n_policies]},
+            {"name": "G", "dimensions": [parameters.n_policies]},
+        ],
+    )
+    return {
+        "gnn_version": "5.1.0", "gnn_module": "/fixture/gnn/__init__.py", "parser": parser,
+        "semantic": {"is_valid": True, "warnings": []},
+        "orientation": {"warnings": [], "tensors": []},
+        "consistency": {"consistent": True},
+    }
+
+
+@pytest.mark.parametrize("name", ["π", "G"])
+@pytest.mark.parametrize("dimensions", [[5], [25, 1], []])
+def test_conformance_rejects_action_sized_or_missing_policy_vector_dimensions(name, dimensions):
+    from scripts.validate_gnn_spec import conformance_failures
+
+    pin = {"tag": "v5.1.0", "commit": "a" * 40}
+    payload = _conformance_fixture()
+    assert conformance_failures(payload, pin=pin, source=None, spec_text=render_spec()) == []
+    variable = next(value for value in payload["parser"]["variables"] if value["name"] == name)
+    variable["dimensions"] = dimensions
+    assert conformance_failures(payload, pin=pin, source=None, spec_text=render_spec())
+
+
+@pytest.mark.parametrize(("name", "value"), [("n_actions", 25), ("n_policies", 5), ("n_policies", None)])
+def test_conformance_rejects_inconsistent_redundant_control_policy_counts(name, value):
+    from scripts.validate_gnn_spec import conformance_failures
+
+    pin = {"tag": "v5.1.0", "commit": "a" * 40}
+    payload = _conformance_fixture()
+    assert conformance_failures(payload, pin=pin, source=None, spec_text=render_spec()) == []
+    payload["parser"]["parameters"][name] = value
+    assert conformance_failures(payload, pin=pin, source=None, spec_text=render_spec())
+
+
+@pytest.mark.gnn
+@pytest.mark.parametrize(("affordances", "policy_count"), [
+    (("RIGHT", "DOWN", "STAY"), 9),
+    (("STAY",), 1),
+])
+def test_pinned_parser_round_trips_policy_cardinality_and_precision(tmp_path, affordances, policy_count):
+    # Real parsing stays inside producer admission; only primitive data returns
+    # to the project interpreter.
+    from blockference.gnn import GridWorldSpecParameters
+    from scripts.validate_gnn_spec import (
+        materialize_pin,
+        read_pin_report,
+        run_probe,
+    )
+
+    runtime = _pinned_runtime_python()
+    if runtime is None:
+        pytest.skip("pinned GNN runtime unavailable; external parsing is not qualified")
+    checkout = Path(os.environ["GNN_ROOT"]) if os.environ.get("GNN_ROOT") else None
+    pin = read_pin_report(runtime)["pin"]
+    if checkout is not None:
+        source, _origin = materialize_pin(checkout, pin, tmp_path / "pinned-source")
+    else:
+        source = None
+    parameters = GridWorldSpecParameters(affordances=affordances, planning_length=2)
+    spec = tmp_path / "policy-case.gnn.md"
+    spec.write_text(render_spec(parameters), encoding="utf-8")
+    payload = run_probe(runtime, spec, tmp_path / "policy-case-probe.json", source=source)
+    qualification = payload["source_qualification"]
+    assert qualification["ok"] and qualification["imports_verified"]
+    assert qualification["commit"] == pin["commit"]
+    package = Path(qualification["package_root"])
+    assert payload["gnn_version"] == pin["tag"].lstrip("v")
+    assert Path(payload["gnn_module"]).resolve().is_relative_to(package.resolve())
+    parser = payload["parser"]
+    assert parser["success"] and parser["errors"] == []
+    assert parameters_from_parsed(parser) == parameters
+    arrays = declared_arrays(parser)
+    assert arrays["B"].shape == (9, 9, len(affordances))
+    assert np.array_equal(arrays["E"], np.full(policy_count, 1 / policy_count))
+    dimensions = {variable["name"]: variable["dimensions"] for variable in parser["variables"]}
+    assert {name: dimensions[name] for name in ("E", "π", "G")} == {
+        "E": [policy_count], "π": [policy_count], "G": [policy_count],
+    }

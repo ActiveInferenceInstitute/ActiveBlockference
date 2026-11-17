@@ -24,15 +24,17 @@ The grid-world model is declared in `specs/gridworld_3x3.gnn.md` (Generalized
 Notation Notation) and generated from the implementation by
 `blockference.gnn.render_spec`; `uv run python scripts/export_gnn_spec.py
 --check` fails when the committed document drifts. The upstream parser is
-pinned in `specs/gnn-pin.json` (GNN v5.1.0, commit `75c834bd8`), and
-`python -m gnn.importers check --repo .` reads that pin and the `.github/GNN.md`
-pointer while `scripts/validate_gnn_spec.py` parses the document with that
-revision, builds the runtime model from the declared parameters, and requires the
-declared matrices to match. Do not add a second pin reader: the shared reader is
-upstream. Both checks need an external runtime (`GNN_ROOT` or
-`GNN_RUNTIME_PYTHON`); the required `gnn-conformance` CI job provisions one from
-the pin and runs `scripts/release_check.py --arm gnn`. Do not
-hand-edit `specs/gridworld_3x3.gnn.md`: change the model or fixture in
+pinned in `specs/gnn-pin.json` (GNN v5.1.0, commit `75c834bd8`).
+`scripts/validate_gnn_spec.py` owns both deep conformance and the shared
+pin/pointer/workflow/job check through `blockference/gnn_source.py`.
+Require the selected separate interpreter plus independently reviewed
+`GNN_BOOTSTRAP` and `GNN_SOURCE_MANIFEST` resources. Complete source/module
+admission must remain active through verdict exit; metadata inspection alone
+is not qualification. Never add a local pin reader or an unchecked direct
+`-m gnn.importers` path. Installed provenance and source-artifact proof remain
+distinct. Hosted resource delivery is a release prerequisite, not an assumed
+published artifact. The required `gnn-conformance` job runs the `gnn` arm.
+Do not hand-edit `specs/gridworld_3x3.gnn.md`: change the model or fixture in
 `blockference/` and regenerate with `scripts/export_gnn_spec.py`. See
 `docs/gnn.md`.
 

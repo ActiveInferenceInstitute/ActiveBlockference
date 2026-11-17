@@ -14,6 +14,12 @@ uv run python scripts/release_check.py --list       # arms and their commands
 Run `uv sync --locked --extra dev` before the gate. Its child commands set
 `UV_NO_SYNC=1` to reuse that prepared project environment instead of repeating
 dependency synchronization.
+Release selections also require the independently reviewed `GNN_BOOTSTRAP`
+and `GNN_SOURCE_MANIFEST` inputs described in [`gnn.md`](gnn.md).
+
+Captured command failures retain their original stdout and stderr before the
+nonzero exit is recorded. A failed pytest/coverage arm cannot hide its
+diagnostics or become a passing receipt.
 
 Measured wall times and test counts live in the generated
 [`_generated/gate-metrics.md`](_generated/gate-metrics.md), which shows the
@@ -33,10 +39,10 @@ measurements.
 | `test` | `uv run pytest -m "not slow"` | no |
 | `test-full` | `uv run pytest --cov=blockference --cov-report=term --cov-report=xml --cov-fail-under=90` | yes |
 | `docs` | `scripts/check_docs_links.py`, `scripts/gate_metrics.py --check` | yes |
-| `manuscript` | `scripts/manuscript_variables.py --check`, `scripts/validate_manuscript.py`, `scripts/build_manuscript.py`, `scripts/build_manuscript.py --check`; the `gnn_*` variables come from `gnn.importers` in the pinned runtime | yes |
-| `gnn` | `scripts/export_gnn_spec.py --check`, then pinned `scripts/validate_gnn_spec.py --verify-tag-remote` conformance (parser digests verified before anything parses, the pin's tag resolved upstream to the pinned commit; needs network), then the shared `python -m gnn.importers check --repo .` pin and pointer check; missing runtime fails | yes |
+| `manuscript` | `scripts/manuscript_variables.py --check`, `scripts/validate_manuscript.py`, `scripts/build_manuscript.py`, `scripts/build_manuscript.py --check`; `gnn_*` metadata comes from checked producer inspection, not a qualification verdict | yes |
+| `gnn` | `scripts/export_gnn_spec.py --check`, then `scripts/validate_gnn_spec.py --verify-tag-remote`, which owns both guarded deep conformance and the shared syntax/pointer/workflow/job check; remote tag verification needs network | yes |
 | `smoke` | pipeline, validation, and standalone `run` JSON smoke checks in a temporary directory | yes |
-| `package` | `uv build`, locked `uv export` constraints for clean-wheel dependencies, and isolated import outside the source tree | yes |
+| `package` | invocation-owned `uv build --wheel --out-dir`, locked dependency constraints, and an isolated installed-wheel import outside the source tree | yes |
 | `render` | `scripts/build_manuscript.py --render pdf` (Pandoc + XeLaTeX) | no |
 
 `--arm` is repeatable and arms always run in the canonical order above. `fast`
@@ -58,22 +64,23 @@ job parses.
 The conformance job's key is `gnn-conformance` and its display name is
 `gnn conformance (pinned)`.
 
-The pin, the pointer and the specification are read by the estate's shared
-reader, `gnn.importers`, so this repository carries no copy of the pin shape. The
-`gnn` arm runs the offline drift check, then real pinned-parser conformance, then
-`python -m gnn.importers check --repo . --require-pointer
---workflow .github/workflows/ci.yml --job gnn-conformance` from the pinned
-runtime. Conformance precedes that reader check because `gnn.importers check`
-parses the document with the installed parser, while the validator verifies the
-pin's parser digests before it parses anything: no arm command reaches the
-parser before its digests are verified.
+The `gnn` arm checks exporter drift, then invokes the project validator with
+the selected external runtime and remote-tag request. The validator owns
+deep conformance and the producer's shared syntax/pointer/workflow/job check
+in separate isolated, qualified lifetimes. No trailing unchecked
+`python -m gnn.importers` command bypasses admission.
 
-Select an installed pinned runtime with `--gnn-runtime` or
-`GNN_RUNTIME_PYTHON`, or supply a pinned source checkout via `GNN_ROOT` as
-described in [`gnn.md`](gnn.md); with `GNN_ROOT` and no runtime named, the
-checkout's own `.venv/bin/python` is used. Missing or invalid runtime
-dependencies fail the arm and therefore `all`; conformance is never silently
-skipped.
+Select the external interpreter and independently reviewed bootstrap/full
+manifest as described in [`gnn.md`](gnn.md). Admission binds complete content
+and actual module ownership through verdict exit; five parser hashes alone
+are insufficient. Installed mode additionally needs real canonical PEP610 Git
+provenance. Source-artifact proof is separately labelled and never becomes an
+installed-origin or scientific verdict. Missing resources, origin, runtime,
+or failed revalidation fails the arm and therefore `all`, never silently skips.
+
+The package arm accepts exactly one fresh regular, non-symlink wheel from its
+own build directory. It neither installs nor deletes stale repository `dist`
+contents. Protocol unit controls are not an actual build/install smoke.
 
 ## GitHub Actions
 
@@ -82,7 +89,7 @@ skipped.
 | Job | Arms |
 | --- | --- |
 | `test` (matrix: Python 3.11 only) | `--arm test-full` |
-| `gnn-conformance` (Python 3.12; display name `gnn conformance (pinned)`) | `--arm all`, with `GNN_RUNTIME_PYTHON` set to the provisioned runtime |
+| `gnn-conformance` (Python 3.12; display name `gnn conformance (pinned)`) | `--arm all`, with the provisioned `GNN_RUNTIME_PYTHON` and checksum-verified `GNN_BOOTSTRAP` / `GNN_SOURCE_MANIFEST` |
 
 The full suite therefore runs on both supported CI Python versions. The
 remaining release arms run in `gnn-conformance` on Python 3.12, alongside the
@@ -90,6 +97,14 @@ real pinned conformance check; there is no separate `gate` job. The pinned GNN
 runtime remains separate from the locked library environment because their
 NumPy requirements differ. PDF rendering is an explicit local `--arm render`
 selection, not part of `all` or CI.
+
+Before provisioning the parser runtime, the workflow downloads the reviewed
+bootstrap and full v5.1.0 manifest from immutable producer resource commit
+`66d491f86895443cf588011cc6f40c37b8bae8fd`, verifies both source-owned SHA-256
+digests, and forwards their paths to `all`. That delivery revision is not a
+parser repin. Acquisition or digest failure stops the job before execution.
+The bootstrap's known strict-origin limitation and the separate producer
+qualification prerequisite are retained in [`gnn.md`](gnn.md).
 
 The workflow installs uv directly with
 `astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2` (`v10.3.3`,

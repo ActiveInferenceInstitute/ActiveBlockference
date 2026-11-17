@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+from zipfile import BadZipFile
 
 import numpy as np
 import pandas as pd
@@ -16,6 +17,8 @@ import yaml
 
 from blockference.config import load_experiment_config
 from blockference.io.layout import RunPaths
+from blockference.io.persist import _model_digest
+from blockference.maths import construct_policies
 
 REQUIRED_TRAJECTORY_COLUMNS: tuple[str, ...] = (
     "agents",
@@ -129,6 +132,86 @@ def _coordinate(value: Any) -> tuple[int, int] | None:
     return int(parsed[0]), int(parsed[1])
 
 
+def _index(value: Any, minimum: int = 0) -> int | None:
+    if isinstance(value, (bool, np.bool_)):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not np.isfinite(number) or not number.is_integer() or number < minimum:
+        return None
+    return int(number)
+
+
+def _agent_id(value: Any) -> str | None:
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, (str, int, np.integer)):
+        return None
+    number = _index(value)
+    return str(number) if number is not None and str(value) == str(number) else None
+
+
+def _row_identity(row: Any) -> tuple[int, int, int] | None:
+    run = _index(row.get("run"), 1)
+    time = _index(row.get("timestep"))
+    substep = _index(row.get("substep"))
+    if run is None or time is None or substep is None:
+        return None
+    return run, time, substep
+
+
+def _trajectory_rows(trajectory: Any) -> dict | None:
+    if (
+        not isinstance(trajectory, pd.DataFrame) or trajectory.empty
+        or any(column not in trajectory for column in REQUIRED_TRAJECTORY_COLUMNS)
+    ):
+        return None
+    rows = {}
+    for _, row in trajectory.iterrows():
+        key = _row_identity(row)
+        if key is None or key in rows:
+            return None
+        rows[key] = row
+    return rows
+
+
+def _expected_model_keys(config: Any) -> set[tuple[int, str]]:
+    return {
+        (run, str(agent)) for run in range(1, config.simulation.runs + 1)
+        for agent in range(config.simulation.n_agents)
+    }
+
+
+def _expected_schedule(config: Any) -> set[tuple[int, int, int]]:
+    # Both adapters run the single canonical update block and retain its initial row.
+    return {
+        (run, time, int(time > 0))
+        for run in range(1, config.simulation.runs + 1)
+        for time in range(config.simulation.timesteps + 1)
+    }
+
+
+def _run_records(payload: Any) -> dict[tuple[int, str], Any]:
+    if not isinstance(payload, dict) or payload.get("version") != 2:
+        raise ValueError("expected a version-2 run/agent artifact")
+    runs = payload.get("runs")
+    if not isinstance(runs, dict) or not runs:
+        raise ValueError("runs must be a non-empty mapping")
+    records = {}
+    for run_label, agents in runs.items():
+        run = _index(run_label, 1)
+        if run is None or str(run) != run_label or not isinstance(agents, dict) or not agents:
+            raise ValueError("invalid run registry")
+        for agent_label, value in agents.items():
+            agent = _agent_id(agent_label)
+            if agent is None:
+                raise ValueError("invalid configured agent ID")
+            records[(run, agent)] = value
+    return records
+
+
+
+
 def validate_trajectory_dataframe(df: pd.DataFrame) -> ValidationReport:
     """Validate trajectory columns, row values, and nested state structure."""
 
@@ -205,11 +288,16 @@ def validate_trajectory_dataframe(df: pd.DataFrame) -> ValidationReport:
     except (TypeError, ValueError):
         finite_indices = False
     report.add("finite_row_indices", finite_indices, "row indices are not numeric")
+    report.add(
+        "unique_row_identities", _trajectory_rows(df) is not None,
+        "run/timestep/substep identities are invalid or duplicated",
+    )
     return report
 
 
 def validate_per_step_records(
-    records: list[dict[str, Any]], *, n_states: int | None = None, n_actions: int | None = None
+    records: list[dict[str, Any]], *, n_states: int | None = None,
+    n_actions: int | None = None, n_policies: int | None = None,
 ) -> ValidationReport:
     """Validate complete per-agent diagnostics for every simulation step.
 
@@ -282,11 +370,14 @@ def validate_per_step_records(
                 posterior.shape != prior.shape
                 or efe.shape != epistemic.shape
                 or efe.shape != pragmatic.shape
+                or efe.shape != q_pi.shape
             ):
                 bad_shapes += 1
             if n_states is not None and (posterior.size != n_states or prior.size != n_states):
                 bad_dimensions += 1
             if n_actions is not None and p_u.size != n_actions:
+                bad_dimensions += 1
+            if n_policies is not None and (efe.size != n_policies or q_pi.size != n_policies):
                 bad_dimensions += 1
             valid_action = isinstance(action, (int, np.integer)) and not isinstance(action, bool)
             valid_observation = isinstance(observation, (int, np.integer)) and not isinstance(
@@ -334,9 +425,9 @@ def _probability_matrix(
     except (TypeError, ValueError) as exc:
         return None, str(exc)
     if array.shape != shape:
-        return array, f"expected shape {shape}, got {array.shape}"
+        return None, f"expected shape {shape}, got {array.shape}"
     if not np.isfinite(array).all() or (array < 0).any():
-        return array, "contains non-finite or negative probabilities"
+        return None, "contains non-finite or negative probabilities"
     return array, None
 
 
@@ -489,7 +580,7 @@ def _validate_manifest(paths: RunPaths) -> ValidationReport:
             f"extra={sorted(listed - actual)}",
         )
         report.add("digests", failures == 0, f"{failures} manifest entries do not match")
-    except (OSError, json.JSONDecodeError, AttributeError, TypeError):
+    except (OSError, UnicodeError, json.JSONDecodeError, AttributeError, TypeError):
         report.add("parses", False, "manifest is not valid JSON")
     return report
 
@@ -576,91 +667,66 @@ def validate_trajectory_boundary(
                 summary_payload is not None
                 and {"n_rows", "n_agents", "grid_dimension"} <= set(summary_payload),
             )
-        except (OSError, json.JSONDecodeError) as exc:
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             report.add("summary_parses", False, str(exc))
     return report, trajectory, summary_payload
 
 
 def validate_model_boundary(
     paths: RunPaths, config: Any
-) -> tuple[ValidationReport, dict[str, Any] | None]:
-    """Validate the persisted generative model JSON and its NPZ archive.
-
-    Returns ``(report, model_payload)`` so the aggregator can run the
-    config-vs-model cross-checks against the parsed payload.
-    """
+) -> tuple[ValidationReport, dict[tuple[int, str], Any] | None]:
+    """Validate every run/agent model and exact JSON/NPZ correspondence."""
     report = ValidationReport()
-    model_payload = None
-    if _file_nonempty(paths.matrices_json):
-        try:
-            model_payload = json.loads(paths.matrices_json.read_text(encoding="utf-8"))
-            valid_payload = isinstance(model_payload, dict) and bool(model_payload)
-            report.add("generative_model_parses", valid_payload)
-            if isinstance(model_payload, dict) and model_payload:
-                for agent_id, payload in model_payload.items():
-                    if not isinstance(payload, dict):
-                        report.add(
-                            f"model.{agent_id}.payload",
-                            False,
-                            "agent model payload must be a mapping",
-                        )
-                        continue
-                    report.merge(
-                        f"model.{agent_id}",
-                        validate_generative_model(_model_from_payload(payload)),
+    models: dict[tuple[int, str], Any] | None = None
+    try:
+        models = _run_records(json.loads(paths.matrices_json.read_text(encoding="utf-8")))
+        report.add("generative_model_parses", True)
+        for (run, agent), payload in models.items():
+            name = f"model.run_{run}.agent_{agent}"
+            if not isinstance(payload, dict):
+                report.add(f"{name}.payload", False, "agent model must be a mapping")
+                continue
+            report.merge(name, validate_generative_model(_model_from_payload(payload)))
+    except (OSError, UnicodeError, ValueError, TypeError) as exc:
+        report.add("generative_model_parses", False, str(exc))
+        models = None
+    try:
+        with np.load(paths.matrices_npz, allow_pickle=False) as archive:
+            arrays = {key: np.asarray(archive[key]) for key in archive.files}
+        report.add("generative_model_npz_parses", True)
+        expected = {
+            f"run_{run}/agent_{agent}/{name}"
+            for run, agent in (models or {}) for name in ("A", "B", "C", "D", "E")
+        }
+        report.add(
+            "generative_model_npz_complete", bool(models) and set(arrays) == expected,
+            "NPZ keys must match every and only the JSON run/agent matrices",
+        )
+        failures = 0
+        for (run, agent), payload in (models or {}).items():
+            if not isinstance(payload, dict):
+                failures += 1
+                continue
+            for name in ("A", "B", "C", "D", "E"):
+                try:
+                    wanted = np.asarray(payload[name])
+                    actual = arrays[f"run_{run}/agent_{agent}/{name}"]
+                    equal = wanted.shape == actual.shape and (
+                        np.array_equal(wanted, actual) if name == "E"
+                        else np.allclose(wanted, actual, atol=0.0, rtol=0.0)
                     )
-            if not valid_payload:
-                model_payload = None
-        except (OSError, AttributeError, json.JSONDecodeError, TypeError) as exc:
-            report.add("generative_model_parses", False, str(exc))
-            model_payload = None
+                except (KeyError, TypeError, ValueError):
+                    equal = False
+                failures += int(not equal)
+        report.add(
+            "generative_model_npz_values", bool(models) and failures == 0,
+            f"{failures} JSON/NPZ matrix values differ",
+        )
+    except (OSError, ValueError, KeyError, TypeError, EOFError, BadZipFile) as exc:
+        report.add("generative_model_npz_parses", False, str(exc))
+    return report, models
 
-    if _file_nonempty(paths.matrices_npz):
-        try:
-            with np.load(paths.matrices_npz, allow_pickle=False) as archive:
-                keys = set(archive.files)
-                npz_arrays = {key: np.asarray(archive[key]) for key in archive.files}
-            expected = {
-                f"agent_{agent_id}/{name}"
-                for agent_id in (model_payload or {})
-                for name in ("A", "B", "C", "D", "E")
-            }
-            report.add(
-                "generative_model_npz_complete",
-                expected <= keys,
-                f"missing keys: {sorted(expected - keys)}",
-            )
-            value_failures = 0
-            if isinstance(model_payload, dict):
-                for agent_id, payload in model_payload.items():
-                    if not isinstance(payload, dict):
-                        continue
-                    for name in ("A", "B", "C", "D", "E"):
-                        key = f"agent_{agent_id}/{name}"
-                        if key not in npz_arrays or name not in payload:
-                            value_failures += 1
-                            continue
-                        try:
-                            json_array = np.asarray(payload[name])
-                            npz_array = npz_arrays[key]
-                            equal = (
-                                np.array_equal(json_array, npz_array)
-                                if name == "E"
-                                else json_array.shape == npz_array.shape
-                                and np.allclose(json_array, npz_array, atol=0.0, rtol=0.0)
-                            )
-                            if not equal:
-                                value_failures += 1
-                        except (TypeError, ValueError):
-                            value_failures += 1
-            report.add(
-                "generative_model_npz_values",
-                value_failures == 0,
-                f"{value_failures} JSON/NPZ matrix values differ",
-            )
-        except (OSError, ValueError, KeyError) as exc:
-            report.add("generative_model_npz_parses", False, str(exc))
-    return report, model_payload
+
 
 
 def validate_manifest_boundary(paths: RunPaths) -> ValidationReport:
@@ -671,156 +737,343 @@ def validate_manifest_boundary(paths: RunPaths) -> ValidationReport:
     return report
 
 
-def validate_policies_boundary(paths: RunPaths) -> ValidationReport:
-    """Validate the persisted policy set JSON."""
+def validate_policies_boundary(
+    paths: RunPaths, config: Any, models: dict | None
+) -> ValidationReport:
+    """Require every run/agent's complete, ordered, actually allowed policies."""
     report = ValidationReport()
-    if _file_nonempty(paths.policies_json):
+    try:
+        records = _run_records(json.loads(paths.policies_json.read_text(encoding="utf-8")))
+        report.add("policies_parses", True)
+    except (OSError, UnicodeError, ValueError, TypeError) as exc:
+        report.add("policies_parses", False, str(exc))
+        return report
+    ready = config is not None and models is not None
+    report.add("policies_prerequisites", ready)
+    if not ready:
+        return report
+    assert models is not None
+    report.add(
+        "policies_run_agent_coverage", set(records) == _expected_model_keys(config) == set(models),
+        "policy identities differ from configuration or models",
+    )
+    try:
+        expected = construct_policies(
+            [config.grid.dimension**2], [len(config.grid.affordances)],
+            policy_len=config.grid.planning_length, max_policies=config.grid.max_policies,
+        )
+    except (TypeError, ValueError, OverflowError) as exc:
+        report.add("policies_complete_ordered", False, str(exc))
+        return report
+    failures = 0
+    for record in records.values():
+        if not isinstance(record, dict):
+            failures += 1
+            continue
+        values = record.get("policies")
+        if not isinstance(values, list) or not values:
+            failures += 1
+            continue
+        valid = (
+            type(record.get("n_policies")) is int
+            and record["n_policies"] == len(values) == len(expected)
+        )
         try:
-            policy_payload = json.loads(paths.policies_json.read_text(encoding="utf-8"))
-            policies = policy_payload.get("policies") if isinstance(policy_payload, dict) else None
-            report.add("policies_parses", isinstance(policies, list) and bool(policies))
-            report.add(
-                "policies_count_consistent",
-                isinstance(policy_payload, dict)
-                and policy_payload.get("n_policies") == len(policies or []),
-            )
-        except (OSError, json.JSONDecodeError) as exc:
-            report.add("policies_parses", False, str(exc))
+            for value, policy in zip(values, expected, strict=True):
+                array = np.asarray(value)
+                valid = valid and array.dtype.kind in "iu" and np.array_equal(array, policy)
+        except (TypeError, ValueError):
+            valid = False
+        failures += int(not valid)
+    report.add("policies_complete_ordered", failures == 0, f"{failures} invalid policy sets")
     return report
+
+
 
 
 def validate_per_step_boundary(
-    paths: RunPaths, config: Any, trajectory: Any
+    paths: RunPaths, config: Any, trajectory: Any, models: dict | None
 ) -> ValidationReport:
-    """Parse and validate the persisted per-step diagnostics records."""
+    """Require one correctly associated diagnostic per configured run/time/agent."""
     report = ValidationReport()
-    if _file_nonempty(paths.per_step_csv):
-        try:
-            per_step_frame = pd.read_csv(paths.per_step_csv)
-            records = [
-                {column: _literal(value) for column, value in row.items()}
-                for row in per_step_frame.to_dict(orient="records")
-            ]
-            report.merge(
-                "per_step",
-                validate_per_step_records(
-                    records,
-                    n_states=config.grid.dimension**2 if config is not None else None,
-                    n_actions=len(config.grid.affordances) if config is not None else None,
-                ),
-            )
-            if config is not None and trajectory is not None:
-                expected_records = sum(
-                    int(float(value)) > 0 for value in trajectory["timestep"]
-                ) * config.simulation.n_agents
-                report.add(
-                    "per_step_coverage",
-                    len(records) == expected_records,
-                    f"expected {expected_records} records, found {len(records)}",
-                )
-        except (OSError, pd.errors.ParserError, ValueError) as exc:
-            report.add("per_step_csv_parses", False, str(exc))
+    try:
+        frame = pd.read_csv(paths.per_step_csv)
+        records = [
+            {column: _literal(value) for column, value in record.items()}
+            for record in frame.to_dict(orient="records")
+        ]
+        report.add("per_step_csv_parses", True)
+    except (OSError, UnicodeError, pd.errors.ParserError, ValueError) as exc:
+        report.add("per_step_csv_parses", False, str(exc))
+        return report
+    rows = _trajectory_rows(trajectory)
+    ready = config is not None and rows is not None and models is not None
+    report.add("per_step_prerequisites", ready, "config, keyed trajectory and models are required")
+    if not ready:
+        return report
+    assert rows is not None and models is not None
+    expected = {
+        (*key, str(agent)) for key in _expected_schedule(config) if key[1] > 0
+        for agent in range(config.simulation.n_agents)
+    }
+    seen = set()
+    bad_keys = bad_values = 0
+    columns = {
+        "env_state": "env_states", "action": "actions", "obs_idx": "obs_idx",
+        "posterior": "inferences", "prior": "priors", "efe": "efe",
+        "efe_epistemic": "efe_epistemic", "efe_pragmatic": "efe_pragmatic",
+        "q_pi": "q_pi", "p_u": "p_u",
+    }
+    for index, record in enumerate(records):
+        identity = _row_identity(record)
+        agent = _agent_id(record.get("agent_id"))
+        key = (*identity, agent) if identity is not None and agent is not None else None
+        if key is None or key in seen or key not in expected:
+            bad_keys += 1
+        if key is not None:
+            seen.add(key)
+        model = models.get((identity[0], agent)) if identity is not None else None
+        if not isinstance(model, dict):
+            report.add(f"per_step.{index}.model", False, "no model for this run/agent")
+            continue
+        report.merge(
+            f"per_step.{index}", validate_per_step_records(
+                [record], n_states=config.grid.dimension**2,
+                n_actions=len(config.grid.affordances),
+                n_policies=len(config.grid.affordances)**config.grid.planning_length,
+            ),
+        )
+        row = rows.get(identity)
+        if row is None:
+            bad_values += 1
+            continue
+        for diagnostic, column in columns.items():
+            mapping = _literal(row[column])
+            try:
+                value = next(
+                    value for label, value in mapping.items() if _agent_id(label) == agent
+                ) if isinstance(mapping, dict) else None
+                actual = record.get(diagnostic)
+                if diagnostic in ("action", "obs_idx"):
+                    equal = (
+                        isinstance(actual, (int, np.integer))
+                        and not isinstance(actual, (bool, np.bool_))
+                        and isinstance(value, (int, np.integer))
+                        and not isinstance(value, (bool, np.bool_))
+                        and actual == value
+                    )
+                else:
+                    actual, wanted = np.asarray(actual, dtype=float), np.asarray(value, dtype=float)
+                    equal = actual.shape == wanted.shape and np.allclose(
+                        actual, wanted, atol=1e-12, rtol=1e-12,
+                    )
+            except (TypeError, ValueError, StopIteration):
+                equal = False
+            bad_values += int(not equal)
+    report.add(
+        "per_step_coverage", bad_keys == 0 and seen == expected and len(records) == len(expected),
+        "diagnostics must have unique, complete configured run/time/agent identities",
+    )
+    report.add("per_step_trajectory_values", bad_values == 0, f"{bad_values} keyed diagnostics differ")
     return report
+
+
 
 
 def validate_config_trajectory_agreement(
-    config: Any,
-    trajectory: Any,
-    summary_payload: dict[str, Any] | None,
+    config: Any, trajectory: Any, summary_payload: dict[str, Any] | None,
 ) -> ValidationReport:
-    """Cross-check trajectory contents and summary against the persisted config."""
+    """Check exact backend schedules, every run's starts and run-scoped summaries."""
     report = ValidationReport()
-    if config is None or trajectory is None or "env_states" not in trajectory:
+    rows = _trajectory_rows(trajectory)
+    ready = config is not None and rows is not None
+    report.add("configured_trajectory_prerequisites", ready)
+    if not ready:
         return report
-    first_env = _literal(trajectory.iloc[0]["env_states"]) if not trajectory.empty else None
-    agent_ids = set(first_env) if isinstance(first_env, dict) else set()
+    assert rows is not None
     report.add(
-        "configured_agent_count",
-        len(agent_ids) == config.simulation.n_agents,
-        f"trajectory has {len(agent_ids)} agents; config expects {config.simulation.n_agents}",
+        "configured_schedule", set(rows) == _expected_schedule(config),
+        "trajectory must retain every run's initial row and configured single-block steps",
     )
-    out_of_bounds = 0
-    for value in trajectory["env_states"]:
-        states = _literal(value)
+    expected_agents = {str(index) for index in range(config.simulation.n_agents)}
+    bad_registries = out_of_bounds = 0
+    for row in rows.values():
+        states = _literal(row["env_states"])
         if not isinstance(states, dict):
+            bad_registries += 1
             continue
-        for coordinate in states.values():
-            parsed = _coordinate(coordinate)
-            if parsed is None or not all(
-                0 <= component < config.grid.dimension for component in parsed
-            ):
-                out_of_bounds += 1
-    report.add(
-        "configured_coordinate_bounds",
-        out_of_bounds == 0,
-        f"{out_of_bounds} coordinates exceed the configured grid",
-    )
-    expected_starts = {
-        index: coordinate
-        for index, coordinate in enumerate(config.simulation.resolved_initial_states)
+        bad_registries += int({_agent_id(agent) for agent in states} != expected_agents)
+        for value in states.values():
+            coordinate = _coordinate(value)
+            out_of_bounds += int(coordinate is None or not all(
+                0 <= component < config.grid.dimension for component in coordinate
+            ))
+    report.add("configured_agent_count", bad_registries == 0, "agent registry differs from config")
+    report.add("configured_coordinate_bounds", out_of_bounds == 0, "invalid configured coordinates")
+    starts = {
+        str(agent): coordinate
+        for agent, coordinate in enumerate(config.simulation.resolved_initial_states)
     }
-    actual_starts = {
-        int(agent_id): _coordinate(coordinate)
-        for agent_id, coordinate in (first_env or {}).items()
-        if isinstance(agent_id, (int, np.integer, str)) and str(agent_id).isdigit()
+    bad_starts = 0
+    for run in range(1, config.simulation.runs + 1):
+        row = rows.get((run, 0, 0))
+        states = _literal(row["env_states"]) if row is not None else None
+        actual = {
+            _agent_id(agent): _coordinate(value) for agent, value in states.items()
+        } if isinstance(states, dict) else None
+        bad_starts += int(actual != starts)
+    report.add("configured_initial_states", bad_starts == 0, "one or more run starts differ")
+    summary_ok = isinstance(summary_payload, dict) and summary_payload.get("version") == 2
+    report.add("summary_run_contract", summary_ok, "version-2 run-scoped summary is required")
+    if not summary_ok:
+        return report
+    assert summary_payload is not None
+    report.add("summary_row_count", summary_payload.get("n_rows") == len(trajectory))
+    report.add("summary_agent_count", summary_payload.get("n_agents") == len(expected_agents))
+    report.add("summary_grid_dimension", summary_payload.get("grid_dimension") == config.grid.dimension)
+    report.add("summary_run_count", summary_payload.get("n_runs") == config.simulation.runs)
+    report.add("summary_max_timestep", summary_payload.get("max_timestep") == config.simulation.timesteps)
+    report.add("summary_max_run", summary_payload.get("max_run") == config.simulation.runs)
+    summaries = summary_payload.get("runs")
+    valid_runs = isinstance(summaries, dict) and set(summaries) == {
+        str(run) for run in range(1, config.simulation.runs + 1)
     }
-    report.add(
-        "configured_initial_states",
-        actual_starts == expected_starts,
-        "trajectory first-row positions do not match configured starts",
-    )
-    if summary_payload is not None:
-        report.add(
-            "summary_row_count",
-            summary_payload.get("n_rows") == len(trajectory),
-            "summary n_rows does not match trajectory rows",
-        )
-        report.add(
-            "summary_agent_count",
-            summary_payload.get("n_agents") == len(agent_ids),
-            "summary n_agents does not match trajectory agents",
-        )
-        report.add(
-            "summary_grid_dimension",
-            summary_payload.get("grid_dimension") == config.grid.dimension,
-            "summary grid_dimension does not match configuration",
-        )
+    report.add("summary_run_coverage", valid_runs)
+    if not valid_runs:
+        return report
+    assert isinstance(summaries, dict)
+    for run in range(1, config.simulation.runs + 1):
+        selected = [row for key, row in sorted(rows.items()) if key[0] == run]
+        value = summaries[str(run)]
+        valid = isinstance(value, dict) and bool(selected)
+        if valid:
+            final = _literal(selected[-1]["env_states"])
+            finals = {
+                str(agent): list(coordinate) if coordinate is not None else None
+                for agent, coordinate in (
+                    (agent, _coordinate(position)) for agent, position in final.items()
+                )
+            } if isinstance(final, dict) else None
+            lengths = {agent: len(selected) for agent in expected_agents}
+            beliefs = {agent: 0 for agent in expected_agents}
+            for row in selected:
+                mapping = _literal(row["inferences"])
+                if isinstance(mapping, dict):
+                    for agent, vector in mapping.items():
+                        label = _agent_id(agent)
+                        if label in beliefs and _vector(vector, "posterior") is not None:
+                            beliefs[label] += 1
+            valid = (
+                value.get("n_rows") == len(selected)
+                and value.get("n_agents") == len(expected_agents)
+                and value.get("final_positions") == finals
+                and value.get("trajectory_lengths") == lengths
+                and value.get("belief_history_lengths") == beliefs
+                and value.get("max_timestep") == max(key[1] for key in rows if key[0] == run)
+            )
+        report.add(f"summary.run_{run}", valid, "run-scoped summary differs from trajectory")
     return report
+
+
 
 
 def validate_config_model_agreement(
-    config: Any, model_payload: dict[str, Any] | None
+    config: Any, model_payload: dict | None, trajectory: Any,
 ) -> ValidationReport:
-    """Cross-check the persisted generative model against the persisted config."""
+    """Bind all run/agent models to config and immutable trajectory references."""
     report = ValidationReport()
-    if config is None or not isinstance(model_payload, dict):
+    ready = config is not None and isinstance(model_payload, dict) and bool(model_payload)
+    report.add("configured_model_prerequisites", ready)
+    if not ready:
         return report
-    expected_agents = {str(index) for index in range(config.simulation.n_agents)}
+    assert isinstance(model_payload, dict)
+    expected_keys = _expected_model_keys(config)
     report.add(
-        "configured_model_agents",
-        set(model_payload) == expected_agents,
-        "generative model agent IDs do not match configuration",
+        "configured_model_agents", set(model_payload) == expected_keys,
+        "models must contain every configured run/agent pair",
     )
-    expected_states = config.grid.dimension**2
-    bad_dimensions = 0
-    for payload in model_payload.values():
-        if not isinstance(payload, dict):
-            continue
-        try:
-            matches = (
-                int(payload.get("n_states", -1)) == expected_states
-                and int(payload.get("n_observations", -1)) == expected_states
-                and len(payload.get("E", [])) == len(config.grid.affordances)
+    states = config.grid.dimension**2
+    failures = 0
+    digests = {}
+    for key, payload in model_payload.items():
+        valid = isinstance(payload, dict)
+        if valid:
+            valid = (
+                key in expected_keys
+                and all(type(payload.get(name)) is int for name in ("border", "policy_len", "max_policies"))
+                and payload.get("n_states") == states and payload.get("n_observations") == states
+                and payload.get("border") == config.grid.dimension - 1
+                and payload.get("policy_len") == config.grid.planning_length
+                and payload.get("max_policies") == config.grid.max_policies
+                and payload.get("E") == list(config.grid.affordances)
             )
-        except (TypeError, ValueError):
-            matches = False
-        bad_dimensions += int(not matches)
+            try:
+                digests[key] = _model_digest(payload)
+            except (TypeError, ValueError):
+                valid = False
+            if key in expected_keys:
+                start = config.simulation.resolved_initial_states[int(key[1])]
+                prior = np.zeros(states)
+                prior[start[0] * config.grid.dimension + start[1]] = 1.0
+                try:
+                    valid = valid and np.array_equal(np.asarray(payload.get("D"), dtype=float), prior)
+                except (TypeError, ValueError):
+                    valid = False
+        failures += int(not valid)
+    report.add("configured_model_dimensions", failures == 0, "model metadata/affordance order differs")
+    rows = _trajectory_rows(trajectory)
+    report.add("model_trajectory_prerequisites", rows is not None)
+    if rows is None:
+        return report
+    failures = 0
+    initial_failures = 0
+    observed = set()
+    for (run, _time, _substep), row in rows.items():
+        references = _literal(row["agents"])
+        if not isinstance(references, dict):
+            failures += 1
+            continue
+        for label, reference in references.items():
+            agent = _agent_id(label)
+            key = (run, agent)
+            observed.add(key)
+            valid = (
+                isinstance(reference, dict) and reference.get("agent_id") == agent
+                and key in digests and reference.get("model_sha256") == digests[key]
+            )
+            failures += int(not valid)
+            if _time == 0:
+                priors = _literal(row["priors"])
+                vector = _vector(priors.get(label), "prior") if isinstance(priors, dict) else None
+                model = model_payload.get(key)
+                valid_prior = vector is not None and vector.size == states and isinstance(model, dict)
+                if valid_prior and vector is not None and isinstance(model, dict):
+                    try:
+                        wanted = np.asarray(model.get("D"), dtype=float)
+                        valid_prior = vector.shape == wanted.shape and np.allclose(vector, wanted)
+                    except (TypeError, ValueError):
+                        valid_prior = False
+                initial_failures += int(not valid_prior)
     report.add(
-        "configured_model_dimensions",
-        bad_dimensions == 0,
-        f"{bad_dimensions} model payloads disagree with configuration",
+        "model_run_association", failures == 0 and observed == expected_keys,
+        "trajectory references do not match their own run/agent model",
     )
+    report.add("model_initial_priors", initial_failures == 0, "initial trajectory priors differ from D")
     return report
+
+
+def _validate_render_coverage(paths: RunPaths, config: Any) -> ValidationReport:
+    report = ValidationReport()
+    report.add("render_coverage_prerequisites", config is not None)
+    if config is None:
+        return report
+    for run, agent in sorted(_expected_model_keys(config)):
+        for label in ("first", "last"):
+            name = f"belief_heatmap_run_{run}_agent_{agent}_{label}.png"
+            report.add(f"render.{name}", _render_file_valid(paths.viz_dir / name), name)
+    return report
+
+
 
 
 def validate_run_outputs(paths: RunPaths) -> ValidationReport:
@@ -845,10 +1098,11 @@ def validate_run_outputs(paths: RunPaths) -> ValidationReport:
         trajectory_report,
         model_report,
         validate_manifest_boundary(paths),
-        validate_policies_boundary(paths),
-        validate_per_step_boundary(paths, config, trajectory),
+        validate_policies_boundary(paths, config, model_payload),
+        validate_per_step_boundary(paths, config, trajectory, model_payload),
         validate_config_trajectory_agreement(config, trajectory, summary_payload),
-        validate_config_model_agreement(config, model_payload),
+        validate_config_model_agreement(config, model_payload, trajectory),
+        _validate_render_coverage(paths, config),
     ]
     for stage in stages:
         aggregate.merge("artefacts", stage)

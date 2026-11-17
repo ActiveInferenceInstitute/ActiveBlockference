@@ -218,10 +218,12 @@ def test_trajectory_validation_rejects_inconsistent_agent_registries():
 
 def test_persisted_model_validation_fails_closed_on_malformed_payload(tmp_path):
     paths = build_run_paths(tmp_path, "malformed").ensure()
-    paths.matrices_json.write_text(json.dumps({"0": []}), encoding="utf-8")
+    paths.matrices_json.write_text(
+        json.dumps({"version": 2, "runs": {"1": {"0": []}}}), encoding="utf-8"
+    )
     report = validate_run_outputs(paths)
     assert not report.ok
-    assert any("model.0.payload" in issue for issue in report.issues)
+    assert any("model.run_1.agent_0.payload" in issue for issue in report.issues)
 
 
 def test_run_name_stays_inside_output_root(tmp_path):
@@ -269,10 +271,9 @@ def test_gridworld_conforms_to_discrete_environment_protocol_and_serialises():
     assert world.stochastic is False
     payload = world.serialize()
     assert payload["dimension"] == 3
-    restored = GridWorld.load(payload)
+    restored = GridWorld.load(json.loads(json.dumps(payload)))
     assert isinstance(restored, DiscreteEnvironment)
-    # Serialization stringifies agent keys for JSON; values round-trip losslessly.
-    assert set(restored.current_state.values()) == {(0, 0), (2, 2)}
+    assert list(restored.current_state.items()) == list(world.current_state.items())
     assert restored.affordances == world.affordances
     assert restored.stochastic == world.stochastic
 

@@ -10,71 +10,12 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 import scripts.release_check as gate
+from blockference.gnn_source import BOOTSTRAP_SHA256, SOURCE_MANIFEST_SHA256
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def test_gnn_arm_runs_the_shared_pin_reader_after_digest_verification():
-    runtime = "/opt/gnn-runtime/bin/python"
-    plan = gate._plan("gnn", workdir=Path("<temporary>"), gnn_runtime=runtime)
-
-    assert plan is not None
-    assert plan[0] == ["uv", "run", "python", "scripts/export_gnn_spec.py", "--check"]
-    assert plan[1] == [
-        "uv",
-        "run",
-        "python",
-        "scripts/validate_gnn_spec.py",
-        "--gnn-runtime",
-        runtime,
-        "--verify-tag-remote",
-        "--json",
-    ]
-    assert plan[2] == [
-        runtime,
-        "-m",
-        "gnn.importers",
-        "check",
-        "--repo",
-        ".",
-        "--require-pointer",
-        "--workflow",
-        ".github/workflows/ci.yml",
-        "--job",
-        "gnn-conformance",
-    ]
-
-
-def test_gnn_arm_verifies_the_pinned_parser_digests_before_it_parses():
-    """``gnn.importers check`` parses the document; the digests must be verified first.
-
-    ``check`` calls ``gnn.importers._validate_spec``, which imports the installed
-    parser and parses every ``*.gnn.md``. The validator is the command that
-    verifies the pin's parser digests before it parses anything, so it has to
-    come first or a tampered parser is executed before its digests are checked.
-    """
-
-    plan = gate._plan("gnn", workdir=Path("<temporary>"), gnn_runtime="/opt/gnn/bin/python")
-
-    assert plan is not None
-    verify = next(
-        index
-        for index, command in enumerate(plan)
-        if any("validate_gnn_spec.py" in part for part in command)
-    )
-    parses = next(
-        index for index, command in enumerate(plan) if "gnn.importers" in command
-    )
-    assert verify < parses
-
-
-def test_gnn_arm_omits_the_reader_without_a_runtime():
-    plan = gate._plan("gnn", workdir=Path("<temporary>"), gnn_runtime=None)
-
-    assert plan is not None
-    assert not any("gnn.importers" in " ".join(command) for command in plan)
 
 
 def test_checkout_runtime_comes_from_the_gnn_checkout(tmp_path, monkeypatch):
@@ -86,10 +27,12 @@ def test_checkout_runtime_comes_from_the_gnn_checkout(tmp_path, monkeypatch):
     python.write_text("", encoding="utf-8")
 
     monkeypatch.setenv("GNN_ROOT", str(tmp_path))
-    assert gate._checkout_runtime() == str(python)
+    monkeypatch.delenv("GNN_RUNTIME_PYTHON", raising=False)
+    monkeypatch.delenv("GNN_PYTHON", raising=False)
+    assert gate.resolve_gnn_runtime() == str(python)
 
     monkeypatch.delenv("GNN_ROOT")
-    assert gate._checkout_runtime() is None
+    assert gate.resolve_gnn_runtime(required=False) is None
 
 
 def test_gnn_arm_without_runtime_cannot_write_a_passing_receipt(tmp_path):
@@ -155,13 +98,33 @@ def test_render_provenance_requires_the_pdf(tmp_path, monkeypatch):
         gate._render_artifact()
 
 
-def test_gnn_arm_always_asks_the_validator_to_resolve_the_tag_upstream():
-    for runtime in (None, "/opt/gnn-runtime/bin/python"):
-        plan = gate._plan("gnn", workdir=Path("<temporary>"), gnn_runtime=runtime)
+def test_workflow_delivers_reviewed_resources_before_release():
+    """Keep immutable resource delivery and release-environment forwarding together."""
+    workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["gnn-conformance"]["steps"]
+    resources = next(step for step in steps if step.get("id") == "resources")
+    release = next(step for step in steps if "--arm all" in step.get("run", ""))
+    assert steps.index(resources) < steps.index(release)
+    script = resources["run"]
+    assert "66d491f86895443cf588011cc6f40c37b8bae8fd/interop" in script
+    assert f"{BOOTSTRAP_SHA256}  gnn_bootstrap.py" in script
+    assert f"{SOURCE_MANIFEST_SHA256}  v5.1.0-source-manifest.json" in script
+    assert script.count("sha256sum --check --strict") == 2
+    assert script.index("sha256sum --check --strict") < script.index('>> "$GITHUB_OUTPUT"')
+    assert release["env"]["GNN_BOOTSTRAP"] == "${{ steps.resources.outputs.bootstrap }}"
+    assert release["env"]["GNN_SOURCE_MANIFEST"] == "${{ steps.resources.outputs.manifest }}"
+    assert release["env"]["GNN_RUNTIME_PYTHON"] == "${{ steps.runtime.outputs.python }}"
 
-        assert plan is not None
-        validator = next(
-            command for command in plan if any("validate_gnn_spec.py" in part for part in command)
-        )
-        assert "--verify-tag-remote" in validator
-        assert validator[-1] == "--json"
+
+def test_failed_captured_command_keeps_real_diagnostics_and_exit(tmp_path, capsys):
+    command = [
+        sys.executable, "-c",
+        "import sys; print('real failure detail'); "
+        "print('real stderr detail', file=sys.stderr); sys.exit(7)",
+    ]
+    with pytest.raises(subprocess.CalledProcessError) as caught:
+        gate._run(command, cwd=tmp_path, capture=True)
+    assert caught.value.returncode == 7
+    captured = capsys.readouterr()
+    assert "real failure detail" in captured.out
+    assert "real stderr detail" in captured.err

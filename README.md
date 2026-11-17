@@ -27,9 +27,10 @@ uv run python scripts/release_check.py --arm all --gnn-runtime /path/to/gnn-runt
 uv run blockference pipeline --config configs/smoke.yml --output-root output
 ```
 
-The release gate requires a separate pinned GNN runtime; replace the example
+The release gate requires a separate pinned GNN runtime and independently
+reviewed `GNN_BOOTSTRAP`/`GNN_SOURCE_MANIFEST` resources; replace the example
 interpreter path above with yours. [`docs/gate.md`](docs/gate.md) defines the
-arms and CI mapping, and [`docs/gnn.md`](docs/gnn.md) explains runtime setup.
+arms and CI mapping, and [`docs/gnn.md`](docs/gnn.md) explains admission/setup.
 
 The CLI has three explicit commands:
 
@@ -44,6 +45,11 @@ summary/model/policies, an NPZ model archive, PNG visualisations, a GIF, a log,
 `manifest.json`, and one aggregate `validation_report.json`. Parquet is an
 optional additional format; CSV and JSON remain required. A non-empty run
 directory is refused unless `--reuse` is supplied explicitly.
+Models, policies, summaries, and visual histories retain `(run, agent)`
+ownership; independent runs are not concatenated. Version-2 artifact layouts
+and exact diagnostic/category checks are documented in
+[`docs/pipeline.md`](docs/pipeline.md). Historical version-1 trees are not
+silently migrated or re-certified.
 
 For single-agent runs, `simulation.initial_state` remains the compatibility
 default. For multi-agent runs (`n_agents > 1`) the simultaneous-transition
@@ -115,10 +121,11 @@ The grid-world generative model is declared in
 the upstream parser pinned in [`specs/gnn-pin.json`](specs/gnn-pin.json)
 (schema `gnn-importer-pin/v1`, GNN v5.1.0, commit
 `75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf`): the estate's shared reader
-`gnn.importers` validates that pin and the [`.github/GNN.md`](.github/GNN.md)
-pointer, and the validator reads the declared parameters back, builds the runtime
-model from them, and requires the declared matrices to match exactly. See [`docs/gnn.md`](docs/gnn.md) for the commands and the
-conformance contract.
+owns pin/pointer validation inside a fully admitted external worker. The
+validator reads declared parameters back, builds the runtime model, and
+requires exact matrices and policy cardinalities. Source execution,
+installed provenance, and scientific adequacy are separate boundaries.
+See [`docs/gnn.md`](docs/gnn.md) for the commands and conformance contract.
 
 GNN maintains a [downstream adoption
 guide](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/main/docs/gnn/integration/downstream_adoption.md)

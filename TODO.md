@@ -1,7 +1,7 @@
 # ActiveBlockference TODO
 
 Owner: Active Inference Institute
-Last reviewed: 2026-11-12
+Last reviewed: 2026-11-14
 
 This file records documentation findings from the 2026-08-02 DOCS-DEEP pass and
 the 2026-11-11 completeness pass, plus the subsequent estate alignment.
@@ -82,19 +82,68 @@ an executable publication validator.
 
 ## Open / deferred
 
-No unresolved documentation finding remains. The Python-floor and pymdp-floor
-reconciliations under **Medium** are complete, not deferred.
+The current candidate is not merged or release-qualified. The dated completed
+items and verification notes below remain historical, not proof for this
+source. Current scope:
 
-One repository defect found in the 2026-11-12 review is open:
+- [x] **B01:** retain per-run/per-agent models and policies; local real-backend
+  and refreshed-manifest association controls passed.
+- [x] **B02:** separate histories, diagnostics, plots, and animation labels by
+  run/agent; real render and artist/data controls passed.
+- [x] **B03:** reviewed artifact-validation controls passed, including six
+  string/float/boolean categorical attacks across actions and observations.
+  Refreshed manifests cannot hide these invalid categorical values.
+- [x] **B04:** malformed artifacts and missing parsed prerequisites fail
+  validation rather than escaping or becoming successful skipped boundaries.
+- [x] **B05:** regenerate only through the exporter; actual pinned-source
+  default, three-action, and singleton-policy parsing passed. Runtime action
+  labels remain distinct from declaration-only numeric policy priors.
+- [ ] **B06:** research-maintainer decision on scientific prose/definitions.
+  Numerical definitions and the held proposed prose remain unchanged.
+- [x] **B07:** one external interpreter-selection contract preserves venv
+  launchers and separate NumPy environments without project-Python fallback.
+- [ ] **B08:** source and installed-origin/content admission controls plus
+  actual pinned parser/importer validation passed in their recorded scopes.
+  The workflow now prepares and forwards checksum-verified immutable producer
+  resources (`66d491f`, bootstrap `f638d4c`, v5.1.0 manifest `43b33c0`). Fresh
+  hosted/full-release acceptance remains required. A strict-origin replacement
+  needs producer qualification and a new public immutable identity; the private
+  candidate is not adopted and full native-ecosystem qualification is not claimed.
+- [x] **B09:** retain actual policy caps and ordered allowed policies.
+- [x] **B10:** preserve built-in integer/string identities, registry order,
+  and established conflict priority through typed serialization.
+- [x] **B11:** normalize extreme finite weights without changing RNG ownership
+  or the EFE definition.
+- [x] **B12:** reject nonmapping configuration roots before output setup,
+  retaining explicit null/default compatibility.
+- [x] **B13:** fresh-wheel selection controls and the actual invocation-owned
+  wheel build, clean-environment installation and isolated import smoke passed.
+- [x] **B14:** metadata-selected confined experiment configuration reaches
+  real dimension-aware rendering.
+- [x] **B15:** relocated composition preserves and resolves local resources;
+  code, citations, external URLs, titles, queries, and fragments are retained.
+- [x] **B16:** one tracked notebook inventory feeds validation/execution;
+  real prepared-kernel execution passed without source output refresh.
+- [x] **B17:** the teaching example owns its seeded generator independently
+  of the global NumPy stream.
+- [x] **B18:** explicit corpus paths are admitted before workspace/provider
+  mutation; offline/literal/default modes retain their existing contracts.
+- [x] **BO1:** document independent graph worlds versus shared occupancy
+  without introducing graph-world collision resolution.
+- [ ] **BO2:** elective optimization/benchmark work requires owner selection,
+  measured workloads, and RNG/invalid-input parity; no speedup claimed.
+- [x] **BO3:** current documentation link/anchor validation passed after
+  replacing retired worker instructions and obsolete GRT descriptions.
+- [ ] **BO4:** optional adapter qualification remains elective and unclaimed;
+  do not reopen its already-set floor or infer incompatibility.
+- [x] **BT01:** retire only the lane's legacy `ignored.csv` with its matching
+  ignore rule. Original bytes remain under private owner-managed custody;
+  no canonical-original deletion or broader CSV cleanup is implied.
 
-- [ ] Remove the stray tracked run dump `ignored.csv` at the repository root.
-      It was committed by 574a5c1 ("updates", 2026-05-10), is a cadCAD record
-      export whose cells hold `ActiveGridference` object reprs, and no file,
-      test, or page in the tree references it. `.gitignore` covers `result.csv`,
-      `results/`, and `output/` but not this name, which is how it was committed.
-      Deleting the file, or adding the matching ignore rule, is a one-file
-      change; git history keeps the content either way. Owner: the maintainer
-      who opens the hygiene PR. Nothing outside this repository blocks it.
+Final quality, full required gates, exact-merge-head proof, hosted CI, review,
+and ordinary governed integration remain open. Existing measurements are not
+rewritten, scientific/owner approvals are not inferred, and canonical figures,
+manuscript outputs, private evidence, and retained storage stay preserved.
 
 ## Verification notes
 

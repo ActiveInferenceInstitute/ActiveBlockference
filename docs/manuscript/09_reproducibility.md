@@ -6,14 +6,17 @@ uses `uv sync --locked --extra dev` for development. The release procedure is:
 ```bash
 uv sync --locked --extra dev
 GNN_RUNTIME_PYTHON="${GNN_RUNTIME_PYTHON:?Set the external pinned GNN runtime Python}" \
+GNN_BOOTSTRAP="${GNN_BOOTSTRAP:?Set the independently reviewed producer bootstrap}" \
+GNN_SOURCE_MANIFEST="${GNN_SOURCE_MANIFEST:?Set the independently reviewed full manifest}" \
 uv run python {{gate_entry_point}} --arm all
 ```
 
 The release selection requires a separately configured external GNN runtime at
 the pinned revision, named by `GNN_RUNTIME_PYTHON` (or a pinned checkout named by
-`GNN_ROOT`); see [`../gnn.md`](../gnn.md) for setup. The `gnn` arm always performs
-real pinned validation and fails when that runtime is unavailable. The gate has
-separately runnable arms (`--list` shows them); `--arm all` is the release
+`GNN_ROOT`), plus the independently reviewed bootstrap and full manifest;
+see [`../gnn.md`](../gnn.md). The `gnn` arm performs real qualified validation
+and fails when required resources, provenance, or exit revalidation are unavailable.
+The gate has separately runnable arms (`--list` shows them); `--arm all` is the release
 selection and the fast default is used while editing.
 
 The generative-model declaration is checked against the pinned upstream parser:
@@ -21,10 +24,10 @@ The generative-model declaration is checked against the pinned upstream parser:
 commit `{{gnn_commit}}`. The conformance job key is `{{gnn_job_key}}` with
 display name `{{gnn_job_name}}`; the pointer
 [`../../.github/GNN.md`](../../.github/GNN.md) records exactly what that job
-parses. The pin and the pointer are validated by the estate's shared reader,
-`python -m gnn.importers check --repo .`, which the `gnn` arm runs from the
-pinned runtime; those same `gnn.importers` facts are what the variables above
-declare, so prose and conformance cannot disagree about the pinned revision.
+parses. The project validator runs the shared producer's pin/pointer check
+and deep conformance in separate qualified external lifetimes. The variables
+above come from checked producer metadata inspection, which is explicitly
+not a source-execution, installed-origin, or scientific qualification verdict.
 
 The canonical command emits a run tree whose completed `manifest.json` and
 independently written `validation_report.json` agree. `PipelineResult.ok` and

@@ -233,14 +233,14 @@ def test_persistence_manifest_and_summary_helpers(tmp_path):
     cfg = ExperimentConfig.from_dict({"output": {"path": None}})
     frame = _frame()
     persist_config(cfg, paths)
-    persist_dataframe(frame, paths)
+    persist_dataframe(frame, paths, models={(1, "0"): frame.iloc[0]["agents"][0]})
     persist_summary(summarise_trajectory(frame), paths)
     agent = ActiveGridference(make_grid(2), planning_length=1)
     agent.get_C((1, 1))
     agent.get_D((0, 0))
-    persist_generative_model({0: agent}, paths)
-    persist_generative_model_npz({0: agent}, paths)
-    persist_policies([np.array([[0]])], paths)
+    persist_generative_model({(1, "0"): agent}, paths)
+    persist_generative_model_npz({(1, "0"): agent}, paths)
+    persist_policies({(1, "0"): [np.array([[0]])]}, paths)
     persist_per_step_records(build_per_step_records(frame), paths)
     assert persist_manifest(paths).is_file()
     assert paths.manifest_json.read_text(encoding="utf-8").find("sha256") >= 0
@@ -297,10 +297,10 @@ def test_validation_rejects_bad_vectors_bounds_and_manifest_entries(tmp_path):
 def test_viz_common_and_renderers_reject_bad_inputs_and_write_outputs(tmp_path):
     frame = _frame()
     assert coerce_cell("[1, 2]") == [1, 2]
-    assert extract_agent_positions(frame)[0] == [(0, 0)]
-    assert extract_action_history(frame)[0] == [3]
-    assert extract_belief_history(frame)[0][0].shape == (4,)
-    assert extract_efe_history(frame)[0][0].shape == (2,)
+    assert extract_agent_positions(frame)[(1, 0)] == [(0, 0)]
+    assert extract_action_history(frame)[(1, 0)] == [3]
+    assert extract_belief_history(frame)[(1, 0)][0].shape == (4,)
+    assert extract_efe_history(frame)[(1, 0)][0].shape == (2,)
     assert infer_grid_dimension(frame) == 2
     for renderer, name in (
         (plot_trajectory, "trajectory.png"),
@@ -363,10 +363,12 @@ def test_atomic_npz_round_trip_is_loadable(tmp_path):
     agent = ActiveGridference(make_grid(2), planning_length=1)
     agent.get_C((1, 1))
     agent.get_D((0, 0))
-    persist_generative_model_npz({0: agent}, paths)
+    persist_generative_model_npz({(1, "0"): agent}, paths)
     with np.load(paths.matrices_npz, allow_pickle=False) as archive:
-        assert set(archive.files) == {"agent_0/A", "agent_0/B", "agent_0/C", "agent_0/D", "agent_0/E"}
-        assert archive["agent_0/A"].shape == (4, 4)
+        assert set(archive.files) == {
+            f"run_1/agent_0/{name}" for name in ("A", "B", "C", "D", "E")
+        }
+        assert archive["run_1/agent_0/A"].shape == (4, 4)
 
 
 def test_trajectory_schema_typed_round_trip(tmp_path):
@@ -382,7 +384,7 @@ def test_trajectory_schema_typed_round_trip(tmp_path):
     assert rec.prior == (1.0, 0.0, 0.0, 0.0)
     # The CSV round-trip preserves the same typed values.
     paths = build_run_paths(tmp_path, "schema").ensure()
-    persist_dataframe(frame, paths)
+    persist_dataframe(frame, paths, models={(1, "0"): frame.iloc[0]["agents"][0]})
     reloaded = pd.read_csv(paths.trajectory_csv)
     assert parse_trajectory_records(reloaded) == records
 
