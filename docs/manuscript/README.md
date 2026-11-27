@@ -54,7 +54,7 @@ bibliography and metadata are copied alongside them and rendering consumes
 those copies. A relocated GNN link still points to its actual source document.
 
 Generating variables requires the reviewed external GNN resources in
-[`../gnn.md`](../gnn.md). Metadata inspection is not a conformance verdict.
+[`../gnn.md`](../reference/gnn.md). Metadata inspection is not a conformance verdict.
 Software composition/render tests do not authorize changing scientific
 definitions, accepting manuscript claims, or refreshing canonical figures.
 

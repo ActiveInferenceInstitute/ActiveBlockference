@@ -12,7 +12,7 @@ uv run python scripts/release_check.py            # fast arms (default)
 uv run python scripts/release_check.py --arm all  # release gate
 ```
 
-Arms are listed in [`docs/gate.md`](docs/gate.md). Use absolute
+Arms are listed in [`docs/development/gate.md`](docs/development/gate.md). Use absolute
 `blockference.*` imports, NumPy-style docstrings, and 100-column Ruff
 formatting. Runtime dependencies belong in `pyproject.toml` and the
 generated `uv.lock`. Do not commit generated result files, caches, virtual
@@ -36,7 +36,7 @@ distinct. Hosted resource delivery is a release prerequisite, not an assumed
 published artifact. The required `gnn-conformance` job runs the `gnn` arm.
 Do not hand-edit `specs/gridworld_3x3.gnn.md`: change the model or fixture in
 `blockference/` and regenerate with `scripts/export_gnn_spec.py`. See
-`docs/gnn.md`.
+`docs/reference/gnn.md`.
 
 ## Contracts
 

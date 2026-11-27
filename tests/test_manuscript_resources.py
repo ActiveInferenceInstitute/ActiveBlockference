@@ -35,7 +35,9 @@ def _publication(tmp_path, monkeypatch):
     for source in builder.FIGURE_DIR.iterdir():
         if source.suffix in {".svg", ".png"}:
             shutil.copy2(source, figures / source.name)
-    shutil.copy2(original_root / "docs" / "gnn.md", root / "docs" / "gnn.md")
+    reference = root / "docs" / "reference"
+    reference.mkdir()
+    shutil.copy2(original_root / "docs" / "reference" / "gnn.md", reference / "gnn.md")
     (root / ".github").mkdir()
     shutil.copy2(original_root / ".github" / "GNN.md", root / ".github" / "GNN.md")
     (root / "configs").mkdir()
@@ -62,7 +64,7 @@ def test_relocated_real_composition_resolves_gnn_bibliography_and_copied_figures
         target = (path.parent / unquote(parsed.path)).resolve()
         assert target.is_file(), destination
         targets.add(target)
-    assert root / "docs" / "gnn.md" in targets
+    assert root / "docs" / "reference" / "gnn.md" in targets
     assert root / ".github" / "GNN.md" in targets
     assert output / "references.bib" in targets
     assert (output / "references.bib").read_bytes() == (manuscript / "references.bib").read_bytes()

@@ -19,8 +19,8 @@ The external worker is `blockference/gnn_source.py`, invoked directly with
 `-I -B` rather than importing the project into the GNN NumPy environment.
 `gnn_parser_probe.py` and `gnn_importer_report.py` are retired. Select the
 prepared interpreter and reviewed bootstrap/full manifest per
-[`../docs/gnn.md`](../docs/gnn.md) before release. Missing inputs fail.
-[`../docs/gate.md`](../docs/gate.md) owns the arm commands, CI mapping,
+[`../docs/gnn.md`](../docs/reference/gnn.md) before release. Missing inputs fail.
+[`../docs/gate.md`](../docs/development/gate.md) owns the arm commands, CI mapping,
 `--timings PATH` recording and metrics-import workflow.
 
 The gate reuses the already-synced locked project environment by setting

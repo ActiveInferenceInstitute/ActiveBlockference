@@ -29,5 +29,5 @@ print(agent.D.sum()) # 1.0
 are one-hot vectors after `get_C` and `get_D`.
 
 What to try next: compare the single-agent inference loop in
-[`theory.md`](../theory.md) with the complete persisted run in
+[`theory.md`](../design/theory.md) with the complete persisted run in
 [`03_cadcad_pipeline.md`](03_cadcad_pipeline.md).

@@ -19,12 +19,12 @@ mypy targets the `requires-python` floor (`python_version = "3.11"` in
 execution, real-pipeline integration, CLI smoke, and figure-byte checks carry
 the `slow` marker and are excluded from `--arm test`. The recorded before/after
 arm times, including the render arm, are in
-[`_generated/gate-metrics.md`](_generated/gate-metrics.md).
+[`_generated/gate-metrics.md`](../_generated/gate-metrics.md).
 
 The `gnn` arm performs exporter drift checks and invokes the project validator,
 which owns deep conformance and the shared importer check inside independent
 qualified external lifetimes. Select the separate runtime and reviewed
-`GNN_BOOTSTRAP`/`GNN_SOURCE_MANIFEST` resources per [`gnn.md`](gnn.md).
+`GNN_BOOTSTRAP`/`GNN_SOURCE_MANIFEST` resources per [`gnn.md`](../reference/gnn.md).
 Missing resources, installed provenance, or failed exit revalidation fail;
 there is no unchecked direct-import or project-Python fallback.
 CI's Python 3.12 `gnn-conformance` job selects `all`; reviewed resource delivery
@@ -52,7 +52,7 @@ virtual environments; `uv.lock` is intentionally tracked.
 
 The manuscript source is under `docs/manuscript/`. Its ordered Markdown files,
 `config.yaml`, `references.bib`, and `figures/` are the publication record.
-[`figure-registry.json`](manuscript/figure-registry.json) records the figure
+[`figure-registry.json`](../manuscript/figure-registry.json) records the figure
 sources and artifacts. `scripts/build_manuscript.py` composes a numbered
 Markdown manuscript; its authoritative PDF command is
 `uv run python scripts/build_manuscript.py --render pdf`, also selected by the

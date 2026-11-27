@@ -15,8 +15,8 @@ then owns deep conformance and the producer's syntax/pointer/workflow/job
 check in separate isolated qualified lifetimes. The shared producer remains
 authoritative for pin discovery and validation. Missing resources, runtime,
 installed provenance, or exit revalidation fail rather than skip. See
-[`docs/gate.md`](../docs/gate.md) for the complete job and arm map, and
-[`docs/gnn.md`](../docs/gnn.md) for standalone validation commands.
+[`docs/development/gate.md`](../docs/development/gate.md) for the complete job and arm map, and
+[`docs/reference/gnn.md`](../docs/reference/gnn.md) for standalone validation commands.
 
 Independent full-package content and actual module ownership are admitted
 before target GNN execution and revalidated at verdict exit. The validator

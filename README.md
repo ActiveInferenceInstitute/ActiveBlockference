@@ -29,8 +29,8 @@ uv run blockference pipeline --config configs/smoke.yml --output-root output
 
 The release gate requires a separate pinned GNN runtime and independently
 reviewed `GNN_BOOTSTRAP`/`GNN_SOURCE_MANIFEST` resources; replace the example
-interpreter path above with yours. [`docs/gate.md`](docs/gate.md) defines the
-arms and CI mapping, and [`docs/gnn.md`](docs/gnn.md) explains admission/setup.
+interpreter path above with yours. [`docs/development/gate.md`](docs/development/gate.md) defines the
+arms and CI mapping, and [`docs/reference/gnn.md`](docs/reference/gnn.md) explains admission/setup.
 
 The CLI has three explicit commands:
 
@@ -48,7 +48,7 @@ directory is refused unless `--reuse` is supplied explicitly.
 Models, policies, summaries, and visual histories retain `(run, agent)`
 ownership; independent runs are not concatenated. Version-2 artifact layouts
 and exact diagnostic/category checks are documented in
-[`docs/pipeline.md`](docs/pipeline.md). Historical version-1 trees are not
+[`docs/design/pipeline.md`](docs/design/pipeline.md). Historical version-1 trees are not
 silently migrated or re-certified.
 
 For single-agent runs, `simulation.initial_state` remains the compatibility
@@ -125,7 +125,7 @@ owns pin/pointer validation inside a fully admitted external worker. The
 validator reads declared parameters back, builds the runtime model, and
 requires exact matrices and policy cardinalities. Source execution,
 installed provenance, and scientific adequacy are separate boundaries.
-See [`docs/gnn.md`](docs/gnn.md) for the commands and conformance contract.
+See [`docs/reference/gnn.md`](docs/reference/gnn.md) for the commands and conformance contract.
 
 GNN maintains a [downstream adoption
 guide](https://github.com/ActiveInferenceInstitute/Generalized_Notation_Notation/blob/main/docs/gnn/integration/downstream_adoption.md)
@@ -134,9 +134,9 @@ for repositories that consume the notation.
 See [`docs/README.md`](docs/README.md) for the documentation hub and
 [`docs/documentation-index.md`](docs/documentation-index.md) for the flat index
 of long-lived documents, plus
-[`docs/api.md`](docs/api.md), [`docs/pipeline.md`](docs/pipeline.md), and
-[`docs/development.md`](docs/development.md) for the complete contracts and
-workflow. Contributions are described in [`docs/contributing.md`](docs/contributing.md);
+[`docs/reference/api.md`](docs/reference/api.md), [`docs/design/pipeline.md`](docs/design/pipeline.md), and
+[`docs/development/README.md`](docs/development/README.md) for the complete contracts and
+workflow. Contributions are described in [`docs/development/contributing.md`](docs/development/contributing.md);
 security issues are reported privately per [`SECURITY.md`](SECURITY.md); the
 repository is released under the [MIT License](LICENSE).
 

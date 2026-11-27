@@ -14,7 +14,7 @@ do not edit them by hand. This README explains the producers.
 elapsed times. Repeat `--record-baseline PATH` for disjoint pre-change selections;
 `--record-timings PATH` imports one combined current receipt into the canonical
 record before generating `gate-metrics.md`. See
-[`../gate.md`](../gate.md) for the authoritative recording and import commands.
+[`../gate.md`](../development/gate.md) for the authoritative recording and import commands.
 
 The before/after records are one-run, host-specific evidence, not a controlled
 benchmark or a claimed speedup. The offline package baseline cache miss is a

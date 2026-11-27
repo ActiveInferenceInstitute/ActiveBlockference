@@ -20,15 +20,15 @@ Choose the shortest path for your goal:
 | Goal | Entry point |
 | --- | --- |
 | Install and run the library | [`README.md`](../README.md) |
-| Understand the public API | [`docs/api.md`](../docs/api.md) |
+| Understand the public API | [`docs/reference/api.md`](../docs/reference/api.md) |
 | Run a first experiment | [`docs/tutorials/01_single_agent.md`](../docs/tutorials/01_single_agent.md) |
-| Configure a reproducible pipeline | [`docs/pipeline.md`](../docs/pipeline.md) and [`configs/README.md`](../configs/README.md) |
-| Understand the model and coordinates | [`docs/theory.md`](../docs/theory.md) and [`docs/architecture.md`](../docs/architecture.md) |
-| Read the generative-model specification | [`docs/gnn.md`](../docs/gnn.md) and [`specs/gridworld_3x3.gnn.md`](../specs/gridworld_3x3.gnn.md) |
+| Configure a reproducible pipeline | [`docs/design/pipeline.md`](../docs/design/pipeline.md) and [`configs/README.md`](../configs/README.md) |
+| Understand the model and coordinates | [`docs/design/theory.md`](../docs/design/theory.md) and [`docs/design/architecture.md`](../docs/design/architecture.md) |
+| Read the generative-model specification | [`docs/reference/gnn.md`](../docs/reference/gnn.md) and [`specs/gridworld_3x3.gnn.md`](../specs/gridworld_3x3.gnn.md) |
 | Explore executable examples | [`notebooks/README.md`](../notebooks/README.md) |
 | Read the publication source | [`docs/manuscript/README.md`](../docs/manuscript/README.md) |
 | Trace publication figures to their sources | [`docs/manuscript/figure-registry.json`](../docs/manuscript/figure-registry.json) |
-| Contribute or report a bug | [`docs/contributing.md`](../docs/contributing.md) |
+| Contribute or report a bug | [`docs/development/contributing.md`](../docs/development/contributing.md) |
 | Report a security issue | [`SECURITY.md`](../SECURITY.md) |
 
 ## Quick start
@@ -91,7 +91,7 @@ mypy, the test suite, notebook hygiene and execution, real pipeline and CLI
 smoke checks, manuscript validation/build drift, and a wheel import smoke.
 The full test suite therefore runs on both Python versions without a separate
 `gate` job. PDF rendering remains an explicit local `--arm render` selection.
-[`docs/gate.md`](../docs/gate.md) defines the arms, runtime-aware local
+[`docs/development/gate.md`](../docs/development/gate.md) defines the arms, runtime-aware local
 commands, and exact pinned `astral-sh/setup-uv` action; this workflow does not
 use the Institute setup composite.
 [`docs/_generated/gate-metrics.md`](../docs/_generated/gate-metrics.md) holds
@@ -104,8 +104,8 @@ docs. The release gate's `gnn` arm always validates
 `specs/gridworld_3x3.gnn.md` against the declared runtime model using the pinned
 parser. The gate is intentionally fail-closed: a missing GNN runtime, required
 backend, or generated artifact cannot turn a required check into a skip. See
-[`docs/development.md`](../docs/development.md) for the development workflow
-and [`docs/design-contract.md`](../docs/design-contract.md) for the project
+[`docs/development/README.md`](../docs/development/README.md) for the development workflow
+and [`docs/design/design-contract.md`](../docs/design/design-contract.md) for the project
 scope and invariants.
 
 ## Repository map
@@ -130,6 +130,6 @@ formal assumptions, supported backends, determinism guarantees, and known
 limitations are documented in the design contract and manuscript.
 
 The project is released under the [MIT License](../LICENSE). Contributions
-should follow [`docs/contributing.md`](../docs/contributing.md); security
+should follow [`docs/development/contributing.md`](../docs/development/contributing.md); security
 reports should use the private GitHub advisory path described in
 [`SECURITY.md`](../SECURITY.md).

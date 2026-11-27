@@ -116,12 +116,12 @@ Exit codes are `0` pass, `1` conformance failure, and `2` unavailable required
 runtime/resources/origin or requested tag resolution. Missing prerequisites
 are not passes. CI provisions the checksum-verified reviewed bootstrap and full
 manifest alongside its pinned runtime; this wiring is not itself hosted,
-installed, or full-release acceptance. See [`gate.md`](gate.md).
+installed, or full-release acceptance. See [`gate.md`](../development/gate.md).
 
 ## What the validation checks
 
 1. The shared producer reports the pin and requires
-   [`.github/GNN.md`](../.github/GNN.md) to name its file, revision, workflow
+   [`.github/GNN.md`](../../.github/GNN.md) to name its file, revision, workflow
    `.github/workflows/ci.yml`, and job `gnn-conformance`.
 2. Independent bootstrap/full-manifest admission precedes all target GNN
    execution. Actual imported modules and verdict exit revalidation must

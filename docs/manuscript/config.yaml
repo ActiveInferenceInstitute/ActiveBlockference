@@ -1,3 +1,5 @@
+manuscript_dir: "docs/manuscript"
+
 paper:
   title: "ActiveBlockference: Strict Discrete Active Inference on Deterministic Grid Worlds"
   subtitle: "A reproducible Python implementation with validated dynamics and artefact round-trips"

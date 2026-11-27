@@ -51,11 +51,11 @@ uv run ruff check  blockference tests
 If you change a public surface, update:
 
 * The relevant module docstring.
-* `docs/api.md`.
-* `docs/architecture.md` if you change layering.
+* `docs/reference/api.md`.
+* `docs/design/architecture.md` if you change layering.
 * The folder-local `README.md` table.
-* [`documentation-index.md`](documentation-index.md) when adding a long-lived guide.
-* [`manuscript/figure-registry.json`](manuscript/figure-registry.json) when changing
+* [`documentation-index.md`](../documentation-index.md) when adding a long-lived guide.
+* [`manuscript/figure-registry.json`](../manuscript/figure-registry.json) when changing
   a publication figure's source or artifact mapping.
 
 Gate timings and counts belong only in generated metrics. Import real
@@ -73,7 +73,7 @@ A reviewer will look at correctness, scope, and doc/test parity.
 
 ## Folder ownership
 
-See the table in the root [`AGENTS.md`](../AGENTS.md). Each folder also
+See the table in the root [`AGENTS.md`](../../AGENTS.md). Each folder also
 ships its own `AGENTS.md` with local rules.
 
 ## Reporting issues
