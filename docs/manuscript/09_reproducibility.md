@@ -14,7 +14,7 @@ uv run python {{gate_entry_point}} --arm all
 The release selection requires a separately configured external GNN runtime at
 the pinned revision, named by `GNN_RUNTIME_PYTHON` (or a pinned checkout named by
 `GNN_ROOT`), plus the independently reviewed bootstrap and full manifest;
-see [`../gnn.md`](../gnn.md). The `gnn` arm performs real qualified validation
+see [`../gnn.md`](../reference/gnn.md). The `gnn` arm performs real qualified validation
 and fails when required resources, provenance, or exit revalidation are unavailable.
 The gate has separately runnable arms (`--list` shows them); `--arm all` is the release
 selection and the fast default is used while editing.

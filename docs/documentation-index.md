@@ -8,7 +8,7 @@ Flat index of the repository's long-lived documents. Generated facts live under
 - [`../README.md`](../README.md) — installation, quick start, public API, and repository map.
 - [`README.md`](README.md) — documentation hub and reading order.
 - [`../.github/README.md`](../.github/README.md) — GitHub-facing signpost.
-- [`contributing.md`](contributing.md) — contribution flow.
+- [`contributing.md`](development/contributing.md) — contribution flow.
 - [`../AGENTS.md`](../AGENTS.md) — repository contributor guidance; folder-local `AGENTS.md` files refine it.
 - [`../SECURITY.md`](../SECURITY.md) — private security reporting.
 - [`../LICENSE`](../LICENSE) — license terms.
@@ -16,17 +16,17 @@ Flat index of the repository's long-lived documents. Generated facts live under
 
 ## Concepts and contracts
 
-- [`theory.md`](theory.md) — discrete Active Inference loop and matrix conventions.
-- [`architecture.md`](architecture.md) — module boundaries and data flow.
-- [`api.md`](api.md) — public Python and CLI contracts.
-- [`pipeline.md`](pipeline.md) — configuration, output tree, and validation.
-- [`design-contract.md`](design-contract.md) — scope, constraints, and release gates.
-- [`glossary.md`](glossary.md) — recurring terms and symbols.
-- [`migration-v1.md`](migration-v1.md) — compatibility and upgrade boundaries.
+- [`theory.md`](design/theory.md) — discrete Active Inference loop and matrix conventions.
+- [`architecture.md`](design/architecture.md) — module boundaries and data flow.
+- [`api.md`](reference/api.md) — public Python and CLI contracts.
+- [`pipeline.md`](design/pipeline.md) — configuration, output tree, and validation.
+- [`design-contract.md`](design/design-contract.md) — scope, constraints, and release gates.
+- [`glossary.md`](reference/glossary.md) — recurring terms and symbols.
+- [`migration-v1.md`](reference/migration-v1.md) — compatibility and upgrade boundaries.
 
 ## Specification and conformance
 
-- [`gnn.md`](gnn.md) — GNN declaration, pinned parser validation, and commands.
+- [`gnn.md`](reference/gnn.md) — GNN declaration, pinned parser validation, and commands.
 - [`../specs/README.md`](../specs/README.md) — GNN document and pin record.
 - [`../.github/GNN.md`](../.github/GNN.md) — what the conformance job parses.
 - [`../specs/gridworld_3x3.gnn.md`](../specs/gridworld_3x3.gnn.md) — canonical generated model declaration.
@@ -34,8 +34,8 @@ Flat index of the repository's long-lived documents. Generated facts live under
 
 ## Development and operations
 
-- [`development.md`](development.md) — locked development workflow.
-- [`gate.md`](gate.md) — gate arms, CI job map, and generated metrics.
+- [`development.md`](development/README.md) — locked development workflow.
+- [`gate.md`](development/gate.md) — gate arms, CI job map, and generated metrics.
 - [`../scripts/README.md`](../scripts/README.md) — gate and generator scripts.
 - [`../tests/README.md`](../tests/README.md) — test layout and gate equivalence.
 - [`../.github/workflows/README.md`](../.github/workflows/README.md) — workflow entry point.
@@ -96,3 +96,5 @@ Flat index of the repository's long-lived documents. Generated facts live under
 - [`../.aii/docs/README.md`](../.aii/docs/README.md) — sidecar document index.
 - [`../.aii/docs/INTEGRATION.md`](../.aii/docs/INTEGRATION.md) — federation and metadata operations.
 - [`../REVIEW_LOG_2026-08-02.md`](../REVIEW_LOG_2026-08-02.md) — historical review record, not current gate evidence.
+- [reference/README.md](reference/README.md)
+- [design/README.md](design/README.md)

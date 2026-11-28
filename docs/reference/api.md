@@ -54,7 +54,7 @@ engine)` is the typed primitive wrapper. Engine names are `radcad` and `cadcad`.
 
 Run the complete local release gate with
 `uv run python scripts/release_check.py --arm all`; the no-argument default is
-the fast selection. See [`gate.md`](gate.md).
+the fast selection. See [`gate.md`](../development/gate.md).
 
 ## Persistence and validation
 
@@ -67,7 +67,7 @@ dimensions, border, policy length, and the actual policy cap.
 Focused model, policy, and per-step validators require their parsed
 configuration/model/trajectory prerequisites. Missing prerequisites fail.
 The version-2 artifact and summary layouts, schedules, and required renders
-are defined in [`pipeline.md`](pipeline.md); refreshing hashes never replaces
+are defined in [`pipeline.md`](../design/pipeline.md); refreshing hashes never replaces
 identity or value validation.
 
 ## GNN, manuscript, and notebook consumers
@@ -86,13 +86,13 @@ constitute source execution, installed-origin, or scientific qualification.
 `load_manuscript_experiment` reads the confined repository-relative
 `experiment.config_path` in manuscript metadata through the typed YAML/TOML
 loader. Missing or escaping selections do not fall back to a default file.
-See [`manuscript/README.md`](manuscript/README.md) for relocated resources.
+See [`manuscript/README.md`](../manuscript/README.md) for relocated resources.
 
 `blockference.notebook_inventory` owns `tracked_notebooks`,
 `validate_notebook`, `validate_all`, and `execute_notebooks`.
 `validate_all` returns `(frozen_paths, failures)`; execution validates and
 executes that frozen tracked selection in its supplied workspace.
-See [`../notebooks/README.md`](../notebooks/README.md) for selection and kernel
+See [`../notebooks/README.md`](../../notebooks/README.md) for selection and kernel
 boundaries.
 
 ## CLI

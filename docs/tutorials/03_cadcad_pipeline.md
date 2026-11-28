@@ -27,8 +27,8 @@ scientific hypothesis has been empirically established.
 
 The example uses radCAD by default. Set `engine: cadcad` in a copied
 configuration to exercise the alternative backend under the same state-update
-contract. See [`pipeline.md`](../pipeline.md) for the required run tree and
-[`development.md`](../development.md) for the complete release gate.
+contract. See [`pipeline.md`](../design/pipeline.md) for the required run tree and
+[`development.md`](../development/README.md) for the complete release gate.
 
 What to try next: replace `target: random` with a bounded `[y, x]` target, or
 run `configs/smoke.yml` as the smallest configured example.

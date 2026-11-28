@@ -19,5 +19,5 @@ on Python 3.12. Missing prerequisites fail. There is no separate `gate` job;
 PDF rendering remains an explicit local arm.
 
 The workflow uses pinned `astral-sh/setup-uv` directly, not the Institute
-composite. [`../../docs/gate.md`](../../docs/gate.md) is authoritative for the
+composite. [`../../docs/gate.md`](../../docs/development/gate.md) is authoritative for the
 exact action pin, gate commands, and measured-receipt workflow.

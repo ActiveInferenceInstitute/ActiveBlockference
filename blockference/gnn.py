@@ -18,7 +18,7 @@ the single canonical construction shared by both directions:
 The pin record in ``specs/gnn-pin.json`` names the exact upstream revision whose
 parser validates the document. The pin is read by the upstream
 ``gnn.importers`` reader, which this repository calls instead of keeping its own;
-see ``docs/gnn.md`` for the commands.
+see ``docs/reference/gnn.md`` for the commands.
 """
 
 from __future__ import annotations

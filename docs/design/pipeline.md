@@ -110,4 +110,4 @@ mutable metadata and are deliberately excluded from the manifest digest.
 
 The complete local release gate is
 `uv run python scripts/release_check.py --arm all`; the no-argument default is
-the fast selection. See [`gate.md`](gate.md).
+the fast selection. See [`gate.md`](../development/gate.md).

@@ -15,7 +15,7 @@ verifies their source-owned SHA-256 digests before use; never invent download
 URLs or weaken admission. Missing prerequisites fail, never skip. PDF rendering remains
 an explicit local `--arm render` selection. The workflow uses pinned
 `astral-sh/setup-uv` directly, not the Institute composite; see
-[`../docs/gate.md`](../docs/gate.md) for the exact action and command map.
+[`../docs/gate.md`](../docs/development/gate.md) for the exact action and command map.
 
 Manuscript figure bytes are written by the host toolchain, and `uv.lock`
 resolves different matplotlib versions for different Python versions, so the

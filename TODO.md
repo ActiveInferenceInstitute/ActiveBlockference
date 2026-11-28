@@ -33,7 +33,7 @@ Items are grouped by the size of the documentation change required:
 - [x] Rewrite the three tutorials as short runnable stories with prerequisites,
       current API/CLI examples, assertions or validation steps, and next steps.
       (55055c4)
-- [x] Remove the nonexistent PR-template claim from `docs/contributing.md` and
+- [x] Remove the nonexistent PR-template claim from `docs/development/contributing.md` and
       describe the actual pull-request information expected. (e67253c)
 - [x] Add a stdlib-only Markdown link/anchor validator
       (`scripts/check_docs_links.py`), a negative-controls test, and a release
@@ -148,14 +148,14 @@ manuscript outputs, private evidence, and retained storage stay preserved.
 ## Verification notes
 
 The earlier completeness pass verified the documented single-agent and
-multi-agent Python examples, the `docs/api.md` pipeline example, the tutorial
+multi-agent Python examples, the `docs/reference/api.md` pipeline example, the tutorial
 snippets, Ruff, manuscript validation/build drift checks, and repository-wide
 relative Markdown links and anchors. These are historical verification notes,
 not results from the estate alignment.
 
 The estate documentation edits were reviewed by reasoning only; integrated
 verification belongs to the canonical release selection in
-[`docs/gate.md`](docs/gate.md), with a configured pinned GNN runtime. The
+[`docs/development/gate.md`](docs/development/gate.md), with a configured pinned GNN runtime. The
 generated metrics and receipts record actual runs, including failures.
 
 On 2026-11-12 the `docs` arm (`scripts/check_docs_links.py` and

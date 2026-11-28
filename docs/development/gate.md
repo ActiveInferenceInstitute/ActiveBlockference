@@ -1,7 +1,7 @@
 # Gate and CI
 
 One entry point runs every local gate:
-[`../scripts/release_check.py`](../scripts/release_check.py). Each arm is a
+[`../scripts/release_check.py`](../../scripts/release_check.py). Each arm is a
 separately runnable selection, and CI invokes the same arms instead of keeping a
 second copy of any command.
 
@@ -15,14 +15,14 @@ Run `uv sync --locked --extra dev` before the gate. Its child commands set
 `UV_NO_SYNC=1` to reuse that prepared project environment instead of repeating
 dependency synchronization.
 Release selections also require the independently reviewed `GNN_BOOTSTRAP`
-and `GNN_SOURCE_MANIFEST` inputs described in [`gnn.md`](gnn.md).
+and `GNN_SOURCE_MANIFEST` inputs described in [`gnn.md`](../reference/gnn.md).
 
 Captured command failures retain their original stdout and stderr before the
 nonzero exit is recorded. A failed pytest/coverage arm cannot hide its
 diagnostics or become a passing receipt.
 
 Measured wall times and test counts live in the generated
-[`_generated/gate-metrics.md`](_generated/gate-metrics.md), which shows the
+[`_generated/gate-metrics.md`](../_generated/gate-metrics.md), which shows the
 recorded before/after arm times and labels baseline workloads that are not
 equivalent to their arms. These are one-run, host-specific receipts, not a
 controlled benchmark or a claimed speedup. The offline package baseline failed
@@ -53,12 +53,12 @@ the fast arm. They stay in `test-full`.
 
 ## GNN conformance
 
-The canonical pin is [`../specs/gnn-pin.json`](../specs/gnn-pin.json) with schema
+The canonical pin is [`../specs/gnn-pin.json`](../../specs/gnn-pin.json) with schema
 `gnn-importer-pin/v1`. It pins
 `ActiveInferenceInstitute/Generalized_Notation_Notation` at `v5.1.0`
 (`75c834bd8519dc7b5adc4d24f16bf393cfd1ecdf`) and records SHA-256 digests for the
 five parser files under `src/gnn/`. The pointer
-[`../.github/GNN.md`](../.github/GNN.md) records exactly what the conformance
+[`../.github/GNN.md`](../../.github/GNN.md) records exactly what the conformance
 job parses.
 
 The conformance job's key is `gnn-conformance` and its display name is
@@ -71,7 +71,7 @@ in separate isolated, qualified lifetimes. No trailing unchecked
 `python -m gnn.importers` command bypasses admission.
 
 Select the external interpreter and independently reviewed bootstrap/full
-manifest as described in [`gnn.md`](gnn.md). Admission binds complete content
+manifest as described in [`gnn.md`](../reference/gnn.md). Admission binds complete content
 and actual module ownership through verdict exit; five parser hashes alone
 are insufficient. Installed mode additionally needs real canonical PEP610 Git
 provenance. Source-artifact proof is separately labelled and never becomes an
@@ -84,7 +84,7 @@ contents. Protocol unit controls are not an actual build/install smoke.
 
 ## GitHub Actions
 
-[`../.github/workflows/ci.yml`](../.github/workflows/ci.yml) calls these arms:
+[`../.github/workflows/ci.yml`](../../.github/workflows/ci.yml) calls these arms:
 
 | Job | Arms |
 | --- | --- |
@@ -104,7 +104,7 @@ bootstrap and full v5.1.0 manifest from immutable producer resource commit
 digests, and forwards their paths to `all`. That delivery revision is not a
 parser repin. Acquisition or digest failure stops the job before execution.
 The bootstrap's known strict-origin limitation and the separate producer
-qualification prerequisite are retained in [`gnn.md`](gnn.md).
+qualification prerequisite are retained in [`gnn.md`](../reference/gnn.md).
 
 The workflow installs uv directly with
 `astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2` (`v10.3.3`,

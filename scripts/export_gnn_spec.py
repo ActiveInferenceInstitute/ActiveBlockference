@@ -7,7 +7,7 @@ declared matrices cannot drift from the runtime model:
     uv run python scripts/export_gnn_spec.py --check   # verify (release gate)
 
 The pinned upstream parser validation is a separate, explicit step:
-``uv run python scripts/validate_gnn_spec.py`` (see ``docs/gnn.md``).
+``uv run python scripts/validate_gnn_spec.py`` (see ``docs/reference/gnn.md``).
 """
 
 from __future__ import annotations

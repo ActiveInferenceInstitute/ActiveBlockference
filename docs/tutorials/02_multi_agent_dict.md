@@ -20,7 +20,7 @@ unavailable, which makes swaps deterministic and safe.
 
 The environment uses `(y, x)` coordinates and validates all positions and
 actions. For configured multi-agent simulation runs, provide distinct starts
-through `simulation.initial_states`; see [`pipeline.md`](../pipeline.md).
+through `simulation.initial_states`; see [`pipeline.md`](../design/pipeline.md).
 
 What to try next: change the two actions to test a boundary or a swap, then
-inspect the environment contract in [`architecture.md`](../architecture.md).
+inspect the environment contract in [`architecture.md`](../design/architecture.md).

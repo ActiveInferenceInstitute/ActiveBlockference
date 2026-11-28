@@ -70,7 +70,9 @@ def test_figure_registry_mismatches_fail_validation_and_build(
     manuscript = builder.MANUSCRIPT_DIR
     copied = tmp_path / "docs" / "manuscript"
     copied.mkdir(parents=True)
-    (copied.parent / "gnn.md").write_text("# GNN\n", encoding="utf-8")
+    reference = copied.parent / "reference"
+    reference.mkdir()
+    (reference / "gnn.md").write_text("# GNN\n", encoding="utf-8")
     pointer = tmp_path / ".github" / "GNN.md"
     pointer.parent.mkdir()
     pointer.write_text("# GNN\n", encoding="utf-8")

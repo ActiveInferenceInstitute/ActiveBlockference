@@ -43,7 +43,7 @@ notebook, and manuscript claims against the implementation.
    configuration, and explicit beginner entry path.
 3. The three tutorials were short fragments despite their local contract saying
    each should be a runnable end-to-end story with prerequisites and next steps.
-4. `docs/contributing.md` instructed contributors to fill in a PR template, but
+4. `docs/development/contributing.md` instructed contributors to fill in a PR template, but
    no PR template exists under `.github/`.
 
 ### Major — 0 findings
@@ -73,14 +73,14 @@ was warranted.
   mechanism (no invented contacts) and documenting factual security-relevant
   project behaviour; linked it from the root README. (96a02e3)
 - Added README CI/license badges, recorded the validator in
-  `docs/development.md` and `tests/README.md`, and corrected two prose issues
-  (paragraph wrap in `docs/architecture.md`; a redundant clause in
+  `docs/development/README.md` and `tests/README.md`, and corrected two prose issues
+  (paragraph wrap in `docs/design/architecture.md`; a redundant clause in
   `docs/manuscript/02_formal_model.md`). (96a02e3)
 
 ## Validation performed
 
 - Executed the README API example after correction.
-- Executed the `docs/api.md` pipeline example.
+- Executed the `docs/reference/api.md` pipeline example.
 - Executed the tutorial Python examples and checked the pipeline CLI commands
   against the current CLI definition.
 - Ran the repo-wide relative Markdown link/anchor audit: no remaining internal

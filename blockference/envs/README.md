@@ -12,4 +12,4 @@ duplicate IDs, malformed typed records, and lossy legacy payloads are rejected.
 
 `p_actinf_dict` uses shared occupancy and realized-state priors.
 `actinf_graph` nodes have independent worlds: equal coordinates across nodes
-are not collisions. See [`../../docs/design-contract.md`](../../docs/design-contract.md).
+are not collisions. See [`../../docs/design-contract.md`](../../docs/design/design-contract.md).
